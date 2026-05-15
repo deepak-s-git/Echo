@@ -1,0 +1,32 @@
+import SwiftUI
+import AppKit
+
+@main
+struct EchoApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environmentObject(appDelegate.appStore)
+                .environmentObject(appDelegate.sessionStore)
+                .environmentObject(appDelegate.activityStore)
+                .environmentObject(appDelegate.permissionsManager)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .commands {
+            EchoCommands()
+        }
+
+        MenuBarExtra {
+            MenuBarView()
+                .environmentObject(appDelegate.appStore)
+                .environmentObject(appDelegate.sessionStore)
+                .environmentObject(appDelegate.activityStore)
+        } label: {
+            MenuBarLabel()
+        }
+        .menuBarExtraStyle(.window)
+    }
+}

@@ -43,7 +43,7 @@ actor SessionEngine {
             return
         }
         // Wire idle monitor → session boundary
-        await idleMonitor.onIdleStateChange = { [weak self] isIdle in
+        await idleMonitor.setOnIdleStateChange { [weak self] isIdle in
             if isIdle {
                 Task { await self?.endCurrentSession(reason: .idle) }
             }

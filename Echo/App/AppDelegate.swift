@@ -2,14 +2,16 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
-    private(set) var container: ServiceContainer?
+    // MARK: - Stores (created eagerly so SwiftUI can access them immediately)
 
-    // MARK: - Store accessors for SwiftUI environment injection
+    let appStore = AppStore()
+    let sessionStore = SessionStore()
+    let activityStore = ActivityStore()
+    let permissionsManager = PermissionsManager()
 
-    var appStore: AppStore { container!.appStore }
-    var sessionStore: SessionStore { container!.sessionStore }
-    var activityStore: ActivityStore { container!.activityStore }
-    var permissionsManager: PermissionsManager { container!.permissionsManager }
+    // MARK: - Container
+
+    private var container: ServiceContainer?
 
     // MARK: - Lifecycle
 
@@ -17,12 +19,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWindow.allowsAutomaticWindowTabbing = false
 
         do {
-            container = try ServiceContainer()
+            container = try ServiceContainer(
+                appStore: appStore,
+                sessionStore: sessionStore,
+                activityStore: activityStore,
+                permissionsManager: permissionsManager
+            )
         } catch {
             // Container failed to init (e.g. DB can't be created).
             // Show error UI without crashing.
-            let fallback = FallbackContainer(error: error)
-            container = fallback.asServiceContainer()
+            appStore.setFailed(error)
             return
         }
 
@@ -43,21 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { container?.appStore.showMainWindow() }
+        if !flag { appStore.showMainWindow() }
         return true
-    }
-}
-
-// MARK: - FallbackContainer
-
-/// Provides a no-op ServiceContainer so the app can show an error UI
-/// rather than crashing if bootstrap fails.
-private struct FallbackContainer {
-    let error: Error
-
-    func asServiceContainer() -> ServiceContainer? {
-        // In practice: set appStore.setFailed(error) through an alternate init.
-        // Left as a stub; implement when error UI is built.
-        nil
     }
 }

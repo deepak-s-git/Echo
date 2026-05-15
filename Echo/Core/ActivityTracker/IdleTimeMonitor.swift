@@ -15,6 +15,10 @@ actor IdleTimeMonitor {
         self.threshold = threshold
     }
 
+    func setOnIdleStateChange(_ handler: (@MainActor (Bool) -> Void)?) {
+        onIdleStateChange = handler
+    }
+
     func start() {
         guard monitorTask == nil else { return }
         monitorTask = Task { [weak self] in

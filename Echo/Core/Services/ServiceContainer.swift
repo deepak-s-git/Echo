@@ -5,7 +5,7 @@ import Foundation
 @MainActor
 final class ServiceContainer {
 
-    // MARK: - Stores (SwiftUI-facing)
+    // MARK: - Stores (injected from AppDelegate)
     let appStore: AppStore
     let sessionStore: SessionStore
     let activityStore: ActivityStore
@@ -19,14 +19,18 @@ final class ServiceContainer {
 
     // MARK: - Init
 
-    init() throws {
+    init(
+        appStore: AppStore,
+        sessionStore: SessionStore,
+        activityStore: ActivityStore,
+        permissionsManager: PermissionsManager
+    ) throws {
         let db = try DatabaseManager()
         let tracker = ActivityTracker()
         let idleMonitor = IdleTimeMonitor(threshold: EchoConfig.sessionIdleTimeout)
 
-        let appStore = AppStore()
-        let activityStore = ActivityStore()
-        let sessionStore = SessionStore(repository: SessionRepository(database: db))
+        // Wire the repository into the session store now that DB is ready
+        sessionStore.configure(repository: SessionRepository(database: db))
 
         let engine = SessionEngine(
             database: db,
@@ -41,7 +45,7 @@ final class ServiceContainer {
         self.appStore = appStore
         self.activityStore = activityStore
         self.sessionStore = sessionStore
-        self.permissionsManager = PermissionsManager()
+        self.permissionsManager = permissionsManager
         self.sessionEngine = engine
     }
 

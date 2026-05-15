@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// UI-facing store for session list state.
 /// Does not hold a database reference; receives updates from SessionEngine and loads via repository.
@@ -10,15 +11,20 @@ final class SessionStore: ObservableObject {
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var loadError: Error?
 
-    private let repository: SessionRepository
+    private var repository: SessionRepository?
 
-    init(repository: SessionRepository) {
+    init() {}
+
+    // MARK: - Configuration (called once DB is ready)
+
+    func configure(repository: SessionRepository) {
         self.repository = repository
     }
 
     // MARK: - Load
 
     func loadRecent() async {
+        guard let repository else { return }
         isLoading = true
         loadError = nil
         defer { isLoading = false }

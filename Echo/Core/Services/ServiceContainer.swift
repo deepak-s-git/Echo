@@ -54,8 +54,8 @@ final class ServiceContainer {
     // MARK: - Startup
 
     func start() async {
-        await sessionEngine.configure(tracker: activityTracker)
         await activityTracker.start()
+        await sessionEngine.configure(tracker: activityTracker)
         await idleMonitor.start()
         await sessionEngine.start()
         await sessionStore.loadRecent()

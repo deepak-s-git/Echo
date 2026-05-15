@@ -38,7 +38,7 @@ final class PermissionsManager: ObservableObject {
         monitorTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
-                await self?.checkAll()
+                self?.checkAll()
             }
         }
     }

@@ -24,12 +24,12 @@ actor SessionEngine {
     // MARK: - Init
 
     init(
-        database: DatabaseManager,
+        repository: SessionRepository,
         activityStore: ActivityStore,
         sessionStore: SessionStore,
         idleMonitor: IdleTimeMonitor
     ) {
-        self.repository = SessionRepository(database: database)
+        self.repository = repository
         self.activityStore = activityStore
         self.sessionStore = sessionStore
         self.idleMonitor = idleMonitor
@@ -73,7 +73,7 @@ actor SessionEngine {
             try await repository.save(session)
             await sessionStore.sessionDidEnd(session)
         } catch {
-            await appStoreError(error)
+            print("[SessionEngine] Non-fatal error: \(error)")
         }
     }
 
@@ -101,7 +101,7 @@ actor SessionEngine {
         lastActivityTime = now
 
         guard let session = currentSession else { return }
-        let event = raw.stamped(sessionId: session.id)
+        let event = await MainActor.run { raw.stamped(sessionId: session.id) }
 
         pendingEvents.append(event)
         await activityStore.append(event)
@@ -117,7 +117,7 @@ actor SessionEngine {
             await activityStore.sessionDidStart(session)
             await sessionStore.sessionDidStart(session)
         } catch {
-            await appStoreError(error)
+            print("[SessionEngine] Non-fatal error: \(error)")
         }
     }
 
@@ -154,15 +154,7 @@ actor SessionEngine {
         guard !pendingEvents.isEmpty else { return 0 }
         let switches = pendingEvents.filter { $0.type == .appSwitch }.count
         let switchRate = Double(switches) / Double(pendingEvents.count)
-        return (1 - switchRate).clamped(to: 0...1)
-    }
-
-    // MARK: - Error Channel
-
-    @MainActor
-    private func appStoreError(_ error: Error) {
-        // Surface to AppStore for non-fatal error display; extend as needed.
-        print("[SessionEngine] Non-fatal error: \(error)")
+        return Swift.min(Swift.max(1 - switchRate, 0), 1)
     }
 }
 
@@ -173,12 +165,4 @@ enum SessionEndReason: Sendable {
     case appTermination
     case userInitiated
     case boundaryHeuristic
-}
-
-// MARK: - Comparable Clamp
-
-extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        min(max(self, range.lowerBound), range.upperBound)
-    }
 }

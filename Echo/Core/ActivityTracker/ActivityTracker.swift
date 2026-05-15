@@ -92,9 +92,10 @@ actor ActivityTracker {
     // MARK: - Polling
 
     private func startPolling() {
+        let interval = pollInterval
         pollTask = Task.detached(priority: .utility) { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(await self?.pollInterval ?? 3.0))
+                try? await Task.sleep(for: .seconds(interval))
                 let info: (String, String, pid_t)? = await MainActor.run {
                     guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
                     return (

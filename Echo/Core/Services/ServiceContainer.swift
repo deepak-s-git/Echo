@@ -29,11 +29,13 @@ final class ServiceContainer {
         let tracker = ActivityTracker()
         let idleMonitor = IdleTimeMonitor(threshold: EchoConfig.sessionIdleTimeout)
 
+        let repo = SessionRepository(database: db)
+
         // Wire the repository into the session store now that DB is ready
-        sessionStore.configure(repository: SessionRepository(database: db))
+        sessionStore.configure(repository: repo)
 
         let engine = SessionEngine(
-            database: db,
+            repository: repo,
             activityStore: activityStore,
             sessionStore: sessionStore,
             idleMonitor: idleMonitor
@@ -67,14 +69,4 @@ final class ServiceContainer {
         await activityTracker.stop()
         await idleMonitor.stop()
     }
-}
-
-// MARK: - Global Configuration
-
-enum EchoConfig {
-    static let sessionIdleTimeout: TimeInterval = 300
-    static let batchWriteInterval: TimeInterval = 10
-    static let minSessionDuration: TimeInterval = 30
-    static let maxLiveEvents: Int = 100
-    static let defaultSessionFetchLimit: Int = 30
 }

@@ -2,7 +2,7 @@ import Foundation
 
 /// Emitted by ActivityTracker before session assignment.
 /// SessionEngine stamps the sessionId and produces ActivityEvent.
-struct RawActivityEvent {
+struct RawActivityEvent: Sendable {
     let id: UUID
     let timestamp: Date
     let type: ActivityEvent.ActivityType

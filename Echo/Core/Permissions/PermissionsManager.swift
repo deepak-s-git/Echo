@@ -26,8 +26,14 @@ final class PermissionsManager: ObservableObject {
     }
 
     func requestAccessibility() {
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true]
-        let _ = AXIsProcessTrustedWithOptions(options)
+        // Open System Settings directly to the Accessibility pane
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+
+        // Also trigger the system prompt as a fallback
+        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        let options = [key: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(options)
     }
 
     var allGranted: Bool { accessibilityGranted }
@@ -37,7 +43,7 @@ final class PermissionsManager: ObservableObject {
     private func startMonitoring() {
         monitorTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(2))
                 self?.checkAll()
             }
         }

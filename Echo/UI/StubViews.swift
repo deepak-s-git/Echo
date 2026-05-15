@@ -110,11 +110,21 @@ struct PermissionsView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
-            Button("Grant Access") {
-                permissionsManager.requestAccessibility()
+
+            VStack(spacing: 12) {
+                Button("Open System Settings") {
+                    permissionsManager.requestAccessibility()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+
+                Text("Toggle the switch for **Echo** (or **Xcode** if running in debug mode) in Privacy & Security → Accessibility.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 320)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+
             Spacer()
         }
         .padding(40)

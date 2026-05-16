@@ -12,6 +12,8 @@ struct EchoApp: App {
                 .environmentObject(appDelegate.sessionStore)
                 .environmentObject(appDelegate.activityStore)
                 .environmentObject(appDelegate.permissionsManager)
+                .environmentObject(appDelegate.sessionDetailStore)
+                .environmentObject(appDelegate.continuityStore)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)

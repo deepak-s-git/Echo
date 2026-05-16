@@ -261,7 +261,7 @@ actor ActivityTracker {
 
     private func updateLastEmittedWindowFingerprint(_ title: String) {
         lastEmittedWindowFingerprint = title
-        if var snap = lastVerifiedSnapshot, snap.bundleId == currentBundleId {
+        if let snap = lastVerifiedSnapshot, snap.bundleId == currentBundleId {
             lastVerifiedSnapshot = FrontmostSnapshot(
                 bundleId: snap.bundleId,
                 displayName: snap.displayName,

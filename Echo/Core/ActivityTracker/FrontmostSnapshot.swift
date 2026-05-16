@@ -1,7 +1,7 @@
 import AppKit
 
 /// Lightweight snapshot of the frontmost application (and optionally its focused window).
-struct FrontmostSnapshot: Sendable, Equatable {
+nonisolated struct FrontmostSnapshot: Sendable, Equatable {
     let bundleId: String
     let displayName: String
     let pid: pid_t

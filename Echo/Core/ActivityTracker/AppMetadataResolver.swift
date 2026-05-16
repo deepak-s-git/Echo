@@ -1,7 +1,7 @@
 import AppKit
 
 /// Resolves human-readable app names from bundle IDs. Never surfaces raw bundle IDs in UI.
-enum AppMetadataResolver {
+nonisolated enum AppMetadataResolver {
 
     private static let cache = NSCache<NSString, NSString>()
 

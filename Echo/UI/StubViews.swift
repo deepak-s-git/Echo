@@ -1,26 +1,55 @@
 import SwiftUI
 
-// MARK: - HomeView
-
-struct HomeView: View {
-    var body: some View {
-        EchoPlaceholder(title: "Home", icon: "house.fill")
-    }
-}
-
-// MARK: - TimelineView
-
-struct TimelineView: View {
-    var body: some View {
-        EchoPlaceholder(title: "Timeline", icon: "timeline.selection")
-    }
-}
-
 // MARK: - SearchView
 
 struct SearchView: View {
+    @EnvironmentObject var sessionStore: SessionStore
+    @EnvironmentObject var appStore: AppStore
+    @State private var query = ""
+
+    private var results: [Session] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return sessionStore.recentSessions }
+        return sessionStore.recentSessions.filter {
+            ($0.title ?? "").lowercased().contains(q)
+        }
+    }
+
     var body: some View {
-        EchoPlaceholder(title: "Search", icon: "magnifyingglass")
+        ZStack {
+            EchoDesign.ambientBackground.ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 20) {
+                TextField("Search sessions", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 14))
+                    .onAppear {
+                        if appStore.isSearchPresented { query = "" }
+                    }
+
+                if results.isEmpty {
+                    Spacer()
+                    Text("No sessions match")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                    Spacer()
+                } else {
+                    List(results) { session in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(session.title ?? "Untitled")
+                                .font(.system(size: 14, weight: .medium))
+                            Text(session.startedAt, style: .date)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .padding(28)
+        }
     }
 }
 
@@ -51,9 +80,9 @@ struct OnboardingView: View {
             Spacer()
             Image(systemName: "memorychip")
                 .font(.system(size: 52, weight: .thin))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(EchoPalette.indigoSoft)
             Text("Welcome to Echo")
-                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .font(.system(size: 24, weight: .semibold))
             Text("Echo remembers your workflow so you don't have to.")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
@@ -102,7 +131,7 @@ struct PermissionsView: View {
             Spacer()
             Image(systemName: "lock.shield")
                 .font(.system(size: 52, weight: .thin))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(EchoPalette.indigoSoft)
             Text("Accessibility Access Required")
                 .font(.system(size: 20, weight: .semibold))
             Text("Echo uses Accessibility to detect which apps you use and how long you use them. No keystrokes or content is ever recorded.")
@@ -139,13 +168,24 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Current Session")
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
-                Text(activityStore.sessionDuration.sessionDurationFormatted)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(activityStore.focusHeadline)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Text(activityStore.workflowIdentity)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                HStack {
+                    EchoLiveDot(isActive: activityStore.isSessionActive)
+                    Text(activityStore.sessionDuration.sessionDurationFormatted)
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundStyle(EchoPalette.indigoSoft)
+                    Spacer()
+                    Text(activityStore.focusLabel)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()

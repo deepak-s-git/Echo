@@ -35,21 +35,9 @@ struct SidebarView: View {
                 .padding(.horizontal, 20)
 
             VStack(spacing: 4) {
-                SidebarItem(
-                    tab: .home,
-                    icon: "house.fill",
-                    label: "Home"
-                )
-                SidebarItem(
-                    tab: .timeline,
-                    icon: "timeline.selection",
-                    label: "Timeline"
-                )
-                SidebarItem(
-                    tab: .search,
-                    icon: "magnifyingglass",
-                    label: "Search"
-                )
+                SidebarItem(tab: .home, icon: "house.fill", label: "Home")
+                SidebarItem(tab: .timeline, icon: "timeline.selection", label: "Timeline")
+                SidebarItem(tab: .search, icon: "magnifyingglass", label: "Search")
             }
             .padding(.horizontal, 12)
 
@@ -75,9 +63,7 @@ struct SidebarItem: View {
 
     var body: some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                appStore.selectedTab = tab
-            }
+            appStore.selectedTab = tab
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
@@ -91,9 +77,9 @@ struct SidebarItem: View {
             .padding(.vertical, 9)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.15) : .clear)
+                    .fill(isSelected ? EchoPalette.indigo.opacity(0.12) : .clear)
             )
-            .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.7))
+            .foregroundStyle(isSelected ? EchoPalette.indigoSoft : Color.primary.opacity(0.7))
         }
         .buttonStyle(.plain)
     }
@@ -106,14 +92,14 @@ struct EchoWordmark: View {
         HStack(spacing: 8) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.15))
+                    .fill(EchoPalette.indigo.opacity(0.12))
                     .frame(width: 28, height: 28)
                 Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 10, height: 10)
+                    .fill(EchoPalette.indigo.opacity(0.55))
+                    .frame(width: 8, height: 8)
             }
             Text("Echo")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(.system(size: 17, weight: .semibold, design: .default))
                 .foregroundStyle(.primary)
             Spacer()
         }
@@ -126,44 +112,34 @@ struct LiveSessionPill: View {
     @EnvironmentObject var activityStore: ActivityStore
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(Color.green)
-                .frame(width: 6, height: 6)
-                .modifier(PulseModifier())
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                EchoLiveDot(isActive: activityStore.isSessionActive)
+                Text(activityStore.isSessionActive ? "Live" : "Idle")
+                    .font(.system(size: 10, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.4)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Text(activityStore.sessionDuration.sessionDurationFormatted)
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(EchoPalette.indigoSoft)
+            }
 
-            Text("Session active")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Text(activityStore.sessionDuration.sessionDurationFormatted)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Color.accentColor)
+            Text(activityStore.focusHeadline)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.primary.opacity(0.85))
+                .lineLimit(1)
+            Text(activityStore.workflowIdentity)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.quaternary)
+                .fill(Color.primary.opacity(0.04))
         )
-    }
-}
-
-// MARK: - Pulse Modifier
-
-struct PulseModifier: ViewModifier {
-    @State private var pulsing = false
-
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(pulsing ? 1.4 : 1.0)
-            .opacity(pulsing ? 0.5 : 1.0)
-            .animation(
-                .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
-                value: pulsing
-            )
-            .onAppear { pulsing = true }
     }
 }

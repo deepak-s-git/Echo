@@ -3,7 +3,7 @@ import GRDB
 
 /// Owns the SQLite connection pool and schema migrations.
 /// All query logic lives in Repository types; this class is infrastructure only.
-final class DatabaseManager: Sendable {
+nonisolated final class DatabaseManager: Sendable {
 
     private let pool: DatabasePool
 
@@ -90,6 +90,13 @@ final class DatabaseManager: Sendable {
             }
         }
 
+        migrator.registerMigration("v2_workflow_memory") { db in
+            try db.alter(table: Session.databaseTableName) { t in
+                t.add(column: "workflowCluster", .text)
+                t.add(column: "restorePlanJSON", .text)
+            }
+        }
+
         try migrator.migrate(pool)
     }
 
@@ -109,7 +116,7 @@ final class DatabaseManager: Sendable {
 
 // MARK: - DatabaseError
 
-enum DatabaseError: Error, LocalizedError {
+nonisolated enum DatabaseError: Error, LocalizedError {
     case cannotLocateAppSupport
 
     var errorDescription: String? {

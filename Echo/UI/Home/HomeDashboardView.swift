@@ -11,6 +11,8 @@ struct HomeView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
+                    ContinuityPanel()
+
                     HomeHeroSection(
                         focusHeadline: activityStore.focusHeadline,
                         workflowIdentity: activityStore.workflowIdentity,

@@ -36,14 +36,20 @@ struct SearchView: View {
                     Spacer()
                 } else {
                     List(results) { session in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(session.title ?? "Untitled")
-                                .font(.system(size: 14, weight: .medium))
-                            Text(session.startedAt, style: .date)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                        Button {
+                            appStore.openSessionDetail(session.id)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(session.title ?? "Untitled")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                Text(session.startedAt, style: .date)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
+                        .buttonStyle(.plain)
                     }
                     .listStyle(.plain)
                 }

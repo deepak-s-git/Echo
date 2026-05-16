@@ -9,10 +9,14 @@ struct MainNavigationView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
         } detail: {
             Group {
-                switch appStore.selectedTab {
-                case .home: HomeView()
-                case .timeline: TimelineView()
-                case .search: SearchView()
+                if appStore.showingSessionDetail, let sessionId = appStore.selectedSessionId {
+                    SessionDetailView(sessionId: sessionId)
+                } else {
+                    switch appStore.selectedTab {
+                    case .home: HomeView()
+                    case .timeline: TimelineView()
+                    case .search: SearchView()
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

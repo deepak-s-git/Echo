@@ -129,6 +129,12 @@ final class ActivityStore: ObservableObject {
     func ingest(_ event: ActivityEvent) { applyLiveEvent(event) }
     func append(_ event: ActivityEvent) { applyLiveEvent(event) }
 
+    /// Events for the live session buffer when reconstructing session detail.
+    func liveEvents(for sessionId: UUID) -> [ActivityEvent] {
+        guard currentSession?.id == sessionId else { return [] }
+        return eventBuffer
+    }
+
     /// Stable identity suggestion for SessionEngine persistence.
     func computeStableWorkflowIdentity(startedAt: Date) -> String {
         StableWorkflowTitleGenerator.generate(

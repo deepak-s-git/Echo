@@ -32,7 +32,11 @@ final class ServiceContainer {
         let repo = SessionRepository(database: db)
 
         sessionStore.configure(repository: repo)
-        sessionDetailStore.configure(repository: repo)
+        sessionDetailStore.configure(
+            repository: repo,
+            sessionStore: sessionStore,
+            activityStore: activityStore
+        )
         continuityStore.configure(repository: repo)
 
         let engine = SessionEngine(

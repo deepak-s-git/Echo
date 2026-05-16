@@ -221,3 +221,108 @@ nonisolated enum EchoConfig {
     /// Sessions ended within this window appear as "recently interrupted".
     static let interruptedSessionWindow: TimeInterval = 86_400
 }
+
+// MARK: - Session detail loading
+
+nonisolated enum SessionDetailLoadOutcome: Sendable {
+    case loaded(SessionDetailPayload)
+    case notFound(SessionDetailDiagnostics)
+}
+
+nonisolated struct SessionDetailPayload: Sendable {
+    let session: Session
+    let memory: WorkflowMemory
+    let snapshot: SessionSnapshot?
+    let diagnostics: SessionDetailDiagnostics
+}
+
+nonisolated struct SessionDetailDiagnostics: Sendable, Equatable {
+    var issues: [Issue] = []
+    var notes: [String] = []
+    var persistedEventCount: Int = 0
+    var liveEventCount: Int = 0
+    var mergedEventCount: Int = 0
+    var hasSnapshot: Bool = false
+    var hasPersistedRestorePlan: Bool = false
+    var isActiveSession: Bool = false
+    var isFinalized: Bool = false
+
+    var hasBlockingIssue: Bool {
+        issues.contains { $0.isBlocking }
+    }
+
+    nonisolated enum Issue: String, Sendable, CaseIterable, Hashable {
+        case repositoryUnavailable
+        case sessionNotFoundInDatabase
+        case usedSessionStoreFallback
+        case noPersistedEvents
+        case mergedLiveEvents
+        case snapshotMissing
+        case snapshotLoadFailed
+        case restorePlanMissing
+        case restorePlanDecodeFailed
+        case restorePlanReconstructed
+        case sessionNotFinalized
+        case databaseReadFailed
+
+        var isBlocking: Bool {
+            switch self {
+            case .repositoryUnavailable, .sessionNotFoundInDatabase, .databaseReadFailed:
+                return true
+            default:
+                return false
+            }
+        }
+
+        var userMessage: String {
+            switch self {
+            case .repositoryUnavailable:
+                return "Database access is not ready yet."
+            case .sessionNotFoundInDatabase:
+                return "This session was not found in storage."
+            case .usedSessionStoreFallback:
+                return "Loaded session metadata from the timeline cache."
+            case .noPersistedEvents:
+                return "No activity events were persisted for this session yet."
+            case .mergedLiveEvents:
+                return "Included live activity from the current recording."
+            case .snapshotMissing:
+                return "No session snapshot was saved when this memory ended."
+            case .snapshotLoadFailed:
+                return "A snapshot exists but could not be read."
+            case .restorePlanMissing:
+                return "No restore plan was saved for this session."
+            case .restorePlanDecodeFailed:
+                return "The saved restore plan could not be decoded."
+            case .restorePlanReconstructed:
+                return "Restore plan was rebuilt from activity data."
+            case .sessionNotFinalized:
+                return "This session is still recording — memory is reconstructed from live data."
+            case .databaseReadFailed:
+                return "Reading session data from the database failed."
+            }
+        }
+    }
+
+    mutating func record(_ issue: Issue, note: String? = nil) {
+        if !issues.contains(issue) { issues.append(issue) }
+        if let note, !notes.contains(note) { notes.append(note) }
+    }
+
+    var summaryLine: String {
+        if issues.isEmpty {
+            return "Memory loaded from \(mergedEventCount) events."
+        }
+        return issues.map(\.userMessage).prefix(2).joined(separator: " ")
+    }
+}
+
+nonisolated enum SessionDetailLogger {
+    static func log(_ message: String) {
+        print("[SessionDetail] \(message)")
+    }
+
+    static func log(_ message: String, error: Error) {
+        print("[SessionDetail] \(message): \(error.localizedDescription)")
+    }
+}

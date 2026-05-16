@@ -1,0 +1,168 @@
+import SwiftUI
+
+struct HomeView: View {
+    @EnvironmentObject var activityStore: ActivityStore
+    @EnvironmentObject var sessionStore: SessionStore
+
+    var body: some View {
+        ZStack {
+            EchoDesign.ambientBackground
+                .ignoresSafeArea()
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
+                    HomeHeroSection(
+                        focusHeadline: activityStore.focusHeadline,
+                        workflowIdentity: activityStore.workflowIdentity,
+                        sessionDuration: activityStore.sessionDuration,
+                        appCount: sessionStore.activeSession?.appCount ?? 0,
+                        isActive: activityStore.isSessionActive,
+                        focusScore: activityStore.liveFocusScore,
+                        focusLabel: activityStore.focusLabel
+                    )
+
+                    HomeCurrentAppSection(
+                        appName: activityStore.currentAppName,
+                        bundleId: activityStore.currentAppBundleId,
+                        focusLabel: activityStore.focusLabel
+                    )
+
+                    MiniTimelineView(
+                        segments: activityStore.timelineSegments,
+                        focusIntensity: activityStore.focusIntensity
+                    )
+                    .equatable()
+
+                    ActivityFeedView(events: activityStore.recentEvents)
+                        .equatable()
+                }
+                .padding(28)
+                .padding(.bottom, 12)
+            }
+        }
+    }
+}
+
+// MARK: - Hero
+
+private struct HomeHeroSection: View {
+    let focusHeadline: String
+    let workflowIdentity: String
+    let sessionDuration: TimeInterval
+    let appCount: Int
+    let isActive: Bool
+    let focusScore: Double
+    let focusLabel: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 22) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    EchoLiveDot(isActive: isActive)
+                    Text(isActive ? "Live session" : "Paused")
+                        .font(.system(size: 10, weight: .semibold))
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Text(focusHeadline)
+                    .font(.system(size: 32, weight: .semibold, design: .default))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .id(focusHeadline)
+                    .animation(nil, value: focusHeadline)
+
+                Text(workflowIdentity)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .animation(.easeOut(duration: 0.25), value: workflowIdentity)
+
+                HStack(spacing: 14) {
+                    Label(
+                        sessionDuration.sessionDurationFormatted,
+                        systemImage: "clock"
+                    )
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(EchoPalette.indigoSoft)
+
+                    if appCount > 0 {
+                        Label("\(appCount) apps", systemImage: "square.grid.2x2")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            FocusIndicatorView(score: focusScore, label: focusLabel)
+        }
+        .padding(24)
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                EchoDesign.heroWash
+                    .clipShape(RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                .strokeBorder(EchoPalette.strokeBright, lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 16, y: 6)
+    }
+}
+
+// MARK: - Current app
+
+private struct HomeCurrentAppSection: View {
+    let appName: String?
+    let bundleId: String?
+    let focusLabel: String
+
+    private var resolvedAppName: String {
+        guard let bundleId else { return appName ?? "Waiting for activity" }
+        return AppMetadataResolver.displayName(bundleId: bundleId, rawName: appName)
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            if let bundleId {
+                AppIconView(bundleId: bundleId, size: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(Color.primary.opacity(0.04))
+                    .frame(width: 48, height: 48)
+                    .overlay {
+                        Image(systemName: "cursorarrow.click.2")
+                            .foregroundStyle(.quaternary)
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("In focus now")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+                    .tracking(0.4)
+
+                Text(resolvedAppName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .id(resolvedAppName)
+
+                Text(focusLabel)
+                    .font(.system(size: 12))
+                    .foregroundStyle(EchoPalette.indigoSoft)
+            }
+
+            Spacer()
+        }
+        .padding(18)
+        .echoCard()
+    }
+}

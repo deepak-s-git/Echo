@@ -16,12 +16,36 @@ struct SessionDetailView: View {
             } else if let memory = sessionDetailStore.memory {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 28) {
+                        if sessionDetailStore.loadState == .degraded {
+                            degradedBanner
+                        }
+                        if let diagnostics = sessionDetailStore.diagnostics, !diagnostics.issues.isEmpty {
+                            diagnosticsSection(diagnostics)
+                        }
                         header(memory)
                         continuitySection(memory)
                         rhythmSection(memory)
-                        if !memory.phases.isEmpty { phasesSection(memory) }
-                        if !memory.appTransitions.isEmpty { transitionsSection(memory) }
-                        if !memory.browserContexts.isEmpty { browserSection(memory) }
+                        if !memory.phases.isEmpty {
+                            phasesSection(memory)
+                        } else {
+                            emptySection(
+                                title: "Workflow phases",
+                                icon: "rectangle.split.3x1",
+                                message: "Not enough focus stretches to form phases yet."
+                            )
+                        }
+                        if !memory.appTransitions.isEmpty {
+                            transitionsSection(memory)
+                        } else {
+                            emptySection(
+                                title: "App transitions",
+                                icon: "arrow.left.arrow.right",
+                                message: "No app transitions were recorded."
+                            )
+                        }
+                        if !memory.browserContexts.isEmpty {
+                            browserSection(memory)
+                        }
                         if !memory.interruptions.isEmpty { interruptionsSection(memory) }
                         restoreSection(memory)
                     }
@@ -29,8 +53,7 @@ struct SessionDetailView: View {
                     .padding(.bottom, 40)
                 }
             } else {
-                Text("This memory could not be loaded.")
-                    .foregroundStyle(.secondary)
+                failedStateView
             }
         }
         .toolbar {
@@ -53,6 +76,117 @@ struct SessionDetailView: View {
         } message: {
             Text(sessionDetailStore.restoreMessage ?? "")
         }
+    }
+
+    // MARK: - Load states
+
+    private var degradedBanner: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Partial memory")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(sessionDetailStore.diagnostics?.summaryLine ?? "Some data was reconstructed.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.orange.opacity(0.08))
+        )
+    }
+
+    private var failedStateView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: "memorychip")
+                .font(.system(size: 32, weight: .thin))
+                .foregroundStyle(EchoPalette.indigo.opacity(0.35))
+
+            Text("Memory could not be loaded")
+                .font(.system(size: 18, weight: .semibold))
+
+            if let error = sessionDetailStore.loadError {
+                Text(error.localizedDescription)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let diagnostics = sessionDetailStore.diagnostics {
+                diagnosticsSection(diagnostics)
+            } else {
+                Text("The session may not exist in storage, or the database is still initializing.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Button("Try again") {
+                Task { await sessionDetailStore.load(sessionId: sessionId) }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(32)
+        .frame(maxWidth: 420, alignment: .leading)
+    }
+
+    private func diagnosticsSection(_ diagnostics: SessionDetailDiagnostics) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("Diagnostics", icon: "stethoscope")
+
+            if !diagnostics.notes.isEmpty {
+                ForEach(Array(diagnostics.notes.enumerated()), id: \.offset) { _, note in
+                    Text(note)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            ForEach(diagnostics.issues, id: \.self) { issue in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: issue.isBlocking ? "xmark.circle.fill" : "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(issue.isBlocking ? .red : .secondary)
+                    Text(issue.userMessage)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 16) {
+                diagnosticStat("Events", value: "\(diagnostics.mergedEventCount)")
+                diagnosticStat("Persisted", value: "\(diagnostics.persistedEventCount)")
+                diagnosticStat("Live", value: "\(diagnostics.liveEventCount)")
+                diagnosticStat("Snapshot", value: diagnostics.hasSnapshot ? "Yes" : "No")
+            }
+        }
+        .echoCard()
+        .padding(18)
+    }
+
+    private func diagnosticStat(_ label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.quaternary)
+                .textCase(.uppercase)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+        }
+    }
+
+    private func emptySection(title: String, icon: String, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle(title, icon: icon)
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundStyle(.tertiary)
+        }
+        .echoCard()
+        .padding(18)
     }
 
     // MARK: - Header
@@ -145,11 +279,19 @@ struct SessionDetailView: View {
     private func rhythmSection(_ memory: WorkflowMemory) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Focus rhythm", icon: "waveform.path")
-            MiniTimelineView(
-                segments: SessionTimelineBuilder.segments(from: memory.events),
-                focusIntensity: SessionTimelineBuilder.focusIntensity(from: memory.events)
-            )
+            if memory.events.isEmpty {
+                Text("Activity timeline will appear once events are captured.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+            } else {
+                MiniTimelineView(
+                    segments: SessionTimelineBuilder.segments(from: memory.events),
+                    focusIntensity: SessionTimelineBuilder.focusIntensity(from: memory.events)
+                )
+            }
         }
+        .echoCard()
+        .padding(18)
     }
 
     // MARK: - Phases

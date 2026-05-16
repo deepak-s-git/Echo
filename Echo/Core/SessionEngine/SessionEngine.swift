@@ -69,13 +69,18 @@ actor SessionEngine {
         await flushPendingEvents()
 
         do {
-            let events = try await repository.fetchActivities(sessionId: session.id)
+            let events = await allEventsForSession(session.id)
+            session.appCount = Set(events.map(\.appBundleId)).count
+            session.focusScore = focusScore(from: events)
             await finalizeSessionMemory(&session, events: events)
             try await repository.save(session)
             await activityStore.sessionDidEnd(session)
             await sessionStore.sessionDidEnd(session)
+            ActivityPersistenceLogger.log(
+                "Ended session \(session.id.uuidString) — \(events.count) events, reason=\(reason)"
+            )
         } catch {
-            print("[SessionEngine] Non-fatal error: \(error)")
+            ActivityPersistenceLogger.log("Session end failed", error: error)
         }
     }
 
@@ -115,9 +120,16 @@ actor SessionEngine {
         }
 
         pendingEvents.append(event)
+        ActivityPersistenceLogger.log(
+            "Queued \(event.type.rawValue) for session \(sessionId.uuidString) — pending=\(pendingEvents.count)"
+        )
 
         // Live UI first — never wait on DB or full title generation.
         await activityStore.applyLiveEvent(event)
+
+        if pendingEvents.count >= EchoConfig.batchWriteEventThreshold {
+            await flushPendingEvents()
+        }
 
         schedulePersistedTitleRefresh(wasFocus: event.type == .appFocus)
 
@@ -178,22 +190,24 @@ actor SessionEngine {
     }
 
     private func closeStaleSession(_ session: Session) async {
+        if currentSession?.id == session.id {
+            await flushPendingEvents()
+        }
         var ended = session
         ended.endedAt = Date()
         do {
-            let events = try await repository.fetchActivities(sessionId: session.id)
+            let events = await allEventsForSession(session.id)
             ended.appCount = Set(events.map(\.appBundleId)).count
-            let switches = events.filter { $0.type == .appSwitch }.count
-            let rate = events.isEmpty ? 0 : Double(switches) / Double(events.count)
-            ended.focusScore = min(max(1 - rate, 0), 1)
+            ended.focusScore = focusScore(from: events)
             ended.title = await MainActor.run {
                 SessionTitleGenerator.generate(from: events, startedAt: session.startedAt)
             }
             await finalizeSessionMemory(&ended, events: events)
             try await repository.save(ended)
             await sessionStore.sessionDidEnd(ended)
+            ActivityPersistenceLogger.log("Closed stale session \(session.id.uuidString) — \(events.count) events")
         } catch {
-            print("[SessionEngine] Stale close failed: \(error)")
+            ActivityPersistenceLogger.log("Stale close failed", error: error)
         }
     }
 
@@ -212,8 +226,9 @@ actor SessionEngine {
             try await repository.save(session)
             await activityStore.sessionDidStart(session)
             await sessionStore.sessionDidStart(session)
+            ActivityPersistenceLogger.log("Began session \(session.id.uuidString)")
         } catch {
-            print("[SessionEngine] Non-fatal error: \(error)")
+            ActivityPersistenceLogger.log("Begin session save failed", error: error)
         }
     }
 
@@ -280,26 +295,51 @@ actor SessionEngine {
     private func flushPendingEvents() async {
         guard !pendingEvents.isEmpty else { return }
         let batch = pendingEvents
+        let sessionIds = Set(batch.map(\.sessionId))
         pendingEvents.removeAll()
+        ActivityPersistenceLogger.log("Flushing \(batch.count) events…")
         do {
-            try await repository.insertBatch(batch)
+            let count = try await repository.insertBatch(batch)
+            for sessionId in sessionIds {
+                notifyActivitiesPersisted(sessionId: sessionId)
+            }
+            ActivityPersistenceLogger.log("Flush succeeded — persisted \(count) events")
         } catch {
             pendingEvents.insert(contentsOf: batch, at: 0)
+            ActivityPersistenceLogger.log("Flush failed — re-queued \(batch.count) events", error: error)
         }
     }
 
-    // MARK: - Metrics
-
-    private func allEventsForMetrics() -> [ActivityEvent] {
-        pendingEvents
+    private func notifyActivitiesPersisted(sessionId: UUID) {
+        NotificationCenter.default.post(
+            name: .echoActivitiesPersisted,
+            object: nil,
+            userInfo: ["sessionId": sessionId]
+        )
     }
+
+    /// Persisted rows plus any still-queued events for this session.
+    private func allEventsForSession(_ sessionId: UUID) async -> [ActivityEvent] {
+        let persisted = (try? await repository.fetchActivities(sessionId: sessionId)) ?? []
+        let queued = pendingEvents.filter { $0.sessionId == sessionId }
+        let merged = SessionRepository.mergeEvents(persisted: persisted, live: queued)
+        ActivityPersistenceLogger.log(
+            "allEventsForSession \(sessionId.uuidString): persisted=\(persisted.count) queued=\(queued.count) merged=\(merged.count)"
+        )
+        return merged
+    }
+
+    // MARK: - Metrics
 
     private func uniqueAppCount() -> Int {
         Set(pendingEvents.map(\.appBundleId)).count
     }
 
     private func computeFocusScore() -> Double {
-        let events = allEventsForMetrics()
+        focusScore(from: pendingEvents)
+    }
+
+    private func focusScore(from events: [ActivityEvent]) -> Double {
         guard !events.isEmpty else { return 0 }
         let switches = events.filter { $0.type == .appSwitch }.count
         let switchRate = Double(switches) / Double(events.count)
@@ -332,7 +372,13 @@ actor SessionEngine {
             appName: appName
         )
         pendingEvents.append(browserEvent)
+        ActivityPersistenceLogger.log(
+            "Queued browser context for session \(sessionId.uuidString) — pending=\(pendingEvents.count)"
+        )
         await activityStore.applyLiveEvent(browserEvent)
+        if pendingEvents.count >= EchoConfig.batchWriteEventThreshold {
+            await flushPendingEvents()
+        }
     }
 
     // MARK: - Session memory finalization

@@ -172,19 +172,42 @@ final class SessionRepository: Sendable {
 
     // MARK: - Activities
 
-    func insertBatch(_ events: [ActivityEvent]) async throws {
-        guard !events.isEmpty else { return }
-        try await database.writeAsync { db in
-            for event in events { try event.insert(db) }
+    @discardableResult
+    func insertBatch(_ events: [ActivityEvent]) async throws -> Int {
+        guard !events.isEmpty else { return 0 }
+        let sessionIds = Set(events.map(\.sessionId.uuidString))
+        return try await database.writeAsync { db in
+            try db.inTransaction {
+                for event in events {
+                    try event.insert(db, onConflict: .replace)
+                }
+                return .commit
+            }
+            ActivityPersistenceLogger.log(
+                "Inserted \(events.count) events for session(s): \(sessionIds.joined(separator: ", "))"
+            )
+            return events.count
         }
     }
 
     func fetchActivities(sessionId: UUID) async throws -> [ActivityEvent] {
-        try await database.readAsync { db in
+        let key = sessionId.uuidString
+        let rows = try await database.readAsync { db in
             try ActivityEvent
-                .filter(Column("sessionId") == sessionId.uuidString)
+                .filter(Column("sessionId") == key)
                 .order(Column("timestamp").asc)
                 .fetchAll(db)
+        }
+        ActivityPersistenceLogger.log("Fetched \(rows.count) activities for session \(key)")
+        return rows
+    }
+
+    func activityCount(sessionId: UUID) async throws -> Int {
+        let key = sessionId.uuidString
+        return try await database.readAsync { db in
+            try ActivityEvent
+                .filter(Column("sessionId") == key)
+                .fetchCount(db)
         }
     }
 
@@ -272,7 +295,7 @@ final class SessionRepository: Sendable {
         return rebuilt
     }
 
-    private static func mergeEvents(
+    nonisolated static func mergeEvents(
         persisted: [ActivityEvent],
         live: [ActivityEvent]
     ) -> [ActivityEvent] {

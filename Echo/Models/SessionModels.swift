@@ -61,6 +61,36 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
     }
 
     var isActive: Bool { endedAt == nil }
+
+    func encode(to container: inout PersistenceContainer) throws {
+        container["id"] = id.uuidString
+        container["title"] = title
+        container["startedAt"] = startedAt
+        container["endedAt"] = endedAt
+        container["focusScore"] = focusScore
+        container["appCount"] = appCount
+        container["tabCount"] = tabCount
+        container["snapshotPath"] = snapshotPath
+        container["projectTag"] = projectTag
+        container["isFavorited"] = isFavorited
+        container["workflowCluster"] = workflowCluster
+        container["restorePlanJSON"] = restorePlanJSON
+    }
+
+    init(row: Row) throws {
+        id = UUID(uuidString: row["id"])!
+        title = row["title"]
+        startedAt = row["startedAt"]
+        endedAt = row["endedAt"]
+        focusScore = row["focusScore"]
+        appCount = row["appCount"]
+        tabCount = row["tabCount"]
+        snapshotPath = row["snapshotPath"]
+        projectTag = row["projectTag"]
+        isFavorited = row["isFavorited"]
+        workflowCluster = row["workflowCluster"]
+        restorePlanJSON = row["restorePlanJSON"]
+    }
 }
 
 // MARK: - Activity Event
@@ -85,6 +115,52 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         case terminalCommand
         case fileAccess
         case idle
+    }
+
+    init(
+        id: UUID,
+        sessionId: UUID,
+        timestamp: Date,
+        type: ActivityType,
+        appBundleId: String,
+        appName: String,
+        windowTitle: String? = nil,
+        url: String? = nil,
+        duration: TimeInterval = 0
+    ) {
+        self.id = id
+        self.sessionId = sessionId
+        self.timestamp = timestamp
+        self.type = type
+        self.appBundleId = appBundleId
+        self.appName = appName
+        self.windowTitle = windowTitle
+        self.url = url
+        self.duration = duration
+    }
+
+    func encode(to container: inout PersistenceContainer) throws {
+        container["id"] = id.uuidString
+        container["sessionId"] = sessionId.uuidString
+        container["timestamp"] = timestamp
+        container["type"] = type.rawValue
+        container["appBundleId"] = appBundleId
+        container["appName"] = appName
+        container["windowTitle"] = windowTitle
+        container["url"] = url
+        container["duration"] = duration
+    }
+
+    init(row: Row) throws {
+        id = UUID(uuidString: row["id"])!
+        sessionId = UUID(uuidString: row["sessionId"])!
+        timestamp = row["timestamp"]
+        type = ActivityType(rawValue: row["type"]) ?? .appFocus
+        appBundleId = row["appBundleId"]
+        appName = row["appName"]
+        windowTitle = row["windowTitle"]
+        url = row["url"]
+        duration = row["duration"]
     }
 }
 
@@ -192,7 +268,11 @@ nonisolated struct WindowLayout: Codable, Sendable {
 /// App-wide constants. Deliberately nonisolated so any actor can read these values.
 nonisolated enum EchoConfig {
     static let sessionIdleTimeout: TimeInterval = 300
-    static let batchWriteInterval: TimeInterval = 10
+    static let batchWriteInterval: TimeInterval = 5
+    /// Flush to SQLite after this many queued events (in addition to the timer).
+    static let batchWriteEventThreshold: Int = 4
+    /// Session detail poll interval while viewing a live session.
+    static let sessionDetailLiveRefreshInterval: TimeInterval = 4
     static let minSessionDuration: TimeInterval = 30
     static let maxLiveEvents: Int = 100
     static let defaultSessionFetchLimit: Int = 30
@@ -324,5 +404,17 @@ nonisolated enum SessionDetailLogger {
 
     static func log(_ message: String, error: Error) {
         print("[SessionDetail] \(message): \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Activity persistence logging
+
+nonisolated enum ActivityPersistenceLogger {
+    static func log(_ message: String) {
+        print("[ActivityPersistence] \(message)")
+    }
+
+    static func log(_ message: String, error: Error) {
+        print("[ActivityPersistence] \(message): \(error.localizedDescription)")
     }
 }

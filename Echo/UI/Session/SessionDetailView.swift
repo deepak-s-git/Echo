@@ -68,6 +68,13 @@ struct SessionDetailView: View {
         .task(id: sessionId) {
             await sessionDetailStore.load(sessionId: sessionId)
         }
+        .onDisappear {
+            sessionDetailStore.stopWatching()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .echoActivitiesPersisted)) { notification in
+            guard let id = notification.userInfo?["sessionId"] as? UUID, id == sessionId else { return }
+            Task { await sessionDetailStore.reload(sessionId: sessionId) }
+        }
         .alert("Restore", isPresented: .init(
             get: { sessionDetailStore.restoreMessage != nil },
             set: { if !$0 { sessionDetailStore.clearRestoreMessage() } }
@@ -191,6 +198,11 @@ struct SessionDetailView: View {
 
     // MARK: - Header
 
+    private func appCountLabel(_ memory: WorkflowMemory) -> Int {
+        let fromEvents = Set(memory.events.map(\.appBundleId)).count
+        return max(fromEvents, memory.session.appCount)
+    }
+
     private func header(_ memory: WorkflowMemory) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
@@ -213,7 +225,7 @@ struct SessionDetailView: View {
             HStack(spacing: 16) {
                 Label(memory.session.startedAt.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
                 Label(memory.session.duration.shortLabel, systemImage: "clock")
-                Label("\(memory.session.appCount) apps", systemImage: "square.grid.2x2")
+                Label("\(appCountLabel(memory)) apps", systemImage: "square.grid.2x2")
             }
             .font(.system(size: 12))
             .foregroundStyle(.secondary)

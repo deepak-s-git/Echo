@@ -26,6 +26,33 @@ final class SessionDetailStore: ObservableObject {
     private var activityStore: ActivityStore?
     private let restoreEngine = WorkflowRestoreEngine()
 
+    private var watchedSessionId: UUID?
+    private var liveRefreshTask: Task<Void, Never>?
+    private var persistenceObserver: NSObjectProtocol?
+
+    init() {
+        persistenceObserver = NotificationCenter.default.addObserver(
+            forName: .echoActivitiesPersisted,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      let sessionId = notification.userInfo?["sessionId"] as? UUID,
+                      sessionId == self.watchedSessionId
+                else { return }
+                await self.reload(sessionId: sessionId)
+            }
+        }
+    }
+
+    deinit {
+        liveRefreshTask?.cancel()
+        if let persistenceObserver {
+            NotificationCenter.default.removeObserver(persistenceObserver)
+        }
+    }
+
     func configure(
         repository: SessionRepository,
         sessionStore: SessionStore,
@@ -37,6 +64,41 @@ final class SessionDetailStore: ObservableObject {
     }
 
     func load(sessionId: UUID) async {
+        watchedSessionId = sessionId
+        await performLoad(sessionId: sessionId, showLoading: true)
+        startLiveRefreshIfNeeded(sessionId: sessionId)
+    }
+
+    func reload(sessionId: UUID) async {
+        await performLoad(sessionId: sessionId, showLoading: false)
+    }
+
+    func stopWatching() {
+        watchedSessionId = nil
+        liveRefreshTask?.cancel()
+        liveRefreshTask = nil
+    }
+
+    func restoreWorkflow() async {
+        guard let plan = memory?.restorePlan, !plan.items.isEmpty else {
+            restoreMessage = "Nothing to restore for this session."
+            return
+        }
+        isRestoring = true
+        defer { isRestoring = false }
+        let result = await restoreEngine.restore(plan: plan)
+        if result.failed.isEmpty {
+            restoreMessage = "Restored \(result.succeeded.count) items from your workflow."
+        } else {
+            restoreMessage = "Restored \(result.succeeded.count); \(result.failed.count) could not open."
+        }
+    }
+
+    func clearRestoreMessage() { restoreMessage = nil }
+
+    // MARK: - Private
+
+    private func performLoad(sessionId: UUID, showLoading: Bool) async {
         guard let repository else {
             var diagnostics = SessionDetailDiagnostics()
             diagnostics.record(.repositoryUnavailable)
@@ -49,14 +111,16 @@ final class SessionDetailStore: ObservableObject {
             return
         }
 
-        isLoading = true
-        loadState = .loading
-        loadError = nil
-        memory = nil
-        snapshot = nil
-        diagnostics = nil
+        if showLoading {
+            isLoading = true
+            loadState = .loading
+            loadError = nil
+            memory = nil
+            snapshot = nil
+            diagnostics = nil
+        }
 
-        defer { isLoading = false }
+        defer { if showLoading { isLoading = false } }
 
         let fallbackSession = sessionStore?.recentSessions.first { $0.id == sessionId }
         let liveEvents = activityStore?.liveEvents(for: sessionId) ?? []
@@ -73,7 +137,9 @@ final class SessionDetailStore: ObservableObject {
             snapshot = payload.snapshot
             diagnostics = payload.diagnostics
             loadState = payload.diagnostics.issues.isEmpty ? .loaded : .degraded
-            SessionDetailLogger.log("UI load complete — state=\(loadState)")
+            SessionDetailLogger.log(
+                "UI load — events=\(payload.memory.events.count) transitions=\(payload.memory.appTransitions.count) restore=\(payload.memory.restorePlan.items.count)"
+            )
 
         case .notFound(var diagnostics):
             if let fallbackSession {
@@ -99,24 +165,22 @@ final class SessionDetailStore: ObservableObject {
         }
     }
 
-    func restoreWorkflow() async {
-        guard let plan = memory?.restorePlan, !plan.items.isEmpty else {
-            restoreMessage = "Nothing to restore for this session."
-            return
-        }
-        isRestoring = true
-        defer { isRestoring = false }
-        let result = await restoreEngine.restore(plan: plan)
-        if result.failed.isEmpty {
-            restoreMessage = "Restored \(result.succeeded.count) items from your workflow."
-        } else {
-            restoreMessage = "Restored \(result.succeeded.count); \(result.failed.count) could not open."
+    private func startLiveRefreshIfNeeded(sessionId: UUID) {
+        liveRefreshTask?.cancel()
+        let hasLiveBuffer = !(activityStore?.liveEvents(for: sessionId) ?? []).isEmpty
+        let isActive = sessionStore?.recentSessions.first(where: { $0.id == sessionId })?.isActive == true
+            || hasLiveBuffer
+        guard isActive else { return }
+
+        liveRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(EchoConfig.sessionDetailLiveRefreshInterval))
+                guard !Task.isCancelled else { break }
+                guard let self, self.watchedSessionId == sessionId else { break }
+                await self.reload(sessionId: sessionId)
+            }
         }
     }
-
-    func clearRestoreMessage() { restoreMessage = nil }
-
-    // MARK: - Private
 
     private func rebuildFromCache(
         session: Session,

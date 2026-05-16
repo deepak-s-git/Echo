@@ -21,8 +21,9 @@ struct EchoCommands: Commands {
 }
 
 extension Notification.Name {
-    static let echoOpenSearch = Notification.Name("echo.openSearch")
-    static let echoSaveSnapshot = Notification.Name("echo.saveSnapshot")
-    static let echoSessionCreated = Notification.Name("echo.sessionCreated")
-    static let echoActivityRecorded = Notification.Name("echo.activityRecorded")
+    nonisolated static let echoOpenSearch = Notification.Name("echo.openSearch")
+    nonisolated static let echoSaveSnapshot = Notification.Name("echo.saveSnapshot")
+    nonisolated static let echoSessionCreated = Notification.Name("echo.sessionCreated")
+    nonisolated static let echoActivityRecorded = Notification.Name("echo.activityRecorded")
+    nonisolated static let echoActivitiesPersisted = Notification.Name("echo.activitiesPersisted")
 }

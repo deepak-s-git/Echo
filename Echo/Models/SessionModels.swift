@@ -3,7 +3,7 @@ import GRDB
 
 // MARK: - Session
 
-struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord {
+nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord, Sendable {
     var id: UUID
     var title: String?
     var startedAt: Date
@@ -14,6 +14,8 @@ struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord {
     var snapshotPath: String?
     var projectTag: String?
     var isFavorited: Bool
+    var workflowCluster: String?
+    var restorePlanJSON: String?
 
     static let databaseTableName = "sessions"
 
@@ -27,7 +29,9 @@ struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord {
         tabCount: Int = 0,
         snapshotPath: String? = nil,
         projectTag: String? = nil,
-        isFavorited: Bool = false
+        isFavorited: Bool = false,
+        workflowCluster: String? = nil,
+        restorePlanJSON: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -39,6 +43,17 @@ struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord {
         self.snapshotPath = snapshotPath
         self.projectTag = projectTag
         self.isFavorited = isFavorited
+        self.workflowCluster = workflowCluster
+        self.restorePlanJSON = restorePlanJSON
+    }
+
+    var cluster: WorkflowCluster {
+        WorkflowCluster(rawValue: workflowCluster ?? "") ?? .mixed
+    }
+
+    var restorePlan: WorkflowRestorePlan? {
+        guard let json = restorePlanJSON else { return nil }
+        return WorkflowRestorePlan.decode(fromJSON: json)
     }
 
     var duration: TimeInterval {
@@ -50,7 +65,7 @@ struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord {
 
 // MARK: - Activity Event
 
-struct ActivityEvent: Identifiable, Codable, FetchableRecord, PersistableRecord {
+nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, PersistableRecord, Sendable {
     var id: UUID
     var sessionId: UUID
     var timestamp: Date
@@ -63,7 +78,7 @@ struct ActivityEvent: Identifiable, Codable, FetchableRecord, PersistableRecord 
 
     static let databaseTableName = "activities"
 
-    enum ActivityType: String, Codable {
+    nonisolated enum ActivityType: String, Codable, Sendable {
         case appFocus
         case appSwitch
         case browserTab
@@ -75,7 +90,7 @@ struct ActivityEvent: Identifiable, Codable, FetchableRecord, PersistableRecord 
 
 // MARK: - App Usage
 
-struct AppUsage: Identifiable, Codable, FetchableRecord, PersistableRecord {
+nonisolated struct AppUsage: Identifiable, Codable, FetchableRecord, PersistableRecord, Sendable {
     var id: UUID
     var sessionId: UUID
     var bundleId: String
@@ -89,7 +104,7 @@ struct AppUsage: Identifiable, Codable, FetchableRecord, PersistableRecord {
 
 // MARK: - Snapshot
 
-struct SessionSnapshot: Identifiable, Codable, FetchableRecord, PersistableRecord {
+nonisolated struct SessionSnapshot: Identifiable, FetchableRecord, PersistableRecord, Sendable {
     var id: UUID
     var sessionId: UUID
     var capturedAt: Date
@@ -99,26 +114,67 @@ struct SessionSnapshot: Identifiable, Codable, FetchableRecord, PersistableRecor
     var thumbnailPath: String?
 
     static let databaseTableName = "snapshots"
+
+    private static let databaseJSONEncoder = JSONEncoder()
+    private static let databaseJSONDecoder = JSONDecoder()
+
+    init(
+        id: UUID,
+        sessionId: UUID,
+        capturedAt: Date,
+        windowLayout: Data,
+        activeApps: [String],
+        browserTabs: [BrowserTab],
+        thumbnailPath: String? = nil
+    ) {
+        self.id = id
+        self.sessionId = sessionId
+        self.capturedAt = capturedAt
+        self.windowLayout = windowLayout
+        self.activeApps = activeApps
+        self.browserTabs = browserTabs
+        self.thumbnailPath = thumbnailPath
+    }
+
+    func encode(to container: inout PersistenceContainer) throws {
+        container["id"] = id.uuidString
+        container["sessionId"] = sessionId.uuidString
+        container["capturedAt"] = capturedAt
+        container["windowLayout"] = windowLayout
+        container["activeApps"] = try Self.databaseJSONEncoder.encode(activeApps)
+        container["browserTabs"] = try Self.databaseJSONEncoder.encode(browserTabs)
+        container["thumbnailPath"] = thumbnailPath
+    }
+
+    init(row: Row) throws {
+        id = UUID(uuidString: row["id"])!
+        sessionId = UUID(uuidString: row["sessionId"])!
+        capturedAt = row["capturedAt"]
+        windowLayout = row["windowLayout"]
+        activeApps = try Self.databaseJSONDecoder.decode([String].self, from: row["activeApps"])
+        browserTabs = try Self.databaseJSONDecoder.decode([BrowserTab].self, from: row["browserTabs"])
+        thumbnailPath = row["thumbnailPath"]
+    }
 }
 
 // MARK: - Browser Tab
 
-struct BrowserTab: Codable, Identifiable {
+nonisolated struct BrowserTab: Codable, Identifiable, Sendable {
     var id: UUID
     var url: String
     var title: String
     var faviconURL: String?
     var browser: Browser
 
-    enum Browser: String, Codable {
+    nonisolated enum Browser: String, Codable, Sendable {
         case safari, chrome, firefox, arc, brave, edge
     }
 }
 
 // MARK: - Window Layout
 
-struct WindowLayout: Codable {
-    struct WindowFrame: Codable {
+nonisolated struct WindowLayout: Codable, Sendable {
+    nonisolated struct WindowFrame: Codable, Sendable {
         var appName: String
         var bundleId: String
         var frame: CGRect
@@ -158,4 +214,10 @@ nonisolated enum EchoConfig {
     static let workflowIdentitySettleInterval: TimeInterval = 2.0
     /// Minimum time between workflow identity changes (anti-flicker).
     static let workflowIdentityMinChangeInterval: TimeInterval = 4.0
+    /// Gap between events treated as an interruption in session memory.
+    static let interruptionThreshold: TimeInterval = 90
+    /// Debounce browser context capture after focusing a browser.
+    static let browserContextCaptureDelay: TimeInterval = 1.2
+    /// Sessions ended within this window appear as "recently interrupted".
+    static let interruptedSessionWindow: TimeInterval = 86_400
 }

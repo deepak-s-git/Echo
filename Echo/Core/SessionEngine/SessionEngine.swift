@@ -345,9 +345,16 @@ actor SessionEngine {
         let memory = WorkflowMemoryBuilder.build(session: session, events: events)
         session.tabCount = memory.browserContexts.count
 
-        if let data = try? JSONEncoder().encode(memory.restorePlan),
-           let json = String(data: data, encoding: .utf8) {
-            session.restorePlanJSON = json
+        do {
+            let data = try JSONEncoder().encode(memory.restorePlan)
+            if let json = String(data: data, encoding: .utf8) {
+                session.restorePlanJSON = json
+                SessionDetailLogger.log(
+                    "Restore plan persisted for \(session.id.uuidString) (\(memory.restorePlan.items.count) items)"
+                )
+            }
+        } catch {
+            SessionDetailLogger.log("Restore plan encode failed for \(session.id.uuidString)", error: error)
         }
 
         let tabs = await MainActor.run { BrowserTabScraper.fetchActiveBrowserTabs() }
@@ -362,7 +369,12 @@ actor SessionEngine {
             browserTabs: tabs,
             thumbnailPath: nil
         )
-        try? await repository.insertSnapshot(snapshot)
+        do {
+            try await repository.insertSnapshot(snapshot)
+            session.snapshotPath = snapshot.id.uuidString
+        } catch {
+            SessionDetailLogger.log("Snapshot insert failed for \(session.id.uuidString)", error: error)
+        }
     }
 }
 

@@ -59,6 +59,10 @@ nonisolated enum WorkflowMemoryBuilder {
 
     // MARK: - Browser
 
+    static func browserContexts(from events: [ActivityEvent]) -> [BrowserContextEntry] {
+        buildBrowserContexts(from: events)
+    }
+
     private static func buildBrowserContexts(from events: [ActivityEvent]) -> [BrowserContextEntry] {
         events.compactMap { event -> BrowserContextEntry? in
             guard event.type == .browserTab || event.url != nil else { return nil }
@@ -144,7 +148,7 @@ nonisolated enum WorkflowPhaseAnalyzer {
         for event in events.sorted(by: { $0.timestamp < $1.timestamp }) {
             switch event.type {
             case .appFocus:
-                if let start = phaseStart, currentBundle != event.appBundleId {
+                if phaseStart != nil, currentBundle != event.appBundleId {
                     closePhase(at: event.timestamp)
                 }
                 if currentBundle != event.appBundleId {
@@ -165,7 +169,7 @@ nonisolated enum WorkflowPhaseAnalyzer {
             }
         }
 
-        if let start = phaseStart {
+        if phaseStart != nil {
             let end = events.last?.timestamp ?? Date()
             closePhase(at: end)
         }

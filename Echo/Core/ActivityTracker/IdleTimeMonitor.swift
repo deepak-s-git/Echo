@@ -8,6 +8,7 @@ actor IdleTimeMonitor {
     private let threshold: TimeInterval
     private var monitorTask: Task<Void, Never>?
     private(set) var isIdle: Bool = false
+    private var monitoringEnabled = false
 
     var onIdleStateChange: (@MainActor (Bool) -> Void)?
 
@@ -17,6 +18,11 @@ actor IdleTimeMonitor {
 
     func setOnIdleStateChange(_ handler: (@MainActor (Bool) -> Void)?) {
         onIdleStateChange = handler
+    }
+
+    func setMonitoringEnabled(_ enabled: Bool) {
+        monitoringEnabled = enabled
+        if !enabled { isIdle = false }
     }
 
     func start() {
@@ -39,6 +45,7 @@ actor IdleTimeMonitor {
     }
 
     private func tick() async {
+        guard monitoringEnabled else { return }
         let idle = Self.readIdleTime()
         let nowIdle = idle >= threshold
         guard nowIdle != isIdle else { return }

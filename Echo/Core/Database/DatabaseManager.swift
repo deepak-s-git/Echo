@@ -11,12 +11,8 @@ nonisolated final class DatabaseManager: Sendable {
 
     init() throws {
         let url = try Self.databaseURL()
-        var config = Configuration()
-        #if DEBUG
-        config.prepareDatabase { db in
-            db.trace(options: .profile) { print("[DB] \($0)") }
-        }
-        #endif
+        let config = Configuration()
+        // SQL profiling disabled — nested transaction noise and main-thread overhead during capture.
         pool = try DatabasePool(path: url.path, configuration: config)
         try runMigrations()
     }
@@ -94,6 +90,65 @@ nonisolated final class DatabaseManager: Sendable {
             try db.alter(table: Session.databaseTableName) { t in
                 t.add(column: "workflowCluster", .text)
                 t.add(column: "restorePlanJSON", .text)
+            }
+        }
+
+        migrator.registerMigration("v3_session_control") { db in
+            try db.alter(table: Session.databaseTableName) { t in
+                t.add(column: "lifecycleStateRaw", .text).defaults(to: "active")
+                t.add(column: "pausedAt", .datetime)
+                t.add(column: "pausedDuration", .double).notNull().defaults(to: 0)
+                t.add(column: "tagsJSON", .text)
+            }
+        }
+
+        migrator.registerMigration("v4_workflow_threads") { db in
+            try db.create(table: WorkflowThread.databaseTableName) { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text)
+                t.column("createdAt", .datetime).notNull().indexed()
+                t.column("lastActiveAt", .datetime).notNull().indexed()
+                t.column("statusRaw", .text).notNull().defaults(to: "idle")
+                t.column("tagsJSON", .text)
+                t.column("totalAccumulatedDuration", .double).notNull().defaults(to: 0)
+            }
+
+            try db.alter(table: Session.databaseTableName) { t in
+                t.add(column: "workflowThreadId", .text).indexed()
+            }
+
+            let sessions = try Row.fetchAll(db, sql: "SELECT id, title, startedAt, endedAt, tagsJSON FROM sessions")
+            for row in sessions {
+                let sessionId: String = row["id"]
+                let title: String? = row["title"]
+                let startedAt: Date = row["startedAt"]
+                let endedAt: Date? = row["endedAt"]
+                let tagsJSON: String? = row["tagsJSON"]
+                let duration: Double
+                if let end = endedAt {
+                    duration = end.timeIntervalSince(startedAt)
+                } else {
+                    duration = 0
+                }
+                try db.execute(
+                    sql: """
+                    INSERT INTO workflow_threads (id, title, createdAt, lastActiveAt, statusRaw, tagsJSON, totalAccumulatedDuration)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    arguments: [
+                        sessionId,
+                        title,
+                        startedAt,
+                        endedAt ?? startedAt,
+                        endedAt == nil ? "active" : "idle",
+                        tagsJSON,
+                        max(duration, 0)
+                    ]
+                )
+                try db.execute(
+                    sql: "UPDATE sessions SET workflowThreadId = ? WHERE id = ?",
+                    arguments: [sessionId, sessionId]
+                )
             }
         }
 

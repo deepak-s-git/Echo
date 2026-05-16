@@ -16,6 +16,12 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
     var isFavorited: Bool
     var workflowCluster: String?
     var restorePlanJSON: String?
+    var lifecycleStateRaw: String
+    var pausedAt: Date?
+    var pausedDuration: TimeInterval
+    var tagsJSON: String?
+    /// Parent workflow memory; each session row is one continuation segment.
+    var workflowThreadId: UUID?
 
     static let databaseTableName = "sessions"
 
@@ -31,7 +37,12 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         projectTag: String? = nil,
         isFavorited: Bool = false,
         workflowCluster: String? = nil,
-        restorePlanJSON: String? = nil
+        restorePlanJSON: String? = nil,
+        lifecycleStateRaw: String = SessionLifecycleState.active.rawValue,
+        pausedAt: Date? = nil,
+        pausedDuration: TimeInterval = 0,
+        tagsJSON: String? = nil,
+        workflowThreadId: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -45,6 +56,11 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         self.isFavorited = isFavorited
         self.workflowCluster = workflowCluster
         self.restorePlanJSON = restorePlanJSON
+        self.lifecycleStateRaw = lifecycleStateRaw
+        self.pausedAt = pausedAt
+        self.pausedDuration = pausedDuration
+        self.tagsJSON = tagsJSON
+        self.workflowThreadId = workflowThreadId
     }
 
     var cluster: WorkflowCluster {
@@ -57,10 +73,26 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
     }
 
     var duration: TimeInterval {
-        (endedAt ?? Date()).timeIntervalSince(startedAt)
+        let end = endedAt ?? Date()
+        var total = end.timeIntervalSince(startedAt) - pausedDuration
+        if let pausedAt, endedAt == nil {
+            total -= Date().timeIntervalSince(pausedAt)
+        }
+        return max(total, 0)
     }
 
-    var isActive: Bool { endedAt == nil }
+    var isActive: Bool { endedAt == nil && lifecycleStateRaw != SessionLifecycleState.archived.rawValue }
+
+    var lifecycleState: SessionLifecycleState {
+        SessionLifecycleState(rawValue: lifecycleStateRaw) ?? .active
+    }
+
+    var tags: [String] {
+        guard let tagsJSON, let data = tagsJSON.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return decoded
+    }
 
     func encode(to container: inout PersistenceContainer) throws {
         container["id"] = id.uuidString
@@ -75,6 +107,11 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         container["isFavorited"] = isFavorited
         container["workflowCluster"] = workflowCluster
         container["restorePlanJSON"] = restorePlanJSON
+        container["lifecycleStateRaw"] = lifecycleStateRaw
+        container["pausedAt"] = pausedAt
+        container["pausedDuration"] = pausedDuration
+        container["tagsJSON"] = tagsJSON
+        container["workflowThreadId"] = workflowThreadId?.uuidString
     }
 
     init(row: Row) throws {
@@ -90,6 +127,157 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         isFavorited = row["isFavorited"]
         workflowCluster = row["workflowCluster"]
         restorePlanJSON = row["restorePlanJSON"]
+        lifecycleStateRaw = row["lifecycleStateRaw"] ?? SessionLifecycleState.active.rawValue
+        pausedAt = row["pausedAt"]
+        pausedDuration = row["pausedDuration"] ?? 0
+        tagsJSON = row["tagsJSON"]
+        if let threadKey: String = row["workflowThreadId"] {
+            workflowThreadId = UUID(uuidString: threadKey)
+        } else {
+            workflowThreadId = nil
+        }
+    }
+}
+
+// MARK: - Workflow thread
+
+nonisolated struct WorkflowThread: Identifiable, Codable, FetchableRecord, PersistableRecord, Sendable {
+    var id: UUID
+    var title: String?
+    var createdAt: Date
+    var lastActiveAt: Date
+    var statusRaw: String
+    var tagsJSON: String?
+    var totalAccumulatedDuration: TimeInterval
+
+    static let databaseTableName = "workflow_threads"
+
+    init(
+        id: UUID = UUID(),
+        title: String? = nil,
+        createdAt: Date = Date(),
+        lastActiveAt: Date = Date(),
+        statusRaw: String = WorkflowThreadStatus.idle.rawValue,
+        tagsJSON: String? = nil,
+        totalAccumulatedDuration: TimeInterval = 0
+    ) {
+        self.id = id
+        self.title = title
+        self.createdAt = createdAt
+        self.lastActiveAt = lastActiveAt
+        self.statusRaw = statusRaw
+        self.tagsJSON = tagsJSON
+        self.totalAccumulatedDuration = totalAccumulatedDuration
+    }
+
+    var status: WorkflowThreadStatus {
+        WorkflowThreadStatus(rawValue: statusRaw) ?? .idle
+    }
+
+    var tags: [String] {
+        guard let tagsJSON, let data = tagsJSON.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return decoded
+    }
+
+    func encode(to container: inout PersistenceContainer) throws {
+        container["id"] = id.uuidString
+        container["title"] = title
+        container["createdAt"] = createdAt
+        container["lastActiveAt"] = lastActiveAt
+        container["statusRaw"] = statusRaw
+        container["tagsJSON"] = tagsJSON
+        container["totalAccumulatedDuration"] = totalAccumulatedDuration
+    }
+
+    init(row: Row) throws {
+        id = UUID(uuidString: row["id"])!
+        title = row["title"]
+        createdAt = row["createdAt"]
+        lastActiveAt = row["lastActiveAt"]
+        statusRaw = row["statusRaw"] ?? WorkflowThreadStatus.idle.rawValue
+        tagsJSON = row["tagsJSON"]
+        totalAccumulatedDuration = row["totalAccumulatedDuration"] ?? 0
+    }
+}
+
+nonisolated enum WorkflowThreadStatus: String, Sendable, Codable {
+    case active
+    case paused
+    case idle
+    case archived
+}
+
+nonisolated struct WorkflowThreadSummary: Identifiable, Sendable {
+    let thread: WorkflowThread
+    let segments: [Session]
+
+    var id: UUID { thread.id }
+
+    var displayTitle: String {
+        thread.title ?? segments.last?.title ?? "Untitled workflow"
+    }
+
+    var activeSegment: Session? {
+        segments.first(where: \.isActive)
+    }
+
+    var endedSegments: [Session] {
+        segments.filter { $0.endedAt != nil }
+    }
+
+    var totalDuration: TimeInterval {
+        thread.totalAccumulatedDuration + (activeSegment?.duration ?? 0)
+    }
+
+    var latestSegmentDuration: TimeInterval {
+        activeSegment?.duration ?? segments.first?.duration ?? 0
+    }
+
+    var appCount: Int {
+        segments.map(\.appCount).max() ?? 0
+    }
+
+    var latestActiveLabel: String {
+        let date = activeSegment?.startedAt ?? thread.lastActiveAt
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+}
+
+nonisolated struct WorkflowSegment: Identifiable, Sendable {
+    let session: Session
+
+    var id: UUID { session.id }
+    var startTime: Date { session.startedAt }
+    var endTime: Date? { session.endedAt }
+    var duration: TimeInterval { session.duration }
+
+    var timeOfDayLabel: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "ha"
+        let start = formatter.string(from: session.startedAt).lowercased()
+        if let end = session.endedAt {
+            let endStr = formatter.string(from: end).lowercased()
+            return "\(start) – \(endStr)"
+        }
+        return start
+    }
+
+    /// Compact log line: `May 17 • 1:03 AM • 3m`
+    @MainActor
+    var activityLogLabel: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMM d"
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mm a"
+        let date = dateFormatter.string(from: session.startedAt)
+        let time = timeFormatter.string(from: session.startedAt)
+        let duration = session.isActive ? "active" : session.duration.shortLabel
+        return "\(date) • \(time) • \(duration)"
     }
 }
 
@@ -241,9 +429,38 @@ nonisolated struct BrowserTab: Codable, Identifiable, Sendable {
     var title: String
     var faviconURL: String?
     var browser: Browser
+    var browserBundleId: String?
+    var windowTitle: String?
+    var profileName: String?
+    var tabIndex: Int?
+    var capturedAt: Date?
 
     nonisolated enum Browser: String, Codable, Sendable {
         case safari, chrome, firefox, arc, brave, edge
+    }
+
+    init(
+        id: UUID = UUID(),
+        url: String,
+        title: String,
+        faviconURL: String? = nil,
+        browser: Browser,
+        browserBundleId: String? = nil,
+        windowTitle: String? = nil,
+        profileName: String? = nil,
+        tabIndex: Int? = nil,
+        capturedAt: Date? = nil
+    ) {
+        self.id = id
+        self.url = url
+        self.title = title
+        self.faviconURL = faviconURL
+        self.browser = browser
+        self.browserBundleId = browserBundleId
+        self.windowTitle = windowTitle
+        self.profileName = profileName
+        self.tabIndex = tabIndex
+        self.capturedAt = capturedAt
     }
 }
 
@@ -263,6 +480,25 @@ nonisolated struct WindowLayout: Codable, Sendable {
     var screenCount: Int
 }
 
+// MARK: - Session lifecycle
+
+nonisolated enum SessionLifecycleState: String, Sendable, Codable {
+    case active
+    case paused
+    case idle
+    case recovered
+    case ended
+    case archived
+}
+
+/// App-wide recording mode (UI + engine).
+nonisolated enum WorkflowRecordingState: String, Sendable {
+    case idle
+    case recording
+    case paused
+    case restoring
+}
+
 // MARK: - Global Configuration
 
 /// App-wide constants. Deliberately nonisolated so any actor can read these values.
@@ -272,13 +508,17 @@ nonisolated enum EchoConfig {
     /// Flush to SQLite after this many queued events (in addition to the timer).
     static let batchWriteEventThreshold: Int = 4
     /// Session detail poll interval while viewing a live session.
-    static let sessionDetailLiveRefreshInterval: TimeInterval = 4
+    static let sessionDetailLiveRefreshInterval: TimeInterval = 8
+    /// Minimum gap between silent detail reloads (notification + poll).
+    static let sessionDetailReloadThrottle: TimeInterval = 1.5
+    /// Max backoff after repeated flush failures (seconds).
+    static let flushFailureMaxBackoff: TimeInterval = 30
     static let minSessionDuration: TimeInterval = 30
     static let maxLiveEvents: Int = 100
     static let defaultSessionFetchLimit: Int = 30
 
     /// Debounces timeline segment recomputation only (not live context).
-    static let timelineRebuildInterval: TimeInterval = 0.06
+    static let timelineRebuildInterval: TimeInterval = 0.12
     /// Hybrid focus verification poll (catches Spaces swipes, Mission Control, etc.).
     static let trackerVerifyInterval: TimeInterval = 0.2
     /// Ignores duplicate transitions to the same app within this window.

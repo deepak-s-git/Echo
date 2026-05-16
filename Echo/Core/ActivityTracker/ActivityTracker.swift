@@ -12,6 +12,7 @@ actor ActivityTracker {
     // MARK: - State
 
     private var isRunning = false
+    private var capturePaused = false
     private var currentBundleId: String?
     private var currentAppName: String?
     private var appFocusStart: Date = Date()
@@ -38,6 +39,10 @@ actor ActivityTracker {
 
         Task { @MainActor in await self.setupWorkspaceObservers() }
         startVerificationPolling()
+    }
+
+    func setCapturePaused(_ paused: Bool) {
+        capturePaused = paused
     }
 
     func stop() {
@@ -136,7 +141,7 @@ actor ActivityTracker {
 
     /// Single reconciliation entry point for notifications and polling.
     private func verifyFrontmostFocus(includeWindow: Bool) async {
-        guard isRunning else { return }
+        guard isRunning, !capturePaused else { return }
 
         let snapshot = await MainActor.run {
             includeWindow ? FrontmostSnapshot.captureWithWindow() : FrontmostSnapshot.captureAppOnly()
@@ -211,6 +216,8 @@ actor ActivityTracker {
         name: String,
         initialWindowTitle: String?
     ) async {
+        guard bundleId != currentBundleId else { return }
+
         let now = Date()
 
         closeCurrentAppFocus(at: now)

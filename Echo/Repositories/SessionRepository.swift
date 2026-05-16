@@ -56,6 +56,42 @@ final class SessionRepository: Sendable {
         }
     }
 
+    func deleteSession(id: UUID) async throws {
+        let key = id.uuidString
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: "DELETE FROM activities WHERE sessionId = ?",
+                arguments: [key]
+            )
+            try db.execute(
+                sql: "DELETE FROM snapshots WHERE sessionId = ?",
+                arguments: [key]
+            )
+            try db.execute(
+                sql: "DELETE FROM sessions WHERE id = ?",
+                arguments: [key]
+            )
+        }
+        ActivityPersistenceLogger.log("Deleted session \(key) and related rows")
+    }
+
+    func updateMetadata(sessionId: UUID, title: String, tags: [String]) async throws {
+        let tagsJSON: String?
+        if tags.isEmpty {
+            tagsJSON = nil
+        } else if let data = try? JSONEncoder().encode(tags) {
+            tagsJSON = String(data: data, encoding: .utf8)
+        } else {
+            tagsJSON = nil
+        }
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE sessions SET title = ?, tagsJSON = ? WHERE id = ?",
+                arguments: [title, tagsJSON, sessionId.uuidString]
+            )
+        }
+    }
+
     func saveRestorePlan(_ plan: WorkflowRestorePlan, for sessionId: UUID) async throws {
         let data = try encoder.encode(plan)
         guard let json = String(data: data, encoding: .utf8) else { return }
@@ -176,17 +212,27 @@ final class SessionRepository: Sendable {
     func insertBatch(_ events: [ActivityEvent]) async throws -> Int {
         guard !events.isEmpty else { return 0 }
         let sessionIds = Set(events.map(\.sessionId.uuidString))
-        return try await database.writeAsync { db in
-            try db.inTransaction {
-                for event in events {
-                    try event.insert(db, onConflict: .replace)
-                }
-                return .commit
+        // `writeAsync` already runs inside a single GRDB transaction — do not nest `inTransaction`.
+        let count = try await database.writeAsync { db in
+            for event in events {
+                try event.insert(db, onConflict: .replace)
             }
-            ActivityPersistenceLogger.log(
-                "Inserted \(events.count) events for session(s): \(sessionIds.joined(separator: ", "))"
-            )
             return events.count
+        }
+        ActivityPersistenceLogger.log(
+            "Inserted \(count) events for session(s): \(sessionIds.joined(separator: ", "))"
+        )
+        return count
+    }
+
+    /// Ends every session still marked active in SQLite (crash recovery / duplicate guard).
+    func closeAllActiveSessions(endedAt: Date = Date()) async throws -> Int {
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE sessions SET endedAt = ? WHERE endedAt IS NULL",
+                arguments: [endedAt]
+            )
+            return db.changesCount
         }
     }
 
@@ -224,6 +270,124 @@ final class SessionRepository: Sendable {
                 .filter(Column("sessionId") == sessionId.uuidString)
                 .order(Column("capturedAt").desc)
                 .fetchOne(db)
+        }
+    }
+
+    // MARK: - Workflow threads
+
+    func saveThread(_ thread: WorkflowThread) async throws {
+        try await database.writeAsync { db in try thread.save(db) }
+    }
+
+    func fetchThread(id: UUID) async throws -> WorkflowThread? {
+        try await database.readAsync { db in
+            try WorkflowThread.filter(Column("id") == id.uuidString).fetchOne(db)
+        }
+    }
+
+    func fetchSegments(threadId: UUID) async throws -> [Session] {
+        try await database.readAsync { db in
+            try Session
+                .filter(Column("workflowThreadId") == threadId.uuidString)
+                .order(Column("startedAt").desc)
+                .fetchAll(db)
+        }
+    }
+
+    func fetchWorkflowThreads(limit: Int = 40) async throws -> [WorkflowThreadSummary] {
+        try await database.readAsync { db in
+            let threads = try WorkflowThread
+                .order(Column("lastActiveAt").desc)
+                .limit(limit)
+                .fetchAll(db)
+            return try threads.map { thread in
+                let segments = try Session
+                    .filter(Column("workflowThreadId") == thread.id.uuidString)
+                    .order(Column("startedAt").desc)
+                    .fetchAll(db)
+                return WorkflowThreadSummary(thread: thread, segments: segments)
+            }
+        }
+    }
+
+    func fetchMostRecentContinuableThread() async throws -> WorkflowThread? {
+        try await database.readAsync { db in
+            try WorkflowThread
+                .filter(Column("statusRaw") != WorkflowThreadStatus.archived.rawValue)
+                .order(Column("lastActiveAt").desc)
+                .fetchOne(db)
+        }
+    }
+
+    func fetchLastEndedSegment(threadId: UUID) async throws -> Session? {
+        try await database.readAsync { db in
+            try Session
+                .filter(Column("workflowThreadId") == threadId.uuidString)
+                .filter(Column("endedAt") != nil)
+                .order(Column("endedAt").desc)
+                .fetchOne(db)
+        }
+    }
+
+    func deleteWorkflowThread(id: UUID) async throws {
+        let key = id.uuidString
+        try await database.writeAsync { db in
+            let segmentIds = try String.fetchAll(
+                db,
+                sql: "SELECT id FROM sessions WHERE workflowThreadId = ?",
+                arguments: [key]
+            )
+            for segmentId in segmentIds {
+                try db.execute(sql: "DELETE FROM activities WHERE sessionId = ?", arguments: [segmentId])
+                try db.execute(sql: "DELETE FROM snapshots WHERE sessionId = ?", arguments: [segmentId])
+            }
+            try db.execute(sql: "DELETE FROM sessions WHERE workflowThreadId = ?", arguments: [key])
+            try db.execute(sql: "DELETE FROM workflow_threads WHERE id = ?", arguments: [key])
+        }
+        ActivityPersistenceLogger.log("Deleted workflow thread \(key) and segments")
+    }
+
+    func archiveWorkflowThread(id: UUID) async throws {
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE workflow_threads SET statusRaw = ? WHERE id = ?",
+                arguments: [WorkflowThreadStatus.archived.rawValue, id.uuidString]
+            )
+        }
+    }
+
+    func updateThreadMetadata(threadId: UUID, title: String, tags: [String]) async throws {
+        let tagsJSON: String?
+        if tags.isEmpty {
+            tagsJSON = nil
+        } else if let data = try? JSONEncoder().encode(tags) {
+            tagsJSON = String(data: data, encoding: .utf8)
+        } else {
+            tagsJSON = nil
+        }
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE workflow_threads SET title = ?, tagsJSON = ? WHERE id = ?",
+                arguments: [title, tagsJSON, threadId.uuidString]
+            )
+            try db.execute(
+                sql: "UPDATE sessions SET title = ? WHERE workflowThreadId = ?",
+                arguments: [title, threadId.uuidString]
+            )
+        }
+    }
+
+    func appendSegmentDurationToThread(threadId: UUID, segmentDuration: TimeInterval) async throws {
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: """
+                UPDATE workflow_threads
+                SET totalAccumulatedDuration = totalAccumulatedDuration + ?,
+                    lastActiveAt = ?
+                WHERE id = ?
+                """,
+                arguments: [segmentDuration, Date(), threadId.uuidString]
+            )
         }
     }
 

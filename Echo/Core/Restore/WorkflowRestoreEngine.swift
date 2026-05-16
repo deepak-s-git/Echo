@@ -9,31 +9,51 @@ final class WorkflowRestoreEngine {
 
     init(restorers: [any WorkflowRestoring]? = nil) {
         self.restorers = restorers ?? [
-            ApplicationRestorer(),
+            BrowserPageRestorer(),
+            DocumentRestorer(),
+            WorkspaceRestorer(),
             URLRestorer(),
+            ApplicationRestorer(),
             FolderRestorer(),
             TerminalDirectoryRestorer()
         ]
     }
 
-    func restore(plan: WorkflowRestorePlan) async -> RestoreResult {
+    func restore(
+        plan: WorkflowRestorePlan,
+        progress: (@MainActor (Int, Int) -> Void)? = nil
+    ) async -> RestoreResult {
         var succeeded: [RestoreItem] = []
+        var skipped: [RestoreItem] = []
         var failed: [(RestoreItem, String)] = []
+        let items = plan.items
+        let total = items.count
 
-        for item in plan.items {
+        for (index, item) in items.enumerated() {
+            progress?(index, total)
             guard let restorer = restorers.first(where: { $0.canRestore(item) }) else {
                 failed.append((item, "No restorer available"))
+                continue
+            }
+            if restorer.skipReasonIfAlreadyOpen(item) != nil {
+                skipped.append(item)
                 continue
             }
             do {
                 try await restorer.restore(item)
                 succeeded.append(item)
+                EchoLog.restore("Restored \(item.label)")
             } catch {
                 failed.append((item, error.localizedDescription))
+                EchoLog.restore("Failed \(item.label)", error: error)
+            }
+            if index + 1 < items.count {
+                try? await Task.sleep(for: .milliseconds(150))
             }
         }
+        progress?(total, total)
 
-        return RestoreResult(succeeded: succeeded, failed: failed)
+        return RestoreResult(succeeded: succeeded, skipped: skipped, failed: failed)
     }
 }
 
@@ -41,7 +61,97 @@ final class WorkflowRestoreEngine {
 
 protocol WorkflowRestoring {
     func canRestore(_ item: RestoreItem) -> Bool
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String?
     func restore(_ item: RestoreItem) async throws
+}
+
+extension WorkflowRestoring {
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? { nil }
+}
+
+// MARK: - Browser page
+
+struct BrowserPageRestorer: WorkflowRestoring {
+    func canRestore(_ item: RestoreItem) -> Bool {
+        (item.kind == .browserPage || item.kind == .url) && item.url != nil
+    }
+
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? {
+        guard let url = item.url, let bundleId = item.bundleId,
+              BrowserContextService.isBrowser(bundleId)
+        else { return nil }
+        if let tab = BrowserTabScraper.activeTab(forBundleId: bundleId),
+           urlsMatch(tab.url, url) {
+            return "tab already open"
+        }
+        return nil
+    }
+
+    func restore(_ item: RestoreItem) async throws {
+        guard let urlString = item.url, let url = URL(string: urlString) else {
+            throw RestoreError.invalidURL
+        }
+        if let bundleId = item.bundleId,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
+            _ = try await NSWorkspace.shared.open(
+                [url],
+                withApplicationAt: appURL,
+                configuration: config
+            )
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func urlsMatch(_ a: String, _ b: String) -> Bool {
+        a.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            == b.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+}
+
+// MARK: - Document (Preview)
+
+struct DocumentRestorer: WorkflowRestoring {
+    func canRestore(_ item: RestoreItem) -> Bool {
+        item.kind == .document && item.path != nil
+    }
+
+    func restore(_ item: RestoreItem) async throws {
+        guard let path = item.path else { throw RestoreError.targetUnavailable }
+        let url = URL(fileURLWithPath: path)
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw RestoreError.targetUnavailable
+        }
+        NSWorkspace.shared.open(url)
+    }
+}
+
+// MARK: - Workspace (Xcode / Cursor / VS Code)
+
+struct WorkspaceRestorer: WorkflowRestoring {
+    func canRestore(_ item: RestoreItem) -> Bool {
+        item.kind == .workspace && item.path != nil
+    }
+
+    func restore(_ item: RestoreItem) async throws {
+        guard let path = item.path else { throw RestoreError.targetUnavailable }
+        let url = URL(fileURLWithPath: path)
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw RestoreError.targetUnavailable
+        }
+        if let bundleId = item.bundleId,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            _ = try await NSWorkspace.shared.open(
+                [url],
+                withApplicationAt: appURL,
+                configuration: NSWorkspace.OpenConfiguration()
+            )
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
 }
 
 // MARK: - Application
@@ -49,6 +159,16 @@ protocol WorkflowRestoring {
 struct ApplicationRestorer: WorkflowRestoring {
     func canRestore(_ item: RestoreItem) -> Bool {
         item.kind == .application && item.bundleId != nil
+    }
+
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? {
+        guard let bundleId = item.bundleId else { return nil }
+        let running = NSWorkspace.shared.runningApplications.first {
+            $0.bundleIdentifier == bundleId && !$0.isTerminated
+        }
+        guard let running else { return nil }
+        running.activate()
+        return "already running"
     }
 
     func restore(_ item: RestoreItem) async throws {
@@ -61,7 +181,7 @@ struct ApplicationRestorer: WorkflowRestoring {
     }
 }
 
-// MARK: - URL
+// MARK: - URL (generic fallback)
 
 struct URLRestorer: WorkflowRestoring {
     func canRestore(_ item: RestoreItem) -> Bool {
@@ -81,6 +201,16 @@ struct URLRestorer: WorkflowRestoring {
 struct FolderRestorer: WorkflowRestoring {
     func canRestore(_ item: RestoreItem) -> Bool {
         item.kind == .folder && item.path != nil
+    }
+
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? {
+        guard let path = item.path else { return nil }
+        guard let finder = NSWorkspace.shared.runningApplications.first(where: {
+            $0.bundleIdentifier == "com.apple.finder"
+        }) else { return nil }
+        finder.activate()
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        return "finder focused"
     }
 
     func restore(_ item: RestoreItem) async throws {

@@ -104,10 +104,12 @@ nonisolated struct RestoreItem: Codable, Sendable, Equatable, Identifiable {
     var path: String?
     var workingDirectory: String?
 
-    nonisolated enum RestoreKind: String, Codable, Sendable {
+    nonisolated enum RestoreKind: String, Codable, Sendable, CaseIterable {
         case application
         case url
+        case browserPage
         case folder
+        case document
         case terminalDirectory
         case workspace
     }
@@ -115,5 +117,16 @@ nonisolated struct RestoreItem: Codable, Sendable, Equatable, Identifiable {
 
 nonisolated struct RestoreResult: Sendable {
     let succeeded: [RestoreItem]
+    let skipped: [RestoreItem]
     let failed: [(RestoreItem, String)]
+
+    init(
+        succeeded: [RestoreItem],
+        skipped: [RestoreItem] = [],
+        failed: [(RestoreItem, String)]
+    ) {
+        self.succeeded = succeeded
+        self.skipped = skipped
+        self.failed = failed
+    }
 }

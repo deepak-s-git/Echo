@@ -37,24 +37,47 @@ nonisolated enum WorkflowMemoryBuilder {
 
     private static func buildTransitions(from events: [ActivityEvent]) -> [AppTransition] {
         var result: [AppTransition] = []
-        var previousApp: String?
+        var previousBundleId: String?
+        var previousAppName: String?
 
-        for event in events where event.type == .appFocus || event.type == .appSwitch {
-            if event.type == .appFocus {
+        for event in events.sorted(by: { $0.timestamp < $1.timestamp })
+            where event.type == .appFocus || event.type == .appSwitch {
+            switch event.type {
+            case .appFocus:
+                if let prev = previousBundleId, prev == event.appBundleId { continue }
                 result.append(AppTransition(
                     id: event.id,
-                    fromApp: previousApp,
+                    fromApp: previousAppName,
                     toApp: event.appName,
                     toBundleId: event.appBundleId,
                     timestamp: event.timestamp,
                     duration: 0
                 ))
-                previousApp = event.appName
-            } else if event.type == .appSwitch {
-                previousApp = event.appName
+                previousBundleId = event.appBundleId
+                previousAppName = event.appName
+            case .appSwitch:
+                previousBundleId = event.appBundleId
+                previousAppName = event.appName
+            default:
+                break
             }
         }
-        return result
+        return collapseTransitions(result)
+    }
+
+    /// Merges consecutive transitions into the same app (e.g. Cursor → Cursor).
+    private static func collapseTransitions(_ transitions: [AppTransition]) -> [AppTransition] {
+        guard !transitions.isEmpty else { return [] }
+        var collapsed: [AppTransition] = []
+        for transition in transitions {
+            if let last = collapsed.last,
+               last.toBundleId == transition.toBundleId,
+               last.fromApp == transition.fromApp {
+                continue
+            }
+            collapsed.append(transition)
+        }
+        return collapsed
     }
 
     // MARK: - Browser
@@ -201,6 +224,12 @@ nonisolated enum WorkflowRestorePlanBuilder {
         var items: [RestoreItem] = []
         var seen = Set<String>()
 
+        for item in WorkflowContextCapture.items(from: events) {
+            let key = restoreKey(item)
+            guard seen.insert(key).inserted else { continue }
+            items.append(item)
+        }
+
         let rankedBundles = bundleDurations(from: events)
             .sorted { $0.value > $1.value }
             .prefix(5)
@@ -224,9 +253,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
             guard let url = sanitizedURL(from: ctx), seen.insert("url:\(url)").inserted else { continue }
             items.append(RestoreItem(
                 id: UUID(),
-                kind: .url,
+                kind: .browserPage,
                 label: ctx.title,
-                bundleId: nil,
+                bundleId: browserBundleId(for: ctx.browser),
                 url: url,
                 path: nil,
                 workingDirectory: nil
@@ -258,6 +287,26 @@ nonisolated enum WorkflowRestorePlanBuilder {
         }
 
         return WorkflowRestorePlan(items: items, createdAt: session.endedAt ?? Date())
+    }
+
+    private static func restoreKey(_ item: RestoreItem) -> String {
+        switch item.kind {
+        case .application: return "app:\(item.bundleId ?? "")"
+        case .url, .browserPage: return "url:\(item.url ?? "")"
+        case .folder: return "folder:\(item.path ?? "")"
+        case .document: return "doc:\(item.path ?? "")"
+        case .terminalDirectory: return "term:\(item.workingDirectory ?? "")"
+        case .workspace: return "ws:\(item.path ?? "")"
+        }
+    }
+
+    private static func browserBundleId(for browserName: String) -> String? {
+        switch browserName.lowercased() {
+        case "safari": return "com.apple.Safari"
+        case "google chrome": return "com.google.Chrome"
+        case "arc": return "company.thebrowser.Browser"
+        default: return nil
+        }
     }
 
     private static func bundleDurations(from events: [ActivityEvent]) -> [String: TimeInterval] {

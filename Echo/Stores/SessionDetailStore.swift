@@ -19,7 +19,10 @@ final class SessionDetailStore: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var loadError: Error?
     @Published private(set) var isRestoring = false
+    @Published private(set) var restoreProgress: Double = 0
     @Published private(set) var restoreMessage: String?
+    @Published var showRestoreSelection = false
+    @Published var selectableRestoreItems: [RestoreWeighting.SelectableItem] = []
 
     private var repository: SessionRepository?
     private var sessionStore: SessionStore?
@@ -29,6 +32,9 @@ final class SessionDetailStore: ObservableObject {
     private var watchedSessionId: UUID?
     private var liveRefreshTask: Task<Void, Never>?
     private var persistenceObserver: NSObjectProtocol?
+    private var lastReloadTime: Date = .distantPast
+    private var pendingReloadTask: Task<Void, Never>?
+    private var lastLoadedSessionId: UUID?
 
     init() {
         persistenceObserver = NotificationCenter.default.addObserver(
@@ -36,18 +42,17 @@ final class SessionDetailStore: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
+            guard let sessionId = notification.userInfo?["sessionId"] as? UUID else { return }
             Task { @MainActor [weak self] in
-                guard let self,
-                      let sessionId = notification.userInfo?["sessionId"] as? UUID,
-                      sessionId == self.watchedSessionId
-                else { return }
-                await self.reload(sessionId: sessionId)
+                guard let self, sessionId == self.watchedSessionId else { return }
+                self.scheduleThrottledReload(sessionId: sessionId)
             }
         }
     }
 
     deinit {
         liveRefreshTask?.cancel()
+        pendingReloadTask?.cancel()
         if let persistenceObserver {
             NotificationCenter.default.removeObserver(persistenceObserver)
         }
@@ -64,12 +69,15 @@ final class SessionDetailStore: ObservableObject {
     }
 
     func load(sessionId: UUID) async {
+        if watchedSessionId == sessionId, loadState == .loading { return }
+        if watchedSessionId == sessionId, memory != nil, loadState == .loaded { return }
         watchedSessionId = sessionId
         await performLoad(sessionId: sessionId, showLoading: true)
         startLiveRefreshIfNeeded(sessionId: sessionId)
     }
 
     func reload(sessionId: UUID) async {
+        lastReloadTime = Date()
         await performLoad(sessionId: sessionId, showLoading: false)
     }
 
@@ -77,18 +85,58 @@ final class SessionDetailStore: ObservableObject {
         watchedSessionId = nil
         liveRefreshTask?.cancel()
         liveRefreshTask = nil
+        pendingReloadTask?.cancel()
+        pendingReloadTask = nil
     }
 
-    func restoreWorkflow() async {
-        guard let plan = memory?.restorePlan, !plan.items.isEmpty else {
-            restoreMessage = "Nothing to restore for this session."
+    func prepareRestoreSelection() {
+        guard let memory else {
+            restoreMessage = "Nothing to restore for this segment."
+            return
+        }
+        selectableRestoreItems = RestoreWeighting.buildSelectableItems(
+            from: memory.events,
+            plan: memory.restorePlan
+        )
+        showRestoreSelection = !selectableRestoreItems.isEmpty
+        if selectableRestoreItems.isEmpty {
+            restoreMessage = "Nothing to restore for this segment."
+        }
+    }
+
+    func restoreSelectedItems() async {
+        var plan = RestoreWeighting.filteredPlan(from: selectableRestoreItems)
+        if plan.items.isEmpty, let memory {
+            plan = RestoreWeighting.fallbackPlan(from: memory.events, plan: memory.restorePlan)
+        }
+        showRestoreSelection = false
+        await restoreWorkflow(plan: plan)
+    }
+
+    func restoreWorkflow(plan: WorkflowRestorePlan? = nil) async {
+        let plan = plan ?? memory?.restorePlan
+        guard let plan, !plan.items.isEmpty else {
+            restoreMessage = "Nothing to restore for this segment."
             return
         }
         isRestoring = true
-        defer { isRestoring = false }
-        let result = await restoreEngine.restore(plan: plan)
+        restoreProgress = 0
+        defer {
+            isRestoring = false
+            restoreProgress = 1
+        }
+        let result = await restoreEngine.restore(plan: plan) { [weak self] done, total in
+            let progress = total > 0 ? Double(done) / Double(total) : 0
+            self?.restoreProgress = progress
+            self?.restoreMessage = total > 0 ? "Restoring \(done)/\(total)…" : nil
+        }
         if result.failed.isEmpty {
-            restoreMessage = "Restored \(result.succeeded.count) items from your workflow."
+            var parts: [String] = []
+            if result.succeeded.count > 0 { parts.append("\(result.succeeded.count) opened") }
+            if result.skipped.count > 0 { parts.append("\(result.skipped.count) already running") }
+            restoreMessage = parts.isEmpty
+                ? "Nothing needed restoring."
+                : parts.joined(separator: " · ")
         } else {
             restoreMessage = "Restored \(result.succeeded.count); \(result.failed.count) could not open."
         }
@@ -133,6 +181,7 @@ final class SessionDetailStore: ObservableObject {
 
         switch outcome {
         case .loaded(let payload):
+            lastLoadedSessionId = sessionId
             memory = payload.memory
             snapshot = payload.snapshot
             diagnostics = payload.diagnostics
@@ -165,6 +214,22 @@ final class SessionDetailStore: ObservableObject {
         }
     }
 
+    private func scheduleThrottledReload(sessionId: UUID) {
+        guard lastLoadedSessionId == sessionId || memory == nil else { return }
+        let elapsed = Date().timeIntervalSince(lastReloadTime)
+        if elapsed >= EchoConfig.sessionDetailReloadThrottle {
+            Task { await reload(sessionId: sessionId) }
+            return
+        }
+        pendingReloadTask?.cancel()
+        let delay = EchoConfig.sessionDetailReloadThrottle - elapsed
+        pendingReloadTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await self?.reload(sessionId: sessionId)
+        }
+    }
+
     private func startLiveRefreshIfNeeded(sessionId: UUID) {
         liveRefreshTask?.cancel()
         let hasLiveBuffer = !(activityStore?.liveEvents(for: sessionId) ?? []).isEmpty
@@ -177,7 +242,7 @@ final class SessionDetailStore: ObservableObject {
                 try? await Task.sleep(for: .seconds(EchoConfig.sessionDetailLiveRefreshInterval))
                 guard !Task.isCancelled else { break }
                 guard let self, self.watchedSessionId == sessionId else { break }
-                await self.reload(sessionId: sessionId)
+                self.scheduleThrottledReload(sessionId: sessionId)
             }
         }
     }

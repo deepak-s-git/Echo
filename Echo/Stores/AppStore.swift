@@ -18,8 +18,14 @@ final class AppStore: ObservableObject {
     @Published var selectedTab: NavigationTab = .home
     @Published var isSearchPresented: Bool = false
     @Published var isOnboardingPresented: Bool = false
-    @Published var selectedSessionId: UUID?
-    @Published var showingSessionDetail: Bool = false
+
+    /// Timeline detail — replaces list content only (no NavigationStack trap).
+    @Published var timelineDetailSessionId: UUID?
+
+    @Published var pendingSessionEnd: SessionEndRequest?
+    @Published var renameSessionDraft: SessionRenameDraft?
+    @Published var renameThreadDraft: WorkflowThreadRenameDraft?
+    @Published var finalizingToast: String?
 
     init() {
         isOnboardingPresented = !UserDefaults.standard.bool(forKey: "echo.onboardingComplete")
@@ -38,14 +44,49 @@ final class AppStore: ObservableObject {
         isOnboardingPresented = false
     }
 
-    func openSessionDetail(_ sessionId: UUID) {
-        selectedSessionId = sessionId
-        showingSessionDetail = true
-        selectedTab = .timeline
+    func selectTab(_ tab: NavigationTab) {
+        if tab != .timeline || selectedTab == .timeline {
+            timelineDetailSessionId = nil
+        }
+        selectedTab = tab
     }
 
-    func closeSessionDetail() {
-        showingSessionDetail = false
-        selectedSessionId = nil
+    func openSessionDetail(_ sessionId: UUID) {
+        selectedTab = .timeline
+        timelineDetailSessionId = sessionId
     }
+
+    func popSessionDetail() {
+        timelineDetailSessionId = nil
+    }
+
+    func presentEndSession(_ request: SessionEndRequest) {
+        pendingSessionEnd = request
+    }
+
+    func dismissEndSession() {
+        pendingSessionEnd = nil
+    }
+}
+
+struct SessionEndRequest: Identifiable {
+    let id = UUID()
+    let sessionId: UUID
+    let suggestedTitle: String
+}
+
+struct SessionRenameDraft: Identifiable {
+    let sessionId: UUID
+    var title: String
+    var tags: [String]
+
+    var id: UUID { sessionId }
+}
+
+struct WorkflowThreadRenameDraft: Identifiable {
+    let threadId: UUID
+    var title: String
+    var tags: [String]
+
+    var id: UUID { threadId }
 }

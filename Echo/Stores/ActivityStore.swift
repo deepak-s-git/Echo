@@ -11,6 +11,10 @@ final class ActivityStore: ObservableObject {
     @Published private(set) var currentAppBundleId: String?
     @Published private(set) var currentSession: Session?
     @Published private(set) var isSessionActive: Bool = false
+    @Published private(set) var isSessionPaused: Bool = false
+    @Published private(set) var recordingState: WorkflowRecordingState = .idle
+
+    var isRecording: Bool { recordingState == .recording || recordingState == .paused }
     @Published private(set) var liveFocusScore: Double = 0
     @Published private(set) var focusLabel: String = "Exploring"
 
@@ -28,6 +32,7 @@ final class ActivityStore: ObservableObject {
     @Published private(set) var focusIntensity: Double = 1
 
     @Published private(set) var sessionDuration: TimeInterval = 0
+    @Published private(set) var threadAccumulatedDuration: TimeInterval = 0
     @Published private(set) var focusScore: Double = 0
 
     private var eventBuffer: [ActivityEvent] = []
@@ -47,9 +52,39 @@ final class ActivityStore: ObservableObject {
 
     // MARK: - Session lifecycle
 
-    func sessionDidStart(_ session: Session) {
+    func enterIdleMode() {
+        identitySettleTask?.cancel()
+        timelineRebuildTask?.cancel()
+        durationTask?.cancel()
+        durationTask = nil
+        currentSession = nil
+        isSessionActive = false
+        isSessionPaused = false
+        recordingState = .idle
+        currentAppName = nil
+        currentAppBundleId = nil
+        focusHeadline = "—"
+        workflowIdentity = "Your workflow"
+        recentEvents = []
+        timelineSegments = []
+        eventBuffer = []
+        threadAccumulatedDuration = 0
+        focusScore = 0
+        liveFocusScore = 0
+        focusIntensity = 1
+        lastDurationPublish = 0
+    }
+
+    func setRestoring(_ restoring: Bool) {
+        recordingState = restoring ? .restoring : (isSessionPaused ? .paused : (isSessionActive ? .recording : .idle))
+    }
+
+    func sessionDidStart(_ session: Session, threadAccumulated: TimeInterval = 0) {
         currentSession = session
         isSessionActive = true
+        isSessionPaused = false
+        recordingState = .recording
+        threadAccumulatedDuration = threadAccumulated
         seedWorkflowIdentity(from: session)
         eventBuffer.removeAll()
         recentEvents.removeAll()
@@ -68,6 +103,8 @@ final class ActivityStore: ObservableObject {
     func restore(session: Session, events: [ActivityEvent]) {
         currentSession = session
         isSessionActive = true
+        isSessionPaused = session.lifecycleState == .paused
+        recordingState = isSessionPaused ? .paused : .recording
         seedWorkflowIdentity(from: session)
         eventBuffer = normalize(events.suffix(EchoConfig.maxLiveEvents))
         sessionDuration = Date().timeIntervalSince(session.startedAt)
@@ -86,17 +123,56 @@ final class ActivityStore: ObservableObject {
         }
     }
 
-    func sessionDidEnd(_ session: Session) {
-        identitySettleTask?.cancel()
-        timelineRebuildTask?.cancel()
+    func sessionDidPause() {
+        isSessionPaused = true
+        recordingState = .paused
         durationTask?.cancel()
         durationTask = nil
+    }
+
+    func sessionDidResumeCapture() {
+        isSessionPaused = false
+        recordingState = .recording
+        startDurationTimer()
+    }
+
+    func sessionDidEnd(_ session: Session) {
+        enterIdleMode()
+    }
+
+    /// Recording armed — no segment in DB until first meaningful activity.
+    func beginRecording(threadTitle: String?, threadAccumulated: TimeInterval) {
         currentSession = nil
-        isSessionActive = false
+        isSessionActive = true
+        isSessionPaused = false
+        recordingState = .recording
+        threadAccumulatedDuration = threadAccumulated
+        workflowIdentity = threadTitle ?? "Your workflow"
+        focusHeadline = "—"
         currentAppName = nil
         currentAppBundleId = nil
-        focusHeadline = "—"
-        focusScore = session.focusScore
+        eventBuffer.removeAll()
+        recentEvents.removeAll()
+        timelineSegments.removeAll()
+        sessionDuration = 0
+        lastDurationPublish = 0
+        liveFocusScore = 0
+        focusScore = 0
+        focusLabel = "Exploring"
+        focusIntensity = 1
+        durationTask?.cancel()
+        durationTask = nil
+    }
+
+    /// First meaningful event created a segment — start block timer at zero.
+    func segmentDidStart(_ session: Session) {
+        currentSession = session
+        sessionDuration = 0
+        lastDurationPublish = 0
+        if let title = session.title, !title.isEmpty {
+            workflowIdentity = title
+        }
+        startDurationTimer()
     }
 
     // MARK: - Hot path

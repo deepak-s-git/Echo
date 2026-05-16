@@ -13,15 +13,15 @@ final class SessionStore: ObservableObject {
 
     private var repository: SessionRepository?
 
-    init() {}
+    var activeSession: Session? {
+        recentSessions.first(where: \.isActive)
+    }
 
-    // MARK: - Configuration (called once DB is ready)
+    init() {}
 
     func configure(repository: SessionRepository) {
         self.repository = repository
     }
-
-    // MARK: - Load
 
     func loadRecent() async {
         guard let repository else { return }
@@ -35,15 +35,23 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    // MARK: - Selection
-
     func select(_ session: Session) { selectedSession = session }
     func deselect() { selectedSession = nil }
 
-    // MARK: - Engine callbacks (called by SessionEngine)
-
     func sessionDidStart(_ session: Session) {
+        recentSessions.removeAll { $0.id == session.id }
         recentSessions.insert(session, at: 0)
+    }
+
+    func sessionDidResume(_ session: Session) {
+        recentSessions.removeAll { $0.id == session.id }
+        recentSessions.insert(session, at: 0)
+    }
+
+    func sessionDidUpdate(_ session: Session) {
+        if let idx = recentSessions.firstIndex(where: { $0.id == session.id }) {
+            recentSessions[idx] = session
+        }
     }
 
     func sessionDidEnd(_ session: Session) {

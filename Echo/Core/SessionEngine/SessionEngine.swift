@@ -15,6 +15,7 @@ actor SessionEngine {
     private var trackerTask: Task<Void, Never>?
     private var batchWriteTask: Task<Void, Never>?
     private var titlePersistTask: Task<Void, Never>?
+    private var browserCaptureTask: Task<Void, Never>?
     private var eventsSinceTitlePersist = 0
 
     init(
@@ -64,9 +65,12 @@ actor SessionEngine {
 
         currentSession = nil
         titlePersistTask?.cancel()
+        browserCaptureTask?.cancel()
         await flushPendingEvents()
 
         do {
+            let events = try await repository.fetchActivities(sessionId: session.id)
+            await finalizeSessionMemory(&session, events: events)
             try await repository.save(session)
             await activityStore.sessionDidEnd(session)
             await sessionStore.sessionDidEnd(session)
@@ -116,6 +120,14 @@ actor SessionEngine {
         await activityStore.applyLiveEvent(event)
 
         schedulePersistedTitleRefresh(wasFocus: event.type == .appFocus)
+
+        if event.type == .appFocus, BrowserContextService.isBrowser(event.appBundleId) {
+            scheduleBrowserCapture(
+                bundleId: event.appBundleId,
+                appName: event.appName,
+                sessionId: sessionId
+            )
+        }
     }
 
     // MARK: - Session Management
@@ -177,6 +189,7 @@ actor SessionEngine {
             ended.title = await MainActor.run {
                 SessionTitleGenerator.generate(from: events, startedAt: session.startedAt)
             }
+            await finalizeSessionMemory(&ended, events: events)
             try await repository.save(ended)
             await sessionStore.sessionDidEnd(ended)
         } catch {
@@ -235,7 +248,6 @@ actor SessionEngine {
         guard var session = currentSession else { return }
         eventsSinceTitlePersist = 0
 
-        let events = pendingEvents
         let startedAt = session.startedAt
         let title = await activityStore.computeStableWorkflowIdentity(startedAt: startedAt)
         guard session.title != title else { return }
@@ -293,9 +305,68 @@ actor SessionEngine {
         let switchRate = Double(switches) / Double(events.count)
         return min(max(1 - switchRate, 0), 1)
     }
+
+    // MARK: - Browser context
+
+    private func scheduleBrowserCapture(bundleId: String, appName: String, sessionId: UUID) {
+        browserCaptureTask?.cancel()
+        browserCaptureTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(EchoConfig.browserContextCaptureDelay))
+            guard !Task.isCancelled else { return }
+            await self?.captureBrowserContext(bundleId: bundleId, appName: appName, sessionId: sessionId)
+        }
+    }
+
+    private func captureBrowserContext(bundleId: String, appName: String, sessionId: UUID) async {
+        guard currentSession?.id == sessionId else { return }
+
+        let tab = await MainActor.run {
+            BrowserContextService.captureActiveTab(for: bundleId)
+        }
+        guard let tab else { return }
+
+        let browserEvent = BrowserContextService.activityEvent(
+            from: tab,
+            sessionId: sessionId,
+            bundleId: bundleId,
+            appName: appName
+        )
+        pendingEvents.append(browserEvent)
+        await activityStore.applyLiveEvent(browserEvent)
+    }
+
+    // MARK: - Session memory finalization
+
+    private func finalizeSessionMemory(_ session: inout Session, events: [ActivityEvent]) async {
+        let cluster = WorkflowClusterDetector.detect(from: events)
+        session.workflowCluster = cluster.rawValue
+        session.projectTag = cluster.label
+
+        let memory = WorkflowMemoryBuilder.build(session: session, events: events)
+        session.tabCount = memory.browserContexts.count
+
+        if let data = try? JSONEncoder().encode(memory.restorePlan),
+           let json = String(data: data, encoding: .utf8) {
+            session.restorePlanJSON = json
+        }
+
+        let tabs = await MainActor.run { BrowserTabScraper.fetchActiveBrowserTabs() }
+        let layoutData = (try? JSONEncoder().encode(WindowLayout(frames: [], capturedAt: Date(), screenCount: 1))) ?? Data()
+        let apps = WorkflowClusterDetector.signature(from: events)
+        let snapshot = SessionSnapshot(
+            id: UUID(),
+            sessionId: session.id,
+            capturedAt: Date(),
+            windowLayout: layoutData,
+            activeApps: apps,
+            browserTabs: tabs,
+            thumbnailPath: nil
+        )
+        try? await repository.insertSnapshot(snapshot)
+    }
 }
 
-enum SessionEndReason: Sendable {
+nonisolated enum SessionEndReason: Sendable {
     case idle
     case appTermination
     case userInitiated

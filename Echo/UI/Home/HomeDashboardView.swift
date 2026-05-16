@@ -11,32 +11,38 @@ struct HomeView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
-                    ContinuityPanel()
+                    if !activityStore.isRecording {
+                        WorkflowIdleDashboard()
+                    } else {
+                        SessionControlBar(compact: false)
 
-                    HomeHeroSection(
-                        focusHeadline: activityStore.focusHeadline,
-                        workflowIdentity: activityStore.workflowIdentity,
-                        sessionDuration: activityStore.sessionDuration,
-                        appCount: sessionStore.activeSession?.appCount ?? 0,
-                        isActive: activityStore.isSessionActive,
-                        focusScore: activityStore.liveFocusScore,
-                        focusLabel: activityStore.focusLabel
-                    )
+                        HomeHeroSection(
+                            focusHeadline: activityStore.focusHeadline,
+                            workflowIdentity: activityStore.workflowIdentity,
+                            threadTotal: activityStore.threadAccumulatedDuration,
+                            blockDuration: activityStore.sessionDuration,
+                            appCount: sessionStore.activeSession?.appCount ?? 0,
+                            isActive: activityStore.isRecording,
+                            isPaused: activityStore.isSessionPaused,
+                            focusScore: activityStore.liveFocusScore,
+                            focusLabel: activityStore.focusLabel
+                        )
 
-                    HomeCurrentAppSection(
-                        appName: activityStore.currentAppName,
-                        bundleId: activityStore.currentAppBundleId,
-                        focusLabel: activityStore.focusLabel
-                    )
+                        HomeCurrentAppSection(
+                            appName: activityStore.currentAppName,
+                            bundleId: activityStore.currentAppBundleId,
+                            focusLabel: activityStore.focusLabel
+                        )
 
-                    MiniTimelineView(
-                        segments: activityStore.timelineSegments,
-                        focusIntensity: activityStore.focusIntensity
-                    )
-                    .equatable()
-
-                    ActivityFeedView(events: activityStore.recentEvents)
+                        MiniTimelineView(
+                            segments: activityStore.timelineSegments,
+                            focusIntensity: activityStore.focusIntensity
+                        )
                         .equatable()
+
+                        ActivityFeedView(events: activityStore.recentEvents)
+                            .equatable()
+                    }
                 }
                 .padding(28)
                 .padding(.bottom, 12)
@@ -50,9 +56,11 @@ struct HomeView: View {
 private struct HomeHeroSection: View {
     let focusHeadline: String
     let workflowIdentity: String
-    let sessionDuration: TimeInterval
+    let threadTotal: TimeInterval
+    let blockDuration: TimeInterval
     let appCount: Int
     let isActive: Bool
+    let isPaused: Bool
     let focusScore: Double
     let focusLabel: String
 
@@ -60,8 +68,8 @@ private struct HomeHeroSection: View {
         HStack(alignment: .top, spacing: 22) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
-                    EchoLiveDot(isActive: isActive)
-                    Text(isActive ? "Live session" : "Paused")
+                    EchoLiveDot(isActive: isActive && !isPaused)
+                    Text(isPaused ? "Paused" : "Recording")
                         .font(.system(size: 10, weight: .semibold))
                         .textCase(.uppercase)
                         .tracking(0.5)
@@ -84,11 +92,18 @@ private struct HomeHeroSection: View {
 
                 HStack(spacing: 14) {
                     Label(
-                        sessionDuration.sessionDurationFormatted,
-                        systemImage: "clock"
+                        "Workflow \(threadTotal.sessionDurationFormatted)",
+                        systemImage: "clock.arrow.circlepath"
                     )
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(EchoPalette.indigoSoft)
+
+                    Label(
+                        "Block \(blockDuration.sessionDurationFormatted)",
+                        systemImage: "clock"
+                    )
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
 
                     if appCount > 0 {
                         Label("\(appCount) apps", systemImage: "square.grid.2x2")

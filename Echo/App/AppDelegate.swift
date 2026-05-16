@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let permissionsManager = PermissionsManager()
     let sessionDetailStore = SessionDetailStore()
     let continuityStore = ContinuityStore()
+    let sessionControl = SessionControlStore()
 
     // MARK: - Container
 
@@ -27,7 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 activityStore: activityStore,
                 permissionsManager: permissionsManager,
                 sessionDetailStore: sessionDetailStore,
-                continuityStore: continuityStore
+                continuityStore: continuityStore,
+                sessionControl: sessionControl
             )
         } catch {
             // Container failed to init (e.g. DB can't be created).

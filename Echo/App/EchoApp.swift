@@ -14,6 +14,7 @@ struct EchoApp: App {
                 .environmentObject(appDelegate.permissionsManager)
                 .environmentObject(appDelegate.sessionDetailStore)
                 .environmentObject(appDelegate.continuityStore)
+                .environmentObject(appDelegate.sessionControl)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
@@ -26,6 +27,7 @@ struct EchoApp: App {
                 .environmentObject(appDelegate.appStore)
                 .environmentObject(appDelegate.sessionStore)
                 .environmentObject(appDelegate.activityStore)
+                .environmentObject(appDelegate.sessionControl)
         } label: {
             MenuBarLabel()
         }

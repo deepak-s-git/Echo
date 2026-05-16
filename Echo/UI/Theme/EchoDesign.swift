@@ -16,8 +16,13 @@ enum EchoPalette {
 
 enum EchoDesign {
 
-    static let cornerRadius: CGFloat = 14
+    static let containerRadius: CGFloat = 24
     static let cardCornerRadius: CGFloat = 18
+    static let pillRadius: CGFloat = 12
+    static let badgeRadius: CGFloat = 8
+    static let cornerRadius: CGFloat = cardCornerRadius
+    static let sectionSpacing: CGFloat = 20
+    static let cardPadding: CGFloat = 16
     static let subtle = Animation.easeOut(duration: 0.22)
 
     static var ambientBackground: some View {
@@ -60,7 +65,7 @@ struct EchoCard: ViewModifier {
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
                     .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+            .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
     }
 }
 
@@ -77,13 +82,21 @@ extension View {
 // MARK: - Subtle hover
 
 struct EchoHoverHighlight: ViewModifier {
+    var radius: CGFloat = EchoDesign.cardCornerRadius
     @State private var hovering = false
 
     func body(content: Content) -> some View {
         content
             .background(
-                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .fill(Color.primary.opacity(hovering ? 0.03 : 0))
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.04 : 0))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(
+                        EchoPalette.strokeBright.opacity(hovering ? 1 : 0),
+                        lineWidth: 0.5
+                    )
             )
             .onHover { hovering = $0 }
     }

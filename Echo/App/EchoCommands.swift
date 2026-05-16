@@ -26,4 +26,5 @@ extension Notification.Name {
     nonisolated static let echoSessionCreated = Notification.Name("echo.sessionCreated")
     nonisolated static let echoActivityRecorded = Notification.Name("echo.activityRecorded")
     nonisolated static let echoActivitiesPersisted = Notification.Name("echo.activitiesPersisted")
+    nonisolated static let echoSessionFinalized = Notification.Name("echo.sessionFinalized")
 }

@@ -5,22 +5,24 @@ struct SessionDetailView: View {
 
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionDetailStore: SessionDetailStore
-    @Environment(\.dismiss) private var dismiss
+    @State private var showDiagnostics = false
 
     var body: some View {
         ZStack {
             EchoDesign.ambientBackground.ignoresSafeArea()
 
+            VStack(spacing: 0) {
+                detailHeader
+
             if sessionDetailStore.isLoading {
+                Spacer()
                 ProgressView("Recalling session…")
+                Spacer()
             } else if let memory = sessionDetailStore.memory {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: EchoDesign.sectionSpacing) {
                         if sessionDetailStore.loadState == .degraded {
                             degradedBanner
-                        }
-                        if let diagnostics = sessionDetailStore.diagnostics, !diagnostics.issues.isEmpty {
-                            diagnosticsSection(diagnostics)
                         }
                         header(memory)
                         continuitySection(memory)
@@ -48,21 +50,16 @@ struct SessionDetailView: View {
                         }
                         if !memory.interruptions.isEmpty { interruptionsSection(memory) }
                         restoreSection(memory)
+                        if let diagnostics = sessionDetailStore.diagnostics, !diagnostics.issues.isEmpty {
+                            developerDiagnosticsFooter(diagnostics)
+                        }
                     }
-                    .padding(28)
-                    .padding(.bottom, 40)
+                    .padding(EchoDesign.containerRadius)
+                    .padding(.bottom, 32)
                 }
             } else {
                 failedStateView
             }
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    appStore.closeSessionDetail()
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
             }
         }
         .task(id: sessionId) {
@@ -70,10 +67,6 @@ struct SessionDetailView: View {
         }
         .onDisappear {
             sessionDetailStore.stopWatching()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .echoActivitiesPersisted)) { notification in
-            guard let id = notification.userInfo?["sessionId"] as? UUID, id == sessionId else { return }
-            Task { await sessionDetailStore.reload(sessionId: sessionId) }
         }
         .alert("Restore", isPresented: .init(
             get: { sessionDetailStore.restoreMessage != nil },
@@ -83,6 +76,57 @@ struct SessionDetailView: View {
         } message: {
             Text(sessionDetailStore.restoreMessage ?? "")
         }
+        .sheet(isPresented: $sessionDetailStore.showRestoreSelection) {
+            RestoreSelectionSheet(
+                items: $sessionDetailStore.selectableRestoreItems,
+                onRestore: {
+                    Task { await sessionDetailStore.restoreSelectedItems() }
+                },
+                onCancel: {
+                    sessionDetailStore.showRestoreSelection = false
+                }
+            )
+        }
+    }
+
+    private func developerDiagnosticsFooter(_ diagnostics: SessionDetailDiagnostics) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(EchoDesign.subtle) { showDiagnostics.toggle() }
+            } label: {
+                Text(showDiagnostics ? "Hide diagnostics" : "Developer diagnostics")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            if showDiagnostics {
+                diagnosticsSection(diagnostics)
+            }
+        }
+    }
+
+    private var detailHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                appStore.popSessionDetail()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Timeline")
+                        .font(.system(size: 13, weight: .medium))
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            if sessionDetailStore.memory?.session.isActive == true {
+                SessionControlBar(compact: true)
+            }
+        }
+        .padding(.horizontal, EchoDesign.containerRadius)
+        .padding(.vertical, 12)
     }
 
     // MARK: - Load states
@@ -103,7 +147,7 @@ struct SessionDetailView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                 .fill(Color.orange.opacity(0.08))
         )
     }
@@ -142,36 +186,54 @@ struct SessionDetailView: View {
 
     private func diagnosticsSection(_ diagnostics: SessionDetailDiagnostics) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Diagnostics", icon: "stethoscope")
-
-            if !diagnostics.notes.isEmpty {
-                ForEach(Array(diagnostics.notes.enumerated()), id: \.offset) { _, note in
-                    Text(note)
-                        .font(.system(size: 11, design: .monospaced))
+            Button {
+                withAnimation(EchoDesign.subtle) { showDiagnostics.toggle() }
+            } label: {
+                HStack {
+                    sectionTitle("Diagnostics", icon: "stethoscope")
+                    Spacer()
+                    Image(systemName: showDiagnostics ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
             }
+            .buttonStyle(.plain)
 
-            ForEach(diagnostics.issues, id: \.self) { issue in
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: issue.isBlocking ? "xmark.circle.fill" : "info.circle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(issue.isBlocking ? .red : .secondary)
-                    Text(issue.userMessage)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+            if showDiagnostics {
+                if !diagnostics.notes.isEmpty {
+                    ForEach(Array(diagnostics.notes.enumerated()), id: \.offset) { _, note in
+                        Text(note)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-            }
 
-            HStack(spacing: 16) {
-                diagnosticStat("Events", value: "\(diagnostics.mergedEventCount)")
-                diagnosticStat("Persisted", value: "\(diagnostics.persistedEventCount)")
-                diagnosticStat("Live", value: "\(diagnostics.liveEventCount)")
-                diagnosticStat("Snapshot", value: diagnostics.hasSnapshot ? "Yes" : "No")
+                ForEach(diagnostics.issues, id: \.self) { issue in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: issue.isBlocking ? "xmark.circle.fill" : "info.circle")
+                            .font(.system(size: 11))
+                            .foregroundStyle(issue.isBlocking ? .red : .secondary)
+                        Text(issue.userMessage)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                HStack(spacing: 16) {
+                    diagnosticStat("Events", value: "\(diagnostics.mergedEventCount)")
+                    diagnosticStat("Persisted", value: "\(diagnostics.persistedEventCount)")
+                    diagnosticStat("Live", value: "\(diagnostics.liveEventCount)")
+                    diagnosticStat("Snapshot", value: diagnostics.hasSnapshot ? "Yes" : "No")
+                }
+            } else {
+                Text(diagnostics.summaryLine)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(2)
             }
         }
-        .echoCard()
-        .padding(18)
+        .padding(EchoDesign.cardPadding)
+        .echoCard(material: .thinMaterial)
     }
 
     private func diagnosticStat(_ label: String, value: String) -> some View {
@@ -192,8 +254,8 @@ struct SessionDetailView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
     }
 
     // MARK: - Header
@@ -252,8 +314,8 @@ struct SessionDetailView: View {
                 }
             }
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
     }
 
     private func continuityNarrative(_ memory: WorkflowMemory) -> String {
@@ -302,8 +364,8 @@ struct SessionDetailView: View {
                 )
             }
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
     }
 
     // MARK: - Phases
@@ -313,63 +375,90 @@ struct SessionDetailView: View {
             sectionTitle("Workflow phases", icon: "rectangle.split.3x1")
 
             VStack(spacing: 0) {
-                ForEach(memory.phases) { phase in
+                ForEach(Array(memory.phases.enumerated()), id: \.element.id) { index, phase in
                     HStack(alignment: .top, spacing: 14) {
                         VStack(spacing: 0) {
                             Circle()
-                                .fill(EchoPalette.indigo.opacity(0.5))
+                                .fill(EchoPalette.indigo.opacity(0.55))
                                 .frame(width: 8, height: 8)
-                            Rectangle()
-                                .fill(EchoPalette.indigo.opacity(0.15))
-                                .frame(width: 1)
+                            if index < memory.phases.count - 1 {
+                                Rectangle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                EchoPalette.indigo.opacity(0.25),
+                                                EchoPalette.indigo.opacity(0.05)
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                    .frame(width: 2)
+                            }
                         }
-                        .frame(width: 8)
+                        .frame(width: 10)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(phase.title)
                                 .font(.system(size: 14, weight: .medium))
-                            Text("\(phase.duration.shortLabel) · \(phase.startedAt, style: .time)")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 8) {
+                                Text(phase.duration.shortLabel)
+                                Text("·")
+                                Text(phase.startedAt, style: .time)
+                            }
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                         }
-                        Spacer()
+                        Spacer(minLength: 0)
                     }
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 8)
                 }
             }
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
     }
 
     // MARK: - Transitions
 
     private func transitionsSection(_ memory: WorkflowMemory) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             sectionTitle("App transitions", icon: "arrow.left.arrow.right")
 
             ForEach(memory.appTransitions.prefix(20)) { t in
-                HStack(spacing: 12) {
-                    AppIconView(bundleId: t.toBundleId, size: 24)
+                HStack(spacing: 10) {
+                    AppIconView(bundleId: t.toBundleId, size: 22)
                     VStack(alignment: .leading, spacing: 2) {
-                        if let from = t.fromApp {
-                            Text("\(from) → \(t.toApp)")
-                                .font(.system(size: 13, weight: .medium))
+                        if let from = t.fromApp, from != t.toApp {
+                            HStack(spacing: 4) {
+                                Text(from)
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.quaternary)
+                                Text(t.toApp)
+                            }
+                            .font(.system(size: 13, weight: .medium))
                         } else {
                             Text(t.toApp)
                                 .font(.system(size: 13, weight: .medium))
                         }
                         Text(t.timestamp, style: .time)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.quaternary)
                     }
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
-                .padding(.vertical, 6)
+                .padding(.vertical, 5)
+                .padding(.horizontal, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                        .fill(Color.primary.opacity(0.02))
+                )
             }
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
     }
 
     // MARK: - Browser
@@ -387,8 +476,8 @@ struct SessionDetailView: View {
                 }
             }
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
     }
 
     // MARK: - Interruptions
@@ -407,14 +496,14 @@ struct SessionDetailView: View {
                 }
             }
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
     }
 
     // MARK: - Restore
 
     private func restoreSection(_ memory: WorkflowMemory) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Continue this memory", icon: "arrow.uturn.backward.circle")
 
             Text("Reopen the apps and places that held your thread of thought.")
@@ -426,20 +515,37 @@ struct SessionDetailView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
             } else {
-                ForEach(memory.restorePlan.items.prefix(8)) { item in
-                    HStack(spacing: 10) {
-                        Image(systemName: restoreIcon(item.kind))
-                            .frame(width: 18)
-                            .foregroundStyle(EchoPalette.indigoSoft)
-                        Text(item.label)
-                            .font(.system(size: 13))
-                            .lineLimit(1)
-                        Spacer()
+                let grouped = Dictionary(grouping: memory.restorePlan.items, by: \.kind)
+                ForEach(RestoreItem.RestoreKind.allCases, id: \.self) { kind in
+                    if let items = grouped[kind], !items.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(restoreGroupTitle(kind))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                                .textCase(.uppercase)
+                            ForEach(items.prefix(6)) { item in
+                                HStack(spacing: 10) {
+                                    Image(systemName: restoreIcon(item.kind))
+                                        .frame(width: 16)
+                                        .foregroundStyle(EchoPalette.indigoSoft)
+                                    Text(item.label)
+                                        .font(.system(size: 13))
+                                        .lineLimit(1)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
                     }
                 }
 
+                if sessionDetailStore.isRestoring {
+                    ProgressView(value: sessionDetailStore.restoreProgress)
+                        .tint(EchoPalette.indigo)
+                }
+
                 Button {
-                    Task { await sessionDetailStore.restoreWorkflow() }
+                    sessionDetailStore.prepareRestoreSelection()
                 } label: {
                     HStack {
                         if sessionDetailStore.isRestoring {
@@ -454,15 +560,27 @@ struct SessionDetailView: View {
                 .disabled(sessionDetailStore.isRestoring)
             }
         }
+        .padding(EchoDesign.cardPadding)
         .echoCard()
-        .padding(18)
+    }
+
+    private func restoreGroupTitle(_ kind: RestoreItem.RestoreKind) -> String {
+        switch kind {
+        case .application: return "Applications"
+        case .url, .browserPage: return "Browser"
+        case .folder: return "Folders"
+        case .document: return "Documents"
+        case .terminalDirectory: return "Terminal"
+        case .workspace: return "Projects"
+        }
     }
 
     private func restoreIcon(_ kind: RestoreItem.RestoreKind) -> String {
         switch kind {
         case .application: return "app"
-        case .url: return "link"
+        case .url, .browserPage: return "globe"
         case .folder: return "folder"
+        case .document: return "doc"
         case .terminalDirectory: return "terminal"
         case .workspace: return "macwindow"
         }

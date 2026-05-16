@@ -5,6 +5,7 @@ struct ContinuityPanel: View {
     @EnvironmentObject var activityStore: ActivityStore
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionStore: SessionStore
+    @EnvironmentObject var sessionControl: SessionControlStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -31,10 +32,18 @@ struct ContinuityPanel: View {
                 }
             }
 
-            if let previous = continuityStore.previousSession {
+            if let thread = sessionStore.continueWorkflowThread {
                 continuityButton(
-                    title: "Continue Previous Session",
-                    subtitle: previous.title ?? "Recent workflow",
+                    title: "Continue Previous Workflow",
+                    subtitle: thread.title ?? "Resume recording",
+                    icon: "clock.arrow.circlepath"
+                ) {
+                    Task { await sessionControl.continuePreviousSession() }
+                }
+            } else if let previous = continuityStore.previousSession {
+                continuityButton(
+                    title: "View last workflow",
+                    subtitle: previous.title ?? "Recent memory",
                     icon: "clock.arrow.circlepath"
                 ) {
                     appStore.openSessionDetail(previous.id)

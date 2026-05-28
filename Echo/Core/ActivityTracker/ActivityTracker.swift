@@ -153,6 +153,10 @@ actor ActivityTracker {
         }
         lastVerifiedSnapshot = snapshot
 
+        // Skip ignored apps
+        let ignoredIds = await MainActor.run { EchoSettings.shared.ignoredBundleIds }
+        guard !ignoredIds.contains(snapshot.bundleId) else { return }
+
         if snapshot.bundleId == currentBundleId {
             await handleSameAppWindowChange(snapshot)
             return

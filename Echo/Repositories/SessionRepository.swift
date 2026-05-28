@@ -501,4 +501,15 @@ final class SessionRepository: Sendable {
         }
         ActivityPersistenceLogger.log("Cleared all data from database")
     }
+
+    /// Resets any workflow_threads still flagged `active` back to `idle`.
+    /// Called on launch after crash recovery to prevent stuck states.
+    func resetActiveThreadStatuses() async throws {
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE workflow_threads SET statusRaw = 'idle' WHERE statusRaw = 'active'"
+            )
+        }
+        ActivityPersistenceLogger.log("Reset active thread statuses on launch")
+    }
 }

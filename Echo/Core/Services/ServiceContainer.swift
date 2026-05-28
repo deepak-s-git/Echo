@@ -71,6 +71,16 @@ final class ServiceContainer {
                 await self?.sessionStore.loadRecent()
             }
         }
+
+        NotificationCenter.default.addObserver(
+            forName: .echoClearAllData,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.clearAllData()
+            }
+        }
     }
 
     func cancelRecording() async {
@@ -175,6 +185,17 @@ final class ServiceContainer {
         await sessionEngine.endIfRecording(reason: .appTermination)
         await activityTracker.stop()
         await idleMonitor.stop()
+    }
+
+    func clearAllData() async {
+        // End any running session first
+        await sessionEngine.endIfRecording(reason: .userInitiated)
+        // Wipe all DB tables
+        try? await sessionRepository.clearAll()
+        // Reset UI stores
+        activityStore.enterIdleMode()
+        await sessionStore.loadRecent()
+        await continuityStore.refresh(activeSession: nil, recent: [])
     }
 
     func repository() -> SessionRepository { sessionRepository }

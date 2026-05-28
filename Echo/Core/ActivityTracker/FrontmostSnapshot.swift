@@ -6,9 +6,13 @@ nonisolated struct FrontmostSnapshot: Sendable, Equatable {
     let displayName: String
     let pid: pid_t
     let windowTitle: String?
+    /// file:// URL for document-based apps; nil for everything else.
+    let documentURL: String?
 
+    /// Fingerprint used to detect same-app context changes (tab switches, file switches).
+    /// Prefers documentURL > windowTitle so switching files in Preview registers correctly.
     var windowFingerprint: String {
-        windowTitle ?? ""
+        documentURL ?? windowTitle ?? ""
     }
 
     /// Fast path: frontmost app only (no AX).
@@ -23,20 +27,22 @@ nonisolated struct FrontmostSnapshot: Sendable, Equatable {
                 rawName: app.localizedName
             ),
             pid: app.processIdentifier,
-            windowTitle: nil
+            windowTitle: nil,
+            documentURL: nil
         )
     }
 
-    /// Includes focused window title when Accessibility is granted (for space/window changes).
+    /// Includes focused window title + document URL when Accessibility is granted.
     @MainActor
     static func captureWithWindow() -> FrontmostSnapshot? {
         guard let base = captureAppOnly() else { return nil }
-        let title = WindowContextCapture.focusedWindowContext().title
+        let ctx = WindowContextCapture.focusedWindowContext()
         return FrontmostSnapshot(
             bundleId: base.bundleId,
             displayName: base.displayName,
             pid: base.pid,
-            windowTitle: title
+            windowTitle: ctx.title,
+            documentURL: ctx.documentURL
         )
     }
 }

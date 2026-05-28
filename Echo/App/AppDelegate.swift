@@ -39,6 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         Task { @MainActor in
+            // Trigger AppleScript prompt on launch
+            let triggerScript = NSAppleScript(source: "tell application \"Google Chrome\" to return 1")
+            triggerScript?.executeAndReturnError(nil)
+            
             await container?.start()
         }
     }

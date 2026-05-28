@@ -9,7 +9,8 @@ struct ActivityFeedView: View, Equatable {
     }
 
     private var displayEvents: [ActivityEvent] {
-        Array(events.suffix(EchoConfig.maxFeedDisplayEvents).reversed())
+        let focusedOnly = events.filter { $0.type == .appFocus }
+        return Array(focusedOnly.suffix(EchoConfig.maxFeedDisplayEvents).reversed())
     }
 
     var body: some View {
@@ -70,7 +71,7 @@ private struct ActivityFeedRow: View {
                     Spacer()
                     Text(event.timestamp, style: .time)
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.quaternary)
+                        .foregroundStyle(.tertiary)
                 }
 
                 Text(subtitle)
@@ -88,7 +89,11 @@ private struct ActivityFeedRow: View {
     private var subtitle: String {
         switch event.type {
         case .appFocus:
-            if let title = event.windowTitle, !title.isEmpty { return title }
+            let text = [event.windowTitle, event.url]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .joined(separator: " • ")
+            if !text.isEmpty { return text }
             return "Now in focus"
         case .appSwitch:
             return "Focused for \(event.duration.shortLabel)"

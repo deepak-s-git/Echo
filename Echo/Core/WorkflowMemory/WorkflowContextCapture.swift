@@ -16,28 +16,36 @@ nonisolated enum WorkflowContextCapture {
   static func itemsForEvent(_ event: ActivityEvent, seen: inout Set<String>) -> [RestoreItem] {
     switch event.appBundleId {
     case "com.apple.finder":
-      return finderItems(title: event.windowTitle, seen: &seen)
+      return finderItems(event: event, seen: &seen)
     case "com.apple.Preview":
-      return documentItems(title: event.windowTitle, seen: &seen)
+      return documentItems(event: event, seen: &seen)
     case "com.apple.dt.Xcode":
-      return workspaceItems(title: event.windowTitle, bundleId: event.appBundleId, seen: &seen)
+      return workspaceItems(event: event, seen: &seen)
     case "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92":
-      return workspaceItems(title: event.windowTitle, bundleId: event.appBundleId, seen: &seen)
+      return workspaceItems(event: event, seen: &seen)
     default:
       if BrowserContextService.isBrowser(event.appBundleId) {
         return browserItems(event: event, seen: &seen)
       }
       if isTerminal(event.appBundleId) {
-        return terminalItems(title: event.windowTitle, bundleId: event.appBundleId, seen: &seen)
+        return terminalItems(event: event, seen: &seen)
       }
-      return pathItems(title: event.windowTitle, bundleId: event.appBundleId, seen: &seen)
+      return pathItems(event: event, seen: &seen)
     }
+  }
+
+  private static func getFilePath(from event: ActivityEvent) -> String? {
+    if let urlStr = event.url, urlStr.hasPrefix("file://"), let url = URL(string: urlStr) {
+      return url.path
+    }
+    return nil
   }
 
   // MARK: - Finder
 
-  private static func finderItems(title: String?, seen: inout Set<String>) -> [RestoreItem] {
-    guard let path = extractPath(from: title), FileManager.default.fileExists(atPath: path) else { return [] }
+  private static func finderItems(event: ActivityEvent, seen: inout Set<String>) -> [RestoreItem] {
+    guard let path = getFilePath(from: event) ?? extractPath(from: event.windowTitle),
+          FileManager.default.fileExists(atPath: path) else { return [] }
     let key = "folder:\(path)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
@@ -53,8 +61,8 @@ nonisolated enum WorkflowContextCapture {
 
   // MARK: - Preview / documents
 
-  private static func documentItems(title: String?, seen: inout Set<String>) -> [RestoreItem] {
-    guard let path = extractFilePath(from: title),
+  private static func documentItems(event: ActivityEvent, seen: inout Set<String>) -> [RestoreItem] {
+    guard let path = getFilePath(from: event) ?? extractFilePath(from: event.windowTitle),
           FileManager.default.fileExists(atPath: path)
     else { return [] }
     let key = "doc:\(path)"
@@ -73,11 +81,11 @@ nonisolated enum WorkflowContextCapture {
   // MARK: - IDE workspaces
 
   private static func workspaceItems(
-    title: String?,
-    bundleId: String,
+    event: ActivityEvent,
     seen: inout Set<String>
   ) -> [RestoreItem] {
-    guard let path = extractWorkspacePath(from: title),
+    let pathOpt = getFilePath(from: event) ?? extractWorkspacePath(from: event.windowTitle)
+    guard let path = pathOpt,
           FileManager.default.fileExists(atPath: path)
     else { return [] }
     let key = "ws:\(path)"
@@ -86,7 +94,7 @@ nonisolated enum WorkflowContextCapture {
       id: UUID(),
       kind: .workspace,
       label: (path as NSString).lastPathComponent,
-      bundleId: bundleId,
+      bundleId: event.appBundleId,
       url: nil,
       path: path,
       workingDirectory: nil
@@ -115,18 +123,17 @@ nonisolated enum WorkflowContextCapture {
   // MARK: - Terminal
 
   private static func terminalItems(
-    title: String?,
-    bundleId: String,
+    event: ActivityEvent,
     seen: inout Set<String>
   ) -> [RestoreItem] {
-    guard let cwd = extractTerminalDirectory(from: title) else { return [] }
+    guard let cwd = extractTerminalDirectory(from: event.windowTitle) else { return [] }
     let key = "term:\(cwd)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
       kind: .terminalDirectory,
       label: "Terminal — \((cwd as NSString).lastPathComponent)",
-      bundleId: bundleId,
+      bundleId: event.appBundleId,
       url: nil,
       path: nil,
       workingDirectory: cwd
@@ -134,11 +141,11 @@ nonisolated enum WorkflowContextCapture {
   }
 
   private static func pathItems(
-    title: String?,
-    bundleId: String,
+    event: ActivityEvent,
     seen: inout Set<String>
   ) -> [RestoreItem] {
-    guard let path = extractPath(from: title), FileManager.default.fileExists(atPath: path) else { return [] }
+    guard let path = getFilePath(from: event) ?? extractPath(from: event.windowTitle),
+          FileManager.default.fileExists(atPath: path) else { return [] }
     let key = "path:\(path)"
     guard seen.insert(key).inserted else { return [] }
     if path.hasSuffix(".xcworkspace") || path.hasSuffix(".xcodeproj") || path.hasSuffix(".code-workspace") {
@@ -146,7 +153,7 @@ nonisolated enum WorkflowContextCapture {
         id: UUID(),
         kind: .workspace,
         label: (path as NSString).lastPathComponent,
-        bundleId: bundleId,
+        bundleId: event.appBundleId,
         url: nil,
         path: path,
         workingDirectory: nil

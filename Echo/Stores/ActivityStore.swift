@@ -299,19 +299,23 @@ final class ActivityStore: ObservableObject {
     }
 
     private func shouldMergeWindowEnrichment(_ event: ActivityEvent) -> Bool {
-        guard event.type == .appFocus,
-              let title = event.windowTitle, !title.isEmpty
-        else { return false }
+        guard event.type == .appFocus else { return false }
+        let hasTitle = event.windowTitle?.isEmpty == false
+        let hasUrl = event.url?.isEmpty == false
+        guard hasTitle || hasUrl else { return false }
+        
         guard let lastIdx = eventBuffer.indices.last else { return false }
         let last = eventBuffer[lastIdx]
         return last.type == .appFocus
             && last.appBundleId == event.appBundleId
             && last.windowTitle == nil
+            && last.url == nil
     }
 
     private func mergeWindowEnrichment(_ event: ActivityEvent) {
         guard let lastIdx = eventBuffer.indices.last else { return }
         eventBuffer[lastIdx].windowTitle = event.windowTitle
+        eventBuffer[lastIdx].url = event.url
         recentEvents = eventBuffer
         applyInstantFocus(eventBuffer[lastIdx])
         scheduleTimelineRebuild()

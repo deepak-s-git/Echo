@@ -142,10 +142,10 @@ struct BrowserTabScraper {
 
         var tabs: [BrowserTab] = []
         let count = result.numberOfItems
-        var index = 1
-        while index + 1 <= count {
-            let url = result.atIndex(index)?.stringValue ?? ""
-            let title = result.atIndex(index + 1)?.stringValue ?? ""
+        for i in 1...count {
+            guard let item = result.atIndex(i) else { continue }
+            let url = item.atIndex(1)?.stringValue ?? ""
+            let title = item.atIndex(2)?.stringValue ?? ""
             if !url.isEmpty {
                 tabs.append(BrowserTab(
                     id: UUID(),
@@ -158,7 +158,6 @@ struct BrowserTabScraper {
                     capturedAt: Date()
                 ))
             }
-            index += 2
         }
         return tabs
     }

@@ -167,7 +167,8 @@ actor ActivityTracker {
         await recordTransition(
             bundleId: snapshot.bundleId,
             name: snapshot.displayName,
-            initialWindowTitle: snapshot.windowTitle
+            initialWindowTitle: snapshot.windowTitle,
+            initialDocumentURL: snapshot.documentURL
         )
     }
 
@@ -183,16 +184,27 @@ actor ActivityTracker {
         lastEmittedWindowFingerprint = fingerprint
 
         guard let bundleId = currentBundleId, let name = currentAppName else { return }
-        emit(RawActivityEvent(
-            id: UUID(),
-            timestamp: now,
-            type: .appFocus,
-            appBundleId: bundleId,
-            appName: name,
-            windowTitle: snapshot.windowTitle,
-            url: nil,
-            duration: 0
-        ))
+
+        // For browsers: schedule AppleScript enrichment to capture the actual URL.
+        // For document apps that expose kAXDocument: emit immediately with the file URL.
+        // For all other apps: emit with window title as-is.
+        if BrowserContextService.isBrowser(bundleId) {
+            // Emit a placeholder immediately so the UI updates fast, then enrich with URL.
+            emit(RawActivityEvent(
+                id: UUID(), timestamp: now, type: .appFocus,
+                appBundleId: bundleId, appName: name,
+                windowTitle: snapshot.windowTitle, url: nil, duration: 0
+            ))
+            scheduleWindowEnrichment(bundleId: bundleId, name: name, timestamp: now)
+        } else {
+            emit(RawActivityEvent(
+                id: UUID(), timestamp: now, type: .appFocus,
+                appBundleId: bundleId, appName: name,
+                windowTitle: snapshot.windowTitle,
+                url: snapshot.documentURL,   // populated by kAXDocument in captureWithWindow()
+                duration: 0
+            ))
+        }
     }
 
     private func shouldSkipDuplicateTransition(to bundleId: String) -> Bool {
@@ -218,7 +230,8 @@ actor ActivityTracker {
     private func recordTransition(
         bundleId: String,
         name: String,
-        initialWindowTitle: String?
+        initialWindowTitle: String?,
+        initialDocumentURL: String? = nil
     ) async {
         guard bundleId != currentBundleId else { return }
 
@@ -228,7 +241,7 @@ actor ActivityTracker {
         currentBundleId = bundleId
         currentAppName = name
         appFocusStart = now
-        lastEmittedWindowFingerprint = initialWindowTitle ?? ""
+        lastEmittedWindowFingerprint = initialDocumentURL ?? initialWindowTitle ?? ""
 
         emit(RawActivityEvent(
             id: UUID(),
@@ -237,36 +250,56 @@ actor ActivityTracker {
             appBundleId: bundleId,
             appName: name,
             windowTitle: initialWindowTitle,
-            url: nil,
+            url: initialDocumentURL,
             duration: 0
         ))
 
-        if initialWindowTitle == nil || initialWindowTitle?.isEmpty == true {
-            scheduleWindowEnrichment(bundleId: bundleId, name: name, timestamp: now)
-        }
+        // Always enrich: get browser URL via AppleScript, or document URL + clean title via AX.
+        scheduleWindowEnrichment(bundleId: bundleId, name: name, timestamp: now)
     }
 
+    /// Enriches a focus event with URL context after a short delay.
+    /// • Browsers  → AppleScript active tab (URL + page title)
+    /// • Doc apps  → kAXDocument file URL + cleaned window title
+    /// • Other     → plain window title from AX
     private func scheduleWindowEnrichment(bundleId: String, name: String, timestamp: Date) {
         enrichTask?.cancel()
         enrichTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(120))
+            try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
-            let title = await MainActor.run {
-                WindowContextCapture.focusedWindowContext().title
-            }
-            guard let title, !title.isEmpty else { return }
             guard await self?.currentBundleId == bundleId else { return }
-            await self?.emit(RawActivityEvent(
-                id: UUID(),
-                timestamp: timestamp,
-                type: .appFocus,
-                appBundleId: bundleId,
-                appName: name,
-                windowTitle: title,
-                url: nil,
-                duration: 0
-            ))
-            await self?.updateLastEmittedWindowFingerprint(title)
+
+            if BrowserContextService.isBrowser(bundleId) {
+                // AppleScript: synchronous but fast (~5–20 ms). Run on main actor per existing API.
+                let tab = await MainActor.run {
+                    BrowserContextService.captureActiveTab(for: bundleId)
+                }
+                guard let tab else { return }
+                guard await self?.currentBundleId == bundleId else { return }
+                let title = tab.title.isEmpty ? nil : tab.title
+                let url   = tab.url.isEmpty   ? nil : tab.url
+                await self?.emit(RawActivityEvent(
+                    id: UUID(), timestamp: timestamp, type: .appFocus,
+                    appBundleId: bundleId, appName: name,
+                    windowTitle: title, url: url, duration: 0
+                ))
+                await self?.updateLastEmittedWindowFingerprint(url ?? title ?? "")
+            } else {
+                // AX: get window title + kAXDocument in one call.
+                let ctx = await MainActor.run {
+                    WindowContextCapture.focusedWindowContext()
+                }
+                let title = ctx.title
+                let docURL = ctx.documentURL
+                guard title != nil || docURL != nil else { return }
+                guard await self?.currentBundleId == bundleId else { return }
+                await self?.emit(RawActivityEvent(
+                    id: UUID(), timestamp: timestamp, type: .appFocus,
+                    appBundleId: bundleId, appName: name,
+                    windowTitle: title, url: docURL, duration: 0
+                ))
+                await self?.updateLastEmittedWindowFingerprint(docURL ?? title ?? "")
+            }
         }
     }
 
@@ -277,7 +310,8 @@ actor ActivityTracker {
                 bundleId: snap.bundleId,
                 displayName: snap.displayName,
                 pid: snap.pid,
-                windowTitle: title
+                windowTitle: title,
+                documentURL: snap.documentURL
             )
         }
     }

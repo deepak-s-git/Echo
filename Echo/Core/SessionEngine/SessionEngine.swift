@@ -639,12 +639,22 @@ actor SessionEngine {
         }
     }
 
-    /// Drops duplicate appFocus bursts for the same bundle within a short window.
     private func shouldSkipRedundantFocus(_ event: ActivityEvent) -> Bool {
         guard event.type == .appFocus else { return false }
-        guard let last = pendingEvents.last(where: { $0.type == .appFocus }) else { return false }
+        guard let lastIdx = pendingEvents.lastIndex(where: { $0.type == .appFocus }) else { return false }
+        let last = pendingEvents[lastIdx]
         guard last.appBundleId == event.appBundleId else { return false }
-        return event.timestamp.timeIntervalSince(last.timestamp) < EchoConfig.trackerMinTransitionInterval
+        
+        let isRedundant = event.timestamp.timeIntervalSince(last.timestamp) < EchoConfig.trackerMinTransitionInterval
+        if isRedundant {
+            if event.url != nil {
+                pendingEvents[lastIdx].url = event.url
+            }
+            if event.windowTitle != nil {
+                pendingEvents[lastIdx].windowTitle = event.windowTitle
+            }
+        }
+        return isRedundant
     }
 
     private func notifyActivitiesPersisted(sessionId: UUID) {

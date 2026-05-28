@@ -100,6 +100,7 @@ actor SessionEngine {
         if currentSession?.id == id {
             currentSession = nil
             currentWorkflowThreadId = nil
+            recordingThread = nil          // must clear — beginNewWorkflow guards on this
             isRecordingEnabled = false
             isSessionPaused = false
             await activityTracker?.setCapturePaused(true)
@@ -116,7 +117,10 @@ actor SessionEngine {
     }
 
     func deleteWorkflowThread(id: UUID) async {
-        if currentWorkflowThreadId == id {
+        // Match on EITHER currentWorkflowThreadId OR recordingThread.id — deleteSession
+        // nil-s currentWorkflowThreadId first, so checking only that would always miss.
+        let isActive = currentWorkflowThreadId == id || recordingThread?.id == id
+        if isActive {
             currentSession = nil
             currentWorkflowThreadId = nil
             recordingThread = nil
@@ -141,7 +145,18 @@ actor SessionEngine {
     }
 
     private func handleIdleTimeout() async {
-        guard isRecordingEnabled, currentSession != nil, !isSessionPaused else { return }
+        guard isRecordingEnabled else { return }
+
+        if currentSession == nil {
+            // Recording was armed (thread ready, waiting for first event) but the user
+            // went idle before any activity arrived — cancel cleanly so startNewSession
+            // can be called again without being blocked by isRecordingEnabled = true.
+            await cancelRecording()
+            EchoLog.lifecycle("Idle timeout fired before segment started — recording cancelled")
+            return
+        }
+
+        guard !isSessionPaused else { return }
         await endCurrentSession(reason: .idle)
     }
 
@@ -345,14 +360,35 @@ actor SessionEngine {
 
     private func prepareOnLaunch() async {
         ActivityPersistenceLogger.log("Launch — idle mode (no auto-recording)")
+
+        // Hard-reset ALL in-memory recording state — guarantees a clean slate
+        // regardless of how the previous run ended (crash, Xcode stop, force-quit, etc.)
         isRecordingEnabled = false
+        isSessionPaused = false
+        isRecoveredSession = false
+        currentSession = nil
+        recordingThread = nil
+        currentWorkflowThreadId = nil
+        pendingEvents = []
+        consecutiveFlushFailures = 0
+        flushBackoffUntil = nil
+        titlePersistTask?.cancel()
+        titlePersistTask = nil
+        browserCaptureTask?.cancel()
+        browserCaptureTask = nil
+
         await activityTracker?.setCapturePaused(true)
         await idleMonitor.setMonitoringEnabled(false)
 
+        // Close any sessions that are still marked active in the DB (crash recovery)
         do {
             let actives = try await repository.fetchActive()
             for stale in actives {
                 await closeStaleSession(stale)
+            }
+            // Also reset any workflow threads still flagged active
+            if !actives.isEmpty {
+                try? await repository.resetActiveThreadStatuses()
             }
         } catch {
             ActivityPersistenceLogger.log("Launch orphan cleanup failed", error: error)

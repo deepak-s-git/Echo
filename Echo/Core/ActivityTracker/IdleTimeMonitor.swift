@@ -47,7 +47,9 @@ actor IdleTimeMonitor {
     private func tick() async {
         guard monitoringEnabled else { return }
         let idle = Self.readIdleTime()
-        let nowIdle = idle >= threshold
+        // Use the live setting threshold if available; fall back to the static one passed at init.
+        let effectiveThreshold = await MainActor.run { EchoSettings.shared.idleTimeoutSeconds }
+        let nowIdle = idle >= (effectiveThreshold > 0 ? effectiveThreshold : threshold)
         guard nowIdle != isIdle else { return }
         isIdle = nowIdle
         let callback = onIdleStateChange

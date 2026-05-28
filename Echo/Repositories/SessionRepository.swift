@@ -486,4 +486,19 @@ final class SessionRepository: Sendable {
             restorePlan: restorePlan
         )
     }
+
+    // MARK: - Data Management
+
+    /// Wipes all rows from every table. Used by Privacy > Clear All Data.
+    func clearAll() async throws {
+        try await database.writeAsync { db in
+            // Order matters: delete child rows before parents
+            try db.execute(sql: "DELETE FROM activities")
+            try db.execute(sql: "DELETE FROM snapshots")
+            try db.execute(sql: "DELETE FROM app_usage")
+            try db.execute(sql: "DELETE FROM sessions")
+            try db.execute(sql: "DELETE FROM workflow_threads")
+        }
+        ActivityPersistenceLogger.log("Cleared all data from database")
+    }
 }

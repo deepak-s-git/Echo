@@ -42,14 +42,18 @@ struct SettingsView: View {
     @EnvironmentObject var permissionsManager: PermissionsManager
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
+            // Sidebar column — fixed width, no NavigationSplitView centering
             SettingsSidebar(selectedPane: $selectedPane)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 196, max: 210)
-        } detail: {
+                .frame(width: 196)
+
+            Divider()
+
+            // Detail pane — fills remaining space
             SettingsPaneContainer(pane: selectedPane)
-                .frame(minWidth: 520, minHeight: 480)
+                .frame(minWidth: 500, minHeight: 460)
         }
-        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 700, minHeight: 460)
         .background(Color(NSColor.windowBackgroundColor))
     }
 }
@@ -60,24 +64,24 @@ private struct SettingsSidebar: View {
     @Binding var selectedPane: SettingsView.Pane
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             // Header
-            HStack(spacing: 8) {
+            HStack(spacing: 9) {
                 ZStack {
                     Circle()
-                        .fill(EchoPalette.indigo.opacity(0.12))
+                        .fill(EchoPalette.indigo.opacity(0.14))
                         .frame(width: 26, height: 26)
                     Circle()
-                        .fill(EchoPalette.indigo.opacity(0.6))
-                        .frame(width: 7, height: 7)
+                        .fill(EchoPalette.indigo.opacity(0.65))
+                        .frame(width: 8, height: 8)
                 }
                 Text("Settings")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
-                Spacer()
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
-            .padding(.top, 20)
+            .padding(.top, 22)
             .padding(.bottom, 14)
 
             Divider()
@@ -85,25 +89,24 @@ private struct SettingsSidebar: View {
                 .padding(.bottom, 6)
 
             // Nav items
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 1) {
-                    ForEach(SettingsView.Pane.allCases) { pane in
-                        SettingsSidebarRow(
-                            pane: pane,
-                            isSelected: selectedPane == pane
-                        ) {
-                            withAnimation(EchoDesign.subtle) {
-                                selectedPane = pane
-                            }
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(SettingsView.Pane.allCases) { pane in
+                    SettingsSidebarRow(
+                        pane: pane,
+                        isSelected: selectedPane == pane
+                    ) {
+                        withAnimation(EchoDesign.subtle) {
+                            selectedPane = pane
                         }
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
             }
+            .padding(.horizontal, 8)
+            .padding(.top, 4)
 
             Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.ultraThinMaterial)
     }
 }
@@ -119,22 +122,26 @@ private struct SettingsSidebarRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 9) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isSelected ? pane.accentColor.opacity(0.18) : Color.primary.opacity(0.06))
+                        .fill(isSelected
+                              ? pane.accentColor.opacity(0.18)
+                              : Color.primary.opacity(0.06))
                         .frame(width: 26, height: 26)
                     Image(systemName: pane.icon)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isSelected ? pane.accentColor : Color.primary.opacity(0.55))
+                        .foregroundStyle(isSelected
+                                         ? pane.accentColor
+                                         : Color.primary.opacity(0.50))
                 }
-
                 Text(pane.rawValue)
                     .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.primary : Color.primary.opacity(0.75))
-
-                Spacer()
+                    .foregroundStyle(isSelected ? .primary : Color.primary.opacity(0.70))
+                Spacer(minLength: 0)
             }
+            // Pin content to leading edge — prevents Button from centering
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 7)
             .background(
@@ -148,6 +155,8 @@ private struct SettingsSidebarRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(EchoDesign.subtle, value: isSelected)
+        .animation(EchoDesign.subtle, value: hovering)
     }
 }
 
@@ -179,6 +188,7 @@ private struct SettingsPaneContainer: View {
             .padding(32)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(settingsPaneBackground)
     }
 
@@ -186,10 +196,7 @@ private struct SettingsPaneContainer: View {
         ZStack {
             Color(NSColor.windowBackgroundColor)
             LinearGradient(
-                colors: [
-                    pane.accentColor.opacity(0.03),
-                    Color.clear
-                ],
+                colors: [pane.accentColor.opacity(0.04), Color.clear],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

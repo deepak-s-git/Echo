@@ -17,7 +17,7 @@ struct AppearancePane: View {
 
             // MARK: Theme
             SettingsGroup(label: "Theme") {
-                HStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 16) {
                     ForEach(AppTheme.allCases) { theme in
                         ThemeCard(
                             theme: theme,
@@ -25,13 +25,11 @@ struct AppearancePane: View {
                         ) {
                             settings.appTheme = theme
                         }
-                        if theme != AppTheme.allCases.last {
-                            Spacer()
-                        }
+                        .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 18)
             }
 
             // MARK: Session UI
@@ -73,11 +71,11 @@ private struct ThemeCard: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 10) {
-                // Mini preview
+                // Mini preview — fills parent width
                 ZStack {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(themeBackground)
-                        .frame(width: 100, height: 66)
+                        .frame(height: 66)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .strokeBorder(
@@ -88,8 +86,8 @@ private struct ThemeCard: View {
                                 )
                         )
 
-                    // Mini UI elements
-                    VStack(spacing: 4) {
+                    // Mini UI skeleton
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(themeSecondary.opacity(0.35))
@@ -101,10 +99,10 @@ private struct ThemeCard: View {
                         }
                         RoundedRectangle(cornerRadius: 3)
                             .fill(themeSecondary.opacity(0.15))
-                            .frame(height: 18)
+                            .frame(height: 16)
                         RoundedRectangle(cornerRadius: 2)
                             .fill(themeSecondary.opacity(0.10))
-                            .frame(height: 12)
+                            .frame(height: 10)
                     }
                     .padding(10)
                 }
@@ -119,10 +117,10 @@ private struct ThemeCard: View {
                         .foregroundStyle(isSelected ? Color(red: 0.72, green: 0.48, blue: 0.88) : .primary)
                 }
 
-                // Selected indicator
+                // Selected dot
                 Circle()
                     .fill(isSelected ? Color(red: 0.72, green: 0.48, blue: 0.88) : Color.clear)
-                    .frame(width: 6, height: 6)
+                    .frame(width: 5, height: 5)
             }
         }
         .buttonStyle(.plain)

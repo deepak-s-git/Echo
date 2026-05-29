@@ -292,6 +292,7 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
     var appName: String
     var windowTitle: String?
     var url: String?
+    var profileName: String?
     var duration: TimeInterval
 
     static let databaseTableName = "activities"
@@ -314,6 +315,7 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         appName: String,
         windowTitle: String? = nil,
         url: String? = nil,
+        profileName: String? = nil,
         duration: TimeInterval = 0
     ) {
         self.id = id
@@ -324,6 +326,7 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         self.appName = appName
         self.windowTitle = windowTitle
         self.url = url
+        self.profileName = profileName
         self.duration = duration
     }
 
@@ -336,6 +339,7 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         container["appName"] = appName
         container["windowTitle"] = windowTitle
         container["url"] = url
+        container["profileName"] = profileName
         container["duration"] = duration
     }
 
@@ -348,6 +352,7 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         appName = row["appName"]
         windowTitle = row["windowTitle"]
         url = row["url"]
+        profileName = row["profileName"]
         duration = row["duration"]
     }
 }

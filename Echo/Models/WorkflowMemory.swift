@@ -71,7 +71,9 @@ nonisolated struct BrowserContextEntry: Identifiable, Sendable, Equatable {
     let domain: String
     let title: String
     let urlHost: String
+    let url: String?
     let browser: String
+    let profileName: String?
     let capturedAt: Date
 }
 
@@ -103,6 +105,7 @@ nonisolated struct RestoreItem: Codable, Sendable, Equatable, Identifiable {
     var url: String?
     var path: String?
     var workingDirectory: String?
+    var profileName: String?
 
     nonisolated enum RestoreKind: String, Codable, Sendable, CaseIterable {
         case application

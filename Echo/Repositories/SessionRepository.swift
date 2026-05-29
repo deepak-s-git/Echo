@@ -444,7 +444,9 @@ final class SessionRepository: Sendable {
                 domain: host,
                 title: event.windowTitle ?? host,
                 urlHost: host,
+                url: event.url,
                 browser: event.appName,
+                profileName: event.profileName,
                 capturedAt: event.timestamp
             )
         }

@@ -60,6 +60,7 @@ nonisolated final class DatabaseManager: Sendable {
                 t.column("appName", .text).notNull()
                 t.column("windowTitle", .text)
                 t.column("url", .text)
+                t.column("profileName", .text)
                 t.column("duration", .double).notNull().defaults(to: 0)
             }
 
@@ -149,6 +150,12 @@ nonisolated final class DatabaseManager: Sendable {
                     sql: "UPDATE sessions SET workflowThreadId = ? WHERE id = ?",
                     arguments: [sessionId, sessionId]
                 )
+            }
+        }
+
+        migrator.registerMigration("v5_activity_profile_name") { db in
+            try db.alter(table: ActivityEvent.databaseTableName) { t in
+                t.add(column: "profileName", .text)
             }
         }
 

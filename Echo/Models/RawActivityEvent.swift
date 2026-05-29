@@ -10,6 +10,7 @@ nonisolated struct RawActivityEvent: Sendable {
     let appName: String
     let windowTitle: String?
     let url: String?
+    let profileName: String?
     let duration: TimeInterval
 
     func stamped(sessionId: UUID) -> ActivityEvent {
@@ -22,6 +23,7 @@ nonisolated struct RawActivityEvent: Sendable {
             appName: appName,
             windowTitle: windowTitle,
             url: url,
+            profileName: profileName,
             duration: duration
         )
     }

@@ -93,6 +93,23 @@ struct BrowserPageRestorer: WorkflowRestoring {
         }
         if let bundleId = item.bundleId,
            let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            
+            if bundleId == "com.google.Chrome", let profileName = item.profileName, !profileName.isEmpty {
+                let process = Process()
+                process.executableURL = appURL.appendingPathComponent("Contents/MacOS/Google Chrome")
+                process.arguments = [
+                    "--profile-directory=\(profileName)",
+                    urlString
+                ]
+                do {
+                    try process.run()
+                    return
+                } catch {
+                    EchoLog.restore("Failed to launch Chrome with profile \(profileName)", error: error)
+                    // fallback to workspace
+                }
+            }
+
             let config = NSWorkspace.OpenConfiguration()
             config.activates = true
             _ = try await NSWorkspace.shared.open(

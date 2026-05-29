@@ -66,8 +66,11 @@ nonisolated enum SessionFinalizationRunner {
         let memory = WorkflowMemoryBuilder.build(session: session, events: events)
         session.tabCount = memory.browserContexts.count
 
+        let tabs = await captureBrowserTabs(events: events)
+        EchoLog.browserCapture("Snapshot tabs: \(tabs.count)")
+
         let contextual = WorkflowContextCapture.items(from: events)
-        let plan = mergeRestorePlan(primary: contextual, secondary: memory.restorePlan)
+        let plan = mergeRestorePlan(primary: contextual, secondary: memory.restorePlan, tabs: tabs)
 
         do {
             let data = try JSONEncoder().encode(plan)
@@ -77,9 +80,6 @@ nonisolated enum SessionFinalizationRunner {
         } catch {
             EchoLog.restore("Restore plan encode failed", error: error)
         }
-
-        let tabs = await captureBrowserTabs(events: events)
-        EchoLog.browserCapture("Snapshot tabs: \(tabs.count)")
 
         let layoutData = (try? JSONEncoder().encode(
             WindowLayout(frames: [], capturedAt: Date(), screenCount: 1)
@@ -119,15 +119,27 @@ nonisolated enum SessionFinalizationRunner {
 
     private static func mergeRestorePlan(
         primary: [RestoreItem],
-        secondary: WorkflowRestorePlan
+        secondary: WorkflowRestorePlan,
+        tabs: [BrowserTab]
     ) -> WorkflowRestorePlan {
+        let defaultChromeProfile = tabs.first(where: { $0.browser == .chrome })?.profileName
         var seen = Set<String>()
         var items: [RestoreItem] = []
-        for item in primary + secondary.items {
+        for var item in primary + secondary.items {
+            if item.kind == .browserPage || item.kind == .url {
+                if item.bundleId == "com.google.Chrome" && item.profileName == nil {
+                    item.profileName = defaultChromeProfile
+                }
+            }
             let key: String
             switch item.kind {
             case .application: key = "app:\(item.bundleId ?? "")"
-            case .url, .browserPage: key = "url:\(item.url ?? "")"
+            case .url, .browserPage:
+                if let u = item.url, let host = URL(string: u)?.host {
+                    key = "page:\(host):\(item.label)"
+                } else {
+                    key = "url:\(item.url ?? "")"
+                }
             case .folder: key = "folder:\(item.path ?? "")"
             case .document: key = "doc:\(item.path ?? "")"
             case .terminalDirectory: key = "term:\(item.workingDirectory ?? "")"

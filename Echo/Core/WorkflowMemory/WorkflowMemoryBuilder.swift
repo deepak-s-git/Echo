@@ -308,12 +308,13 @@ nonisolated enum WorkflowRestorePlanBuilder {
     }
 
     private static func browserBundleId(for browserName: String) -> String? {
-        switch browserName.lowercased() {
-        case "safari": return "com.apple.Safari"
-        case "google chrome": return "com.google.Chrome"
-        case "arc": return "company.thebrowser.Browser"
-        default: return nil
-        }
+        let name = browserName.lowercased()
+        if name.contains("safari") { return "com.apple.Safari" }
+        if name.contains("chrome") { return "com.google.Chrome" }
+        if name.contains("arc") { return "company.thebrowser.Browser" }
+        if name.contains("brave") { return "com.brave.Browser" }
+        if name.contains("edge") { return "com.microsoft.edgemac" }
+        return nil
     }
 
     private static func bundleDurations(from events: [ActivityEvent]) -> [String: TimeInterval] {

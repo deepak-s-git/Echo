@@ -38,11 +38,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Trigger AppleScript prompt on launch synchronously
+        let triggerScript = NSAppleScript(source: "tell application \"Google Chrome\" to return 1")
+        var errorInfo: NSDictionary?
+        triggerScript?.executeAndReturnError(&errorInfo)
+        if let error = errorInfo {
+            print("AppleScript Trigger Error: \(error)")
+        }
+
         Task { @MainActor in
-            // Trigger AppleScript prompt on launch
-            let triggerScript = NSAppleScript(source: "tell application \"Google Chrome\" to return 1")
-            triggerScript?.executeAndReturnError(nil)
-            
             await container?.start()
         }
     }

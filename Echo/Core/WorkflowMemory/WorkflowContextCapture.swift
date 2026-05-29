@@ -7,13 +7,27 @@ nonisolated enum WorkflowContextCapture {
     var items: [RestoreItem] = []
     var seen = Set<String>()
 
-    for event in events.reversed() {
-      items.append(contentsOf: itemsForEvent(event, seen: &seen))
+    let sorted = events.sorted { $0.timestamp < $1.timestamp }
+    var eventDurations: [UUID: TimeInterval] = [:]
+    
+    for i in 0..<sorted.count {
+        let event = sorted[i]
+        if i < sorted.count - 1 {
+            let nextEvent = sorted[i + 1]
+            eventDurations[event.id] = nextEvent.timestamp.timeIntervalSince(event.timestamp)
+        } else {
+            eventDurations[event.id] = 60.0
+        }
+    }
+
+    for event in sorted.reversed() {
+      let duration = eventDurations[event.id] ?? 0
+      items.append(contentsOf: itemsForEvent(event, duration: duration, seen: &seen))
     }
     return items
   }
 
-  static func itemsForEvent(_ event: ActivityEvent, seen: inout Set<String>) -> [RestoreItem] {
+  static func itemsForEvent(_ event: ActivityEvent, duration: TimeInterval, seen: inout Set<String>) -> [RestoreItem] {
     switch event.appBundleId {
     case "com.apple.finder":
       return finderItems(event: event, seen: &seen)
@@ -25,7 +39,7 @@ nonisolated enum WorkflowContextCapture {
       return workspaceItems(event: event, seen: &seen)
     default:
       if BrowserContextService.isBrowser(event.appBundleId) {
-        return browserItems(event: event, seen: &seen)
+        return browserItems(event: event, duration: duration, seen: &seen)
       }
       if isTerminal(event.appBundleId) {
         return terminalItems(event: event, seen: &seen)
@@ -103,12 +117,18 @@ nonisolated enum WorkflowContextCapture {
 
   // MARK: - Browser
 
-  private static func browserItems(event: ActivityEvent, seen: inout Set<String>) -> [RestoreItem] {
+  private static func browserItems(event: ActivityEvent, duration: TimeInterval, seen: inout Set<String>) -> [RestoreItem] {
+    if duration < 12.0 {
+        return []
+    }
     let urlString = event.url ?? sanitizedURL(from: event.windowTitle)
     guard let urlString, let url = URL(string: urlString) else { return [] }
+    let label = event.windowTitle ?? url.host ?? "Page"
+    if label == "New Tab" || urlString.starts(with: "chrome://newtab") || urlString.starts(with: "edge://newtab") || urlString.starts(with: "brave://newtab") {
+        return []
+    }
     let key = "browser:\(url.absoluteString)"
     guard seen.insert(key).inserted else { return [] }
-    let label = event.windowTitle ?? url.host ?? "Page"
     return [RestoreItem(
       id: UUID(),
       kind: .browserPage,
@@ -116,7 +136,8 @@ nonisolated enum WorkflowContextCapture {
       bundleId: event.appBundleId,
       url: url.absoluteString,
       path: nil,
-      workingDirectory: nil
+      workingDirectory: nil,
+      profileName: event.profileName
     )]
   }
 

@@ -96,7 +96,9 @@ nonisolated enum WorkflowMemoryBuilder {
                 domain: host,
                 title: title,
                 urlHost: host,
+                url: event.url,
                 browser: event.appName,
+                profileName: event.profileName,
                 capturedAt: event.timestamp
             )
         }
@@ -258,7 +260,8 @@ nonisolated enum WorkflowRestorePlanBuilder {
                 bundleId: browserBundleId(for: ctx.browser),
                 url: url,
                 path: nil,
-                workingDirectory: nil
+                workingDirectory: nil,
+                profileName: ctx.profileName
             ))
         }
 
@@ -292,7 +295,11 @@ nonisolated enum WorkflowRestorePlanBuilder {
     private static func restoreKey(_ item: RestoreItem) -> String {
         switch item.kind {
         case .application: return "app:\(item.bundleId ?? "")"
-        case .url, .browserPage: return "url:\(item.url ?? "")"
+        case .url, .browserPage:
+            if let u = item.url, let host = URL(string: u)?.host {
+                return "page:\(host):\(item.label)"
+            }
+            return "url:\(item.url ?? "")"
         case .folder: return "folder:\(item.path ?? "")"
         case .document: return "doc:\(item.path ?? "")"
         case .terminalDirectory: return "term:\(item.workingDirectory ?? "")"
@@ -319,6 +326,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
     }
 
     private static func sanitizedURL(from ctx: BrowserContextEntry) -> String? {
+        if let exactURL = ctx.url, URL(string: exactURL) != nil {
+            return exactURL
+        }
         guard ctx.title.count < 120 else { return nil }
         if ctx.urlHost.contains(".") { return "https://\(ctx.urlHost)" }
         return nil

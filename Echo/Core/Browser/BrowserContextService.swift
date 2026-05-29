@@ -43,6 +43,7 @@ nonisolated enum BrowserContextService {
             appName: appName,
             windowTitle: tab.title,
             url: "https://\(domain)",
+            profileName: tab.profileName,
             duration: 0
         )
     }

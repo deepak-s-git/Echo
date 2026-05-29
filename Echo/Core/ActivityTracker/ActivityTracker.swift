@@ -193,7 +193,8 @@ actor ActivityTracker {
             emit(RawActivityEvent(
                 id: UUID(), timestamp: now, type: .appFocus,
                 appBundleId: bundleId, appName: name,
-                windowTitle: snapshot.windowTitle, url: nil, duration: 0
+                windowTitle: snapshot.windowTitle, url: nil,
+                profileName: nil, duration: 0
             ))
             scheduleWindowEnrichment(bundleId: bundleId, name: name, timestamp: now)
         } else {
@@ -202,6 +203,7 @@ actor ActivityTracker {
                 appBundleId: bundleId, appName: name,
                 windowTitle: snapshot.windowTitle,
                 url: snapshot.documentURL,   // populated by kAXDocument in captureWithWindow()
+                profileName: nil,
                 duration: 0
             ))
         }
@@ -251,6 +253,7 @@ actor ActivityTracker {
             appName: name,
             windowTitle: initialWindowTitle,
             url: initialDocumentURL,
+            profileName: nil,
             duration: 0
         ))
 
@@ -281,7 +284,8 @@ actor ActivityTracker {
                 await self?.emit(RawActivityEvent(
                     id: UUID(), timestamp: timestamp, type: .appFocus,
                     appBundleId: bundleId, appName: name,
-                    windowTitle: title, url: url, duration: 0
+                    windowTitle: title, url: url,
+                    profileName: tab.profileName, duration: 0
                 ))
                 await self?.updateLastEmittedWindowFingerprint(url ?? title ?? "")
             } else {
@@ -296,7 +300,8 @@ actor ActivityTracker {
                 await self?.emit(RawActivityEvent(
                     id: UUID(), timestamp: timestamp, type: .appFocus,
                     appBundleId: bundleId, appName: name,
-                    windowTitle: title, url: docURL, duration: 0
+                    windowTitle: title, url: docURL,
+                    profileName: nil, duration: 0
                 ))
                 await self?.updateLastEmittedWindowFingerprint(docURL ?? title ?? "")
             }
@@ -331,6 +336,7 @@ actor ActivityTracker {
             appName: name,
             windowTitle: nil,
             url: nil,
+            profileName: nil,
             duration: duration
         ))
 

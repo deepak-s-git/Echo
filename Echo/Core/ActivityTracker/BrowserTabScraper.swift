@@ -20,33 +20,57 @@ struct BrowserTabScraper {
               isRunning(bundleId: bundleId) || isRunning(appName: appName)
         else { return nil }
 
-        let source: String
+        let script: String
         switch browser {
         case .safari:
-            source = """
-            tell application "Safari"
-                set w to front window
-                set t to current tab of w
-                return {URL of t, name of t}
-            end tell
+            script = """
+            try {
+                var app = Application('Safari');
+                var tab = app.windows[0].currentTab();
+                JSON.stringify({url: tab.url(), title: tab.name()});
+            } catch(e) { JSON.stringify(null); }
             """
         case .arc:
-            source = """
-            tell application "Arc"
-                set t to active tab of front window
-                return {URL of t, title of t}
-            end tell
+            script = """
+            try {
+                var app = Application('Arc');
+                var tab = app.windows[0].activeTab();
+                JSON.stringify({url: tab.url(), title: tab.name()});
+            } catch(e) { JSON.stringify(null); }
             """
         default:
-            source = """
-            tell application "\(appName)"
-                set t to active tab of front window
-                return {URL of t, title of t}
-            end tell
+            script = """
+            try {
+                var app = Application('\(appName)');
+                var tab = app.windows[0].activeTab();
+                JSON.stringify({url: tab.url(), title: tab.name()});
+            } catch(e) { JSON.stringify(null); }
             """
         }
 
-        return runPairScript(source, browser: browser, bundleId: bundleId)
+        let result = runJXA(script)
+        guard let item = result?.first, let url = item["url"], let title = item["title"], !url.isEmpty else {
+            return nil
+        }
+        if title == "New Tab" || url.starts(with: "chrome://newtab") || url.starts(with: "edge://newtab") || url.starts(with: "brave://newtab") {
+            return nil
+        }
+        var profileName: String? = nil
+        if browser == .chrome {
+            profileName = currentChromeProfile()
+        }
+
+        return BrowserTab(
+            id: UUID(),
+            url: url,
+            title: String(title.prefix(200)),
+            faviconURL: nil,
+            browser: browser,
+            browserBundleId: bundleId,
+            windowTitle: title,
+            profileName: profileName,
+            capturedAt: Date()
+        )
     }
 
     // MARK: - Full scrape (session end snapshot only)
@@ -83,83 +107,115 @@ struct BrowserTabScraper {
 
     @MainActor
     private static func runChromeStyleTabList(appName: String, browser: BrowserTab.Browser) -> [BrowserTab]? {
-        let source = """
-        tell application "\(appName)"
-            set out to {}
-            repeat with w in windows
-                repeat with t in tabs of w
-                    try
-                        set end of out to {URL of t, title of t}
-                    end try
-                end repeat
-            end repeat
-            return out
-        end tell
+        var profileName: String? = nil
+        if browser == .chrome {
+            profileName = currentChromeProfile()
+        }
+
+        let script = """
+        try {
+            var app = Application('\(appName)');
+            var tabs = [];
+            if (app.windows.length > 0) {
+                var win = app.windows[0];
+                for (var j = 0; j < win.tabs.length; j++) {
+                    var tab = win.tabs[j];
+                    try { tabs.push({url: tab.url(), title: tab.name()}); } catch(e) {}
+                }
+            }
+            JSON.stringify(tabs);
+        } catch(e) { JSON.stringify(null); }
         """
-        let tabs = runTabListScript(source, browser: browser)
+        
+        guard let result = runJXA(script) else { return nil }
+        
+        var tabs: [BrowserTab] = []
+        for item in result {
+            guard let url = item["url"], let title = item["title"], !url.isEmpty else { continue }
+            if title == "New Tab" || url.starts(with: "chrome://newtab") || url.starts(with: "edge://newtab") || url.starts(with: "brave://newtab") {
+                continue
+            }
+            tabs.append(BrowserTab(
+                id: UUID(),
+                url: url,
+                title: String(title.prefix(200)),
+                faviconURL: nil,
+                browser: browser,
+                browserBundleId: bundleIdFor(browser),
+                windowTitle: title,
+                profileName: profileName,
+                capturedAt: Date()
+            ))
+        }
         return tabs.isEmpty ? nil : tabs
     }
 
     // MARK: - Script runner
 
-    @MainActor
-    private static func runPairScript(
-        _ source: String,
-        browser: BrowserTab.Browser,
-        bundleId: String?
-    ) -> BrowserTab? {
-        var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return nil }
-        let result = script.executeAndReturnError(&error)
-        guard error == nil, result.numberOfItems >= 2 else { return nil }
-
-        let url = result.atIndex(1)?.stringValue ?? ""
-        let title = result.atIndex(2)?.stringValue ?? ""
-        guard !url.isEmpty else { return nil }
-
-        return BrowserTab(
-            id: UUID(),
-            url: url,
-            title: String(title.prefix(200)),
-            faviconURL: nil,
-            browser: browser,
-            browserBundleId: bundleIdFor(browser),
-            windowTitle: title,
-            capturedAt: Date()
-        )
-    }
-
     private static func bundleIdFor(_ browser: BrowserTab.Browser) -> String? {
         bundleToAppName.first { $0.value.0 == browser }?.key
     }
 
-    @MainActor
-    private static func runTabListScript(_ source: String, browser: BrowserTab.Browser) -> [BrowserTab] {
-        var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return [] }
-        let result = script.executeAndReturnError(&error)
-        guard error == nil else { return [] }
-
-        var tabs: [BrowserTab] = []
-        let count = result.numberOfItems
-        for i in 1...count {
-            guard let item = result.atIndex(i) else { continue }
-            let url = item.atIndex(1)?.stringValue ?? ""
-            let title = item.atIndex(2)?.stringValue ?? ""
-            if !url.isEmpty {
-                tabs.append(BrowserTab(
-                    id: UUID(),
-                    url: url,
-                    title: String(title.prefix(200)),
-                    faviconURL: nil,
-                    browser: browser,
-                    browserBundleId: bundleIdFor(browser),
-                    windowTitle: title,
-                    capturedAt: Date()
-                ))
+    private static func currentChromeProfile() -> String? {
+        let base = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Google/Chrome")
+        guard let contents = try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return nil
+        }
+        
+        var latestMtime: Date = Date.distantPast
+        var latestProfile: String? = nil
+        
+        for url in contents {
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if !isDir { continue }
+            
+            let profile = url.lastPathComponent
+            if profile == "System Profile" || profile == "Crashpad" || profile == "Guest Profile" { continue }
+            
+            let sessionsDir = url.appendingPathComponent("Sessions")
+            guard let sessionFiles = try? FileManager.default.contentsOfDirectory(at: sessionsDir, includingPropertiesForKeys: [.contentModificationDateKey]) else {
+                continue
+            }
+            
+            for file in sessionFiles {
+                if let mtime = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
+                    if mtime > latestMtime {
+                        latestMtime = mtime
+                        latestProfile = profile
+                    }
+                }
             }
         }
-        return tabs
+        return latestProfile
+    }
+
+    private static func runJXA(_ script: String) -> [[String: String]]? {
+        let task = Process()
+        task.launchPath = "/usr/bin/osascript"
+        task.arguments = ["-l", "JavaScript", "-e", script]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = Pipe()
+        
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let jsonString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let jsonData = jsonString.data(using: .utf8) else {
+                return nil
+            }
+            
+            if let array = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: String]] {
+                return array
+            }
+            if let obj = try? JSONSerialization.jsonObject(with: jsonData) as? [String: String] {
+                return [obj]
+            }
+            return nil
+        } catch {
+            return nil
+        }
     }
 
     @MainActor

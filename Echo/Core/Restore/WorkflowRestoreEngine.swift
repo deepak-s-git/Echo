@@ -91,23 +91,32 @@ struct BrowserPageRestorer: WorkflowRestoring {
         guard let urlString = item.url, let url = URL(string: urlString) else {
             throw RestoreError.invalidURL
         }
+        EchoLog.restore("[restore] item=\(item.label) profileName=\(item.profileName ?? "nil") bundleId=\(item.bundleId ?? "nil")")
+
         if let bundleId = item.bundleId,
            let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
-            
+
             if bundleId == "com.google.Chrome", let profileName = item.profileName, !profileName.isEmpty {
+                EchoLog.restore("[restore] Using open -na for profile=\(profileName) url=\(urlString)")
                 let process = Process()
-                process.executableURL = appURL.appendingPathComponent("Contents/MacOS/Google Chrome")
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
                 process.arguments = [
+                    "-na", "Google Chrome",
+                    "--args",
                     "--profile-directory=\(profileName)",
                     urlString
                 ]
                 do {
                     try process.run()
+                    process.waitUntilExit()
+                    EchoLog.restore("[restore] open -na exited with status=\(process.terminationStatus)")
                     return
                 } catch {
-                    EchoLog.restore("Failed to launch Chrome with profile \(profileName)", error: error)
-                    // fallback to workspace
+                    EchoLog.restore("[restore] open -na failed for profile \(profileName)", error: error)
+                    // fallback to generic open
                 }
+            } else {
+                EchoLog.restore("[restore] Using generic NSWorkspace path (no profile)")
             }
 
             let config = NSWorkspace.OpenConfiguration()

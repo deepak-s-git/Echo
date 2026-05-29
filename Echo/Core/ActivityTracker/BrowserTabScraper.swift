@@ -57,7 +57,7 @@ struct BrowserTabScraper {
         }
         var profileName: String? = nil
         if browser == .chrome {
-            profileName = currentChromeProfile()
+            profileName = chromeProfile(forURL: url)
         }
 
         return BrowserTab(
@@ -107,10 +107,6 @@ struct BrowserTabScraper {
 
     @MainActor
     private static func runChromeStyleTabList(appName: String, browser: BrowserTab.Browser) -> [BrowserTab]? {
-        var profileName: String? = nil
-        if browser == .chrome {
-            profileName = currentChromeProfile()
-        }
 
         let script = """
         try {
@@ -129,11 +125,20 @@ struct BrowserTabScraper {
         
         guard let result = runJXA(script) else { return nil }
         
+        // All tabs in a single Chrome window share the same profile.
+        // Resolve once from the first valid URL to avoid redundant file reads.
+        var resolvedProfile: String? = nil
+        var didResolve = false
+
         var tabs: [BrowserTab] = []
         for item in result {
             guard let url = item["url"], let title = item["title"], !url.isEmpty else { continue }
             if title == "New Tab" || url.starts(with: "chrome://newtab") || url.starts(with: "edge://newtab") || url.starts(with: "brave://newtab") {
                 continue
+            }
+            if browser == .chrome && !didResolve {
+                resolvedProfile = chromeProfile(forURL: url)
+                didResolve = true
             }
             tabs.append(BrowserTab(
                 id: UUID(),
@@ -143,7 +148,7 @@ struct BrowserTabScraper {
                 browser: browser,
                 browserBundleId: bundleIdFor(browser),
                 windowTitle: title,
-                profileName: profileName,
+                profileName: resolvedProfile,
                 capturedAt: Date()
             ))
         }
@@ -156,37 +161,82 @@ struct BrowserTabScraper {
         bundleToAppName.first { $0.value.0 == browser }?.key
     }
 
-    private static func currentChromeProfile() -> String? {
-        let base = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Google/Chrome")
-        guard let contents = try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: [.isDirectoryKey]) else {
-            return nil
+    /// Determines which Chrome profile directory contains the given URL by searching
+    /// each profile's session files for the URL string.
+    private static func chromeProfile(forURL url: String) -> String? {
+        let base = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Google/Chrome")
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: base, includingPropertiesForKeys: [.isDirectoryKey]
+        ) else { return nil }
+
+        let skipDirs: Set<String> = ["System Profile", "Crashpad", "Guest Profile",
+                                      "SafetyTips", "ShaderCache", "GrShaderCache",
+                                      "BrowserMetrics", "Crowd Deny", "MEIPreload",
+                                      "SSLErrorAssistant", "CertificateRevocation",
+                                      "FileTypePolicies", "OriginTrials", "ZxcvbnData",
+                                      "hyphen-data", "WidevineCdm", "pnacl",
+                                      "extensions_crx_cache", "Subresource Filter"]
+
+        struct ProfileCandidate {
+            let name: String
+            let latestFile: URL
+            let mtime: Date
+            let data: Data
         }
-        
-        var latestMtime: Date = Date.distantPast
-        var latestProfile: String? = nil
-        
-        for url in contents {
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            if !isDir { continue }
-            
-            let profile = url.lastPathComponent
-            if profile == "System Profile" || profile == "Crashpad" || profile == "Guest Profile" { continue }
-            
-            let sessionsDir = url.appendingPathComponent("Sessions")
-            guard let sessionFiles = try? FileManager.default.contentsOfDirectory(at: sessionsDir, includingPropertiesForKeys: [.contentModificationDateKey]) else {
-                continue
-            }
-            
-            for file in sessionFiles {
-                if let mtime = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
-                    if mtime > latestMtime {
-                        latestMtime = mtime
-                        latestProfile = profile
-                    }
+
+        var candidates: [ProfileCandidate] = []
+
+        for profileURL in contents {
+            let isDir = (try? profileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            guard isDir else { continue }
+            let profile = profileURL.lastPathComponent
+            guard !skipDirs.contains(profile),
+                  profile != "System Profile" else { continue }
+
+            let sessionsDir = profileURL.appendingPathComponent("Sessions")
+            guard let files = try? FileManager.default.contentsOfDirectory(
+                at: sessionsDir, includingPropertiesForKeys: [.contentModificationDateKey]
+            ) else { continue }
+
+            let tabsFiles = files
+                .filter { $0.lastPathComponent.hasPrefix("Tabs_") }
+                .sorted { f1, f2 in
+                    let d1 = (try? f1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                    let d2 = (try? f2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                    return d1 > d2
+                }
+
+            guard let latestFile = tabsFiles.first,
+                  let mtime = (try? latestFile.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate),
+                  let data = try? Data(contentsOf: latestFile) else { continue }
+
+            candidates.append(ProfileCandidate(name: profile, latestFile: latestFile, mtime: mtime, data: data))
+        }
+
+        // Sort candidates newest-first by session file modification date
+        candidates.sort { $0.mtime > $1.mtime }
+
+        // 1. Try exact URL match
+        if let urlData = url.data(using: .utf8) {
+            for candidate in candidates {
+                if candidate.data.range(of: urlData) != nil {
+                    return candidate.name
                 }
             }
         }
-        return latestProfile
+
+        // 2. Try host/domain match
+        if let host = URL(string: url)?.host, let hostData = host.data(using: .utf8) {
+            for candidate in candidates {
+                if candidate.data.range(of: hostData) != nil {
+                    return candidate.name
+                }
+            }
+        }
+
+        // 3. Fallback: most recently modified profile
+        return candidates.first?.name
     }
 
     private static func runJXA(_ script: String) -> [[String: String]]? {

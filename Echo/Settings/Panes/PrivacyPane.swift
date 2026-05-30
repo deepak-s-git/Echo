@@ -229,7 +229,10 @@ private struct PrivacyFactRow: View {
             .padding(.vertical, 10)
 
             if showDivider {
-                Divider().padding(.leading, 56)
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
+                    .padding(.leading, 56)
             }
         }
     }

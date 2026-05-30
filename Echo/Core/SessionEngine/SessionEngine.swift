@@ -25,6 +25,7 @@ actor SessionEngine {
     private var isRecordingEnabled = false
     private var currentWorkflowThreadId: UUID?
     private var recordingThread: WorkflowThread?
+    private var capturedBrowserURLs = Set<String>()
 
     init(
         repository: SessionRepository,
@@ -172,7 +173,7 @@ actor SessionEngine {
         do {
             try await repository.save(session)
             await sessionStore.sessionDidUpdate(session)
-            await activityStore.sessionDidPause()
+            await activityStore.sessionDidPause(session)
             ActivityPersistenceLogger.log("Paused session \(session.id.uuidString)")
         } catch {
             ActivityPersistenceLogger.log("Pause save failed", error: error)
@@ -195,7 +196,7 @@ actor SessionEngine {
         do {
             try await repository.save(session)
             await sessionStore.sessionDidUpdate(session)
-            await activityStore.sessionDidResumeCapture()
+            await activityStore.sessionDidResumeCapture(session)
             ActivityPersistenceLogger.log("Resumed session \(session.id.uuidString)")
         } catch {
             ActivityPersistenceLogger.log("Resume save failed", error: error)
@@ -238,6 +239,7 @@ actor SessionEngine {
         currentSession = nil
         currentWorkflowThreadId = nil
         recordingThread = nil
+        capturedBrowserURLs.removeAll()
         pendingEvents = []
         isRecordingEnabled = false
         isRecoveredSession = false
@@ -439,6 +441,7 @@ actor SessionEngine {
 
     private func ensureSegmentStarted(trigger: RawActivityEvent) async {
         guard currentSession == nil, let thread = recordingThread else { return }
+        capturedBrowserURLs.removeAll()
 
         let startedAt = Date()
         var session = Session(startedAt: startedAt, workflowThreadId: thread.id)
@@ -712,7 +715,12 @@ actor SessionEngine {
         }
         guard !tabs.isEmpty else { return }
 
+        var addedCount = 0
         for tab in tabs {
+            let urlKey = tab.url.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard capturedBrowserURLs.insert(urlKey).inserted else { continue }
+            addedCount += 1
+
             let browserEvent = BrowserContextService.activityEvent(
                 from: tab,
                 sessionId: sessionId,
@@ -721,9 +729,11 @@ actor SessionEngine {
             )
             pendingEvents.append(browserEvent)
         }
-        ActivityPersistenceLogger.log(
-            "Queued \(tabs.count) browser tab(s) for \(sessionId.uuidString)"
-        )
+        if addedCount > 0 {
+            ActivityPersistenceLogger.log(
+                "Queued \(addedCount) new browser tab(s) for \(sessionId.uuidString)"
+            )
+        }
         if let last = tabs.last {
             let liveEvent = BrowserContextService.activityEvent(
                 from: last,

@@ -7,86 +7,56 @@ struct WorkflowIdleDashboard: View {
     @EnvironmentObject var sessionControl: SessionControlStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Workflow memory")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.4)
+        VStack(alignment: .leading, spacing: EchoDesign.sectionSpacing) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Workflow Memory")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(EchoPalette.indigoSoft)
+                    .textCase(.uppercase)
+                    .tracking(1.0)
+                
+                Text("Recall and continue your working context instantly.")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.bottom, 4)
 
-            Text("Browse your memories freely, or start recording when you're ready.")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 if let thread = sessionStore.continueWorkflowThread {
-                    actionButton(
+                    DashboardActionButton(
                         title: "Continue Previous Workflow",
                         subtitle: continueSubtitle(for: thread),
                         icon: "arrow.uturn.backward",
-                        prominent: true
+                        prominent: true,
+                        gradientColor: true
                     ) {
                         Task { await sessionControl.continuePreviousSession() }
                     }
                 }
 
-                actionButton(
+                DashboardActionButton(
                     title: "Start New Workflow",
-                    subtitle: "Begin a fresh workflow memory",
+                    subtitle: "Begin a fresh workflow memory segment",
                     icon: "record.circle",
-                    prominent: sessionStore.continueWorkflowThread == nil
+                    prominent: sessionStore.continueWorkflowThread == nil,
+                    gradientColor: false
                 ) {
                     Task { await sessionControl.startNewSession() }
                 }
 
-                actionButton(
+                DashboardActionButton(
                     title: "Browse Memories",
                     subtitle: "Open timeline without recording",
                     icon: "timeline.selection",
-                    prominent: false
+                    prominent: false,
+                    gradientColor: false
                 ) {
                     appStore.selectTab(.timeline)
                 }
             }
         }
-        .padding(EchoDesign.cardPadding)
+        .padding(24)
         .echoCard(material: .thinMaterial)
-    }
-
-    private func actionButton(
-        title: String,
-        subtitle: String,
-        icon: String,
-        prominent: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(prominent ? EchoPalette.indigoSoft : .secondary)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.quaternary)
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .fill(prominent ? EchoPalette.indigo.opacity(0.08) : Color.primary.opacity(0.03))
-            )
-        }
-        .buttonStyle(.plain)
     }
 
     private func continueSubtitle(for thread: WorkflowThread) -> String {
@@ -95,5 +65,74 @@ struct WorkflowIdleDashboard: View {
             return "\(title) · \(thread.totalAccumulatedDuration.shortLabel) total"
         }
         return title
+    }
+}
+
+private struct DashboardActionButton: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let prominent: Bool
+    let gradientColor: Bool
+    let action: () -> Void
+    
+    @State private var hovering = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(prominent ? EchoPalette.indigo.opacity(0.12) : Color.primary.opacity(0.04))
+                        .frame(width: 40, height: 40)
+                    
+                    if gradientColor {
+                        Image(systemName: icon)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(EchoPalette.premiumGradient)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(prominent ? EchoPalette.indigoSoft : .secondary)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary.opacity(0.85))
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(hovering ? .secondary : .quaternary)
+                    .offset(x: hovering ? 2 : 0)
+                    .animation(EchoDesign.subtle, value: hovering)
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background {
+                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                    .fill(prominent ? EchoPalette.indigo.opacity(0.06) : Color.primary.opacity(0.02))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                    .strokeBorder(
+                        prominent ? EchoPalette.indigo.opacity(0.15) : EchoPalette.stroke,
+                        lineWidth: 0.5
+                    )
+            )
+            .scaleEffect(hovering ? 1.008 : 1.0)
+            .animation(EchoDesign.subtle, value: hovering)
+            .echoHoverHighlight()
+            .onHover { hovering = $0 }
+        }
+        .buttonStyle(.plain)
     }
 }

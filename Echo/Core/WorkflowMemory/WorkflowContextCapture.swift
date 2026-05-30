@@ -3,7 +3,12 @@ import Foundation
 /// Extracts restorable working context from window titles, URLs, and bundle IDs.
 nonisolated enum WorkflowContextCapture {
 
-  static func items(from events: [ActivityEvent]) -> [RestoreItem] {
+  static func items(from events: [ActivityEvent], tabEligibility: Double? = nil) -> [RestoreItem] {
+    let threshold = tabEligibility ?? {
+        let val = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
+        return val > 0 ? val : 12.0
+    }()
+
     var items: [RestoreItem] = []
     var seen = Set<String>()
 
@@ -20,14 +25,41 @@ nonisolated enum WorkflowContextCapture {
         }
     }
 
+    var urlDurations: [String: TimeInterval] = [:]
+    for event in sorted {
+        let d = eventDurations[event.id] ?? 0.0
+        let urlString = event.url ?? sanitizedURL(from: event.windowTitle)
+        if let urlString {
+            let normalized = normalizeURL(urlString)
+            urlDurations[normalized, default: 0] += d
+        }
+    }
+
     for event in sorted.reversed() {
       let duration = eventDurations[event.id] ?? 0
-      items.append(contentsOf: itemsForEvent(event, duration: duration, seen: &seen))
+      items.append(contentsOf: itemsForEvent(event, duration: duration, urlDurations: urlDurations, tabEligibility: threshold, seen: &seen))
     }
     return items
   }
 
-  static func itemsForEvent(_ event: ActivityEvent, duration: TimeInterval, seen: inout Set<String>) -> [RestoreItem] {
+  private static func normalizeURL(_ urlString: String) -> String {
+    guard let url = URL(string: urlString) else {
+        return urlString.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+    var host = url.host ?? ""
+    if host.hasPrefix("www.") {
+        host = String(host.dropFirst(4))
+    }
+    let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    return "\(host)/\(path)".lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+  }
+
+  static func itemsForEvent(_ event: ActivityEvent, duration: TimeInterval, urlDurations: [String: TimeInterval] = [:], tabEligibility: Double? = nil, seen: inout Set<String>) -> [RestoreItem] {
+    let threshold = tabEligibility ?? {
+        let val = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
+        return val > 0 ? val : 12.0
+    }()
+
     switch event.appBundleId {
     case "com.apple.finder":
       return finderItems(event: event, seen: &seen)
@@ -39,7 +71,7 @@ nonisolated enum WorkflowContextCapture {
       return workspaceItems(event: event, seen: &seen)
     default:
       if BrowserContextService.isBrowser(event.appBundleId) {
-        return browserItems(event: event, duration: duration, seen: &seen)
+        return browserItems(event: event, duration: duration, urlDurations: urlDurations, tabEligibility: threshold, seen: &seen)
       }
       if isTerminal(event.appBundleId) {
         return terminalItems(event: event, seen: &seen)
@@ -117,18 +149,87 @@ nonisolated enum WorkflowContextCapture {
 
   // MARK: - Browser
 
-  private static func browserItems(event: ActivityEvent, duration: TimeInterval, seen: inout Set<String>) -> [RestoreItem] {
-    if duration < 12.0 {
+  private static func browserItems(event: ActivityEvent, duration: TimeInterval, urlDurations: [String: TimeInterval], tabEligibility: Double, seen: inout Set<String>) -> [RestoreItem] {
+    let checkURLString = event.url ?? sanitizedURL(from: event.windowTitle)
+    var totalDuration = duration
+    if let checkURLString {
+        let normalized = normalizeURL(checkURLString)
+        if let agg = urlDurations[normalized] {
+            totalDuration = agg
+        }
+    }
+
+    if totalDuration < tabEligibility {
         return []
     }
+
+    // 1. Detect local PDF opened in browser via title or url
+    let isPDF: Bool
+    let pdfLabel: String
+    if let title = event.windowTitle, title.lowercased().contains(".pdf") {
+        isPDF = true
+        if let range = title.lowercased().range(of: ".pdf") {
+            pdfLabel = String(title[..<range.upperBound])
+        } else {
+            pdfLabel = title
+        }
+    } else if let urlStr = event.url, urlStr.lowercased().contains(".pdf") {
+        isPDF = true
+        if let url = URL(string: urlStr) {
+            pdfLabel = url.lastPathComponent
+        } else {
+            pdfLabel = "Document.pdf"
+        }
+    } else {
+        isPDF = false
+        pdfLabel = ""
+    }
+
+    if isPDF {
+        let path = event.url?.hasPrefix("file://") == true ? URL(string: event.url!)?.path : nil
+        let key = "doc:\(pdfLabel)"
+        guard seen.insert(key).inserted else { return [] }
+        return [RestoreItem(
+          id: UUID(),
+          kind: .document,
+          label: pdfLabel,
+          bundleId: nil, // Group under Files & Documents!
+          url: event.url,
+          path: path,
+          workingDirectory: nil
+        )]
+    }
+
     let urlString = event.url ?? sanitizedURL(from: event.windowTitle)
     guard let urlString, let url = URL(string: urlString) else { return [] }
+    
+    // Check if the URL is a local file (e.g. PDF opened in browser)
+    let lowerU = urlString.lowercased()
+    if urlString.hasPrefix("file://") || lowerU.contains("/users/") || lowerU.contains("/volumes/") {
+        let path: String
+        if urlString.hasPrefix("file://") {
+            path = url.path
+        } else {
+            path = urlString
+        }
+        let key = "doc:\(path)"
+        guard seen.insert(key).inserted else { return [] }
+        return [RestoreItem(
+          id: UUID(),
+          kind: .document,
+          label: (path as NSString).lastPathComponent,
+          bundleId: nil, // set to nil so it groups under Files & Documents!
+          url: nil,
+          path: path,
+          workingDirectory: nil
+        )]
+    }
+    
     let label = event.windowTitle ?? url.host ?? "Page"
     
     let t = label.trimmingCharacters(in: .whitespacesAndNewlines)
     let u = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
     let lowerT = t.lowercased()
-    let lowerU = u.lowercased()
     
     if t.isEmpty || u.isEmpty { return [] }
     if lowerT == "new tab" || lowerT == "start page" || lowerT == "favorites" || lowerT == "untitled" { return [] }

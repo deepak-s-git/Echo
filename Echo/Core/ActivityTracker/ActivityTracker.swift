@@ -274,8 +274,18 @@ actor ActivityTracker {
 
             if BrowserContextService.isBrowser(bundleId) {
                 // AppleScript: synchronous but fast (~5–20 ms). Run on main actor per existing API.
-                let tab = await MainActor.run {
-                    BrowserContextService.captureActiveTab(for: bundleId)
+                var tab: BrowserTab? = nil
+                for delayMs in [0, 300, 800, 1500] {
+                    if delayMs > 0 {
+                        try? await Task.sleep(for: .milliseconds(delayMs))
+                    }
+                    guard !Task.isCancelled else { return }
+                    guard await self?.currentBundleId == bundleId else { return }
+                    
+                    tab = await MainActor.run {
+                        BrowserContextService.captureActiveTab(for: bundleId)
+                    }
+                    if tab != nil { break }
                 }
                 guard let tab else { return }
                 guard await self?.currentBundleId == bundleId else { return }

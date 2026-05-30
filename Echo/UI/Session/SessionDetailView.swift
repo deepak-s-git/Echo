@@ -309,8 +309,8 @@ struct SessionDetailView: View {
                         .foregroundStyle(.primary.opacity(0.85))
                         .fixedSize(horizontal: false, vertical: true)
                     Text("\(Int(memory.session.focusScore * 100))% focus · \(memory.interruptions.count) pauses")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -334,15 +334,18 @@ struct SessionDetailView: View {
                 Circle().stroke(Color.primary.opacity(0.06), lineWidth: 6)
                 Circle()
                     .trim(from: 0, to: score)
-                    .stroke(EchoPalette.indigo.opacity(0.7), style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .stroke(
+                        EchoPalette.premiumGradient,
+                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                    )
                     .rotationEffect(.degrees(-90))
                 Text("\(Int(score * 100))")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
             }
             .frame(width: 64, height: 64)
             Text(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(width: 72)
         }
@@ -426,35 +429,7 @@ struct SessionDetailView: View {
             sectionTitle("App transitions", icon: "arrow.left.arrow.right")
 
             ForEach(memory.appTransitions.prefix(20)) { t in
-                HStack(spacing: 10) {
-                    AppIconView(bundleId: t.toBundleId, size: 22)
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let from = t.fromApp, from != t.toApp {
-                            HStack(spacing: 4) {
-                                Text(from)
-                                    .foregroundStyle(.secondary)
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.quaternary)
-                                Text(t.toApp)
-                            }
-                            .font(.system(size: 13, weight: .medium))
-                        } else {
-                            Text(t.toApp)
-                                .font(.system(size: 13, weight: .medium))
-                        }
-                        Text(t.timestamp, style: .time)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.quaternary)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 5)
-                .padding(.horizontal, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                        .fill(Color.primary.opacity(0.02))
-                )
+                AppTransitionRow(t: t)
             }
         }
         .padding(EchoDesign.cardPadding)
@@ -597,6 +572,45 @@ struct SessionDetailView: View {
                 .textCase(.uppercase)
                 .tracking(0.4)
         }
+    }
+}
+
+private struct AppTransitionRow: View {
+    let t: AppTransition
+    @State private var hovering = false
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            AppIconView(bundleId: t.toBundleId, size: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                if let from = t.fromApp, from != t.toApp {
+                    HStack(spacing: 6) {
+                        Text(from)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(EchoPalette.indigoSoft)
+                        Text(t.toApp)
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                } else {
+                    Text(t.toApp)
+                        .font(.system(size: 13, weight: .medium))
+                }
+                Text(t.timestamp, style: .time)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                .fill(hovering ? Color.primary.opacity(0.04) : Color.primary.opacity(0.01))
+        )
+        .echoPointingCursor()
+        .onHover { hovering = $0 }
     }
 }
 

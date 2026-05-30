@@ -29,11 +29,7 @@ nonisolated enum BrowserContextService {
         bundleId: String,
         appName: String
     ) -> ActivityEvent {
-        let domain = tab.url
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-            .components(separatedBy: "/").first ?? tab.url
-
+        let urlStr = tab.url.trimmingCharacters(in: .whitespacesAndNewlines)
         return ActivityEvent(
             id: UUID(),
             sessionId: sessionId,
@@ -42,7 +38,7 @@ nonisolated enum BrowserContextService {
             appBundleId: bundleId,
             appName: appName,
             windowTitle: tab.title,
-            url: "https://\(domain)",
+            url: urlStr,
             profileName: tab.profileName,
             duration: 0
         )

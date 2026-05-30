@@ -52,7 +52,7 @@ struct SettingsGroup<Content: View>: View {
             VStack(spacing: 0) {
                 content()
             }
-            .background(.ultraThinMaterial,
+            .background(EchoPalette.graphiteElevated,
                         in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
@@ -121,7 +121,9 @@ struct SettingsRow<Content: View>: View {
             .padding(.vertical, 12)
 
             if showDivider {
-                Divider()
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
                     .padding(.leading, icon != nil ? 56 : 16)
             }
         }
@@ -214,7 +216,9 @@ struct SettingsSliderRow: View {
             .padding(.vertical, 12)
 
             if showDivider {
-                Divider()
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
                     .padding(.leading, icon != nil ? 56 : 16)
             }
         }

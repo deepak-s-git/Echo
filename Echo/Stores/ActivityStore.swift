@@ -107,7 +107,7 @@ final class ActivityStore: ObservableObject {
         recordingState = isSessionPaused ? .paused : .recording
         seedWorkflowIdentity(from: session)
         eventBuffer = normalize(events.suffix(EchoConfig.maxLiveEvents))
-        sessionDuration = Date().timeIntervalSince(session.startedAt)
+        sessionDuration = session.duration
         focusScore = session.focusScore
         applyInstantFocusFromBuffer()
         recentEvents = eventBuffer
@@ -123,14 +123,17 @@ final class ActivityStore: ObservableObject {
         }
     }
 
-    func sessionDidPause() {
+    func sessionDidPause(_ session: Session) {
+        currentSession = session
         isSessionPaused = true
         recordingState = .paused
+        sessionDuration = session.duration
         durationTask?.cancel()
         durationTask = nil
     }
 
-    func sessionDidResumeCapture() {
+    func sessionDidResumeCapture(_ session: Session) {
+        currentSession = session
         isSessionPaused = false
         recordingState = .recording
         startDurationTimer()
@@ -373,7 +376,7 @@ final class ActivityStore: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self, let session = self.currentSession else { continue }
-                let duration = Date().timeIntervalSince(session.startedAt)
+                let duration = session.duration
                 let rounded = floor(duration)
                 guard rounded != self.lastDurationPublish else { continue }
                 self.lastDurationPublish = rounded

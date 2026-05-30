@@ -256,6 +256,18 @@ nonisolated enum WorkflowRestorePlanBuilder {
 
         for ctx in browserContexts.suffix(8) {
             guard let url = sanitizedURL(from: ctx), seen.insert("url:\(url)").inserted else { continue }
+            
+            let t = ctx.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let u = url.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lowerT = t.lowercased()
+            let lowerU = u.lowercased()
+            
+            if t.isEmpty || u.isEmpty { continue }
+            if lowerT == "new tab" || lowerT == "start page" || lowerT == "favorites" || lowerT == "untitled" || lowerT == "empty" { continue }
+            if lowerU == "about:blank" || lowerU.hasPrefix("chrome://") || lowerU.hasPrefix("edge://") || lowerU.hasPrefix("brave://") || lowerU.hasPrefix("favorites://") || lowerU.hasPrefix("topsites://") {
+                continue
+            }
+
             items.append(RestoreItem(
                 id: UUID(),
                 kind: .browserPage,

@@ -76,12 +76,12 @@ struct SidebarView: View {
             } else {
                 Text("Not recording")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
             }
         }
-        .background(.ultraThinMaterial)
+        .background(EchoPalette.sidebar)
     }
 }
 
@@ -109,6 +109,7 @@ struct SidebarItem: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
+            .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                     .fill(isSelected ? EchoPalette.indigo.opacity(0.12) : .clear)
@@ -116,6 +117,7 @@ struct SidebarItem: View {
             .foregroundStyle(isSelected ? EchoPalette.indigoSoft : Color.primary.opacity(0.7))
         }
         .buttonStyle(.plain)
+        .echoPointingCursor()
     }
 }
 
@@ -168,7 +170,7 @@ struct LiveSessionPill: View {
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase)
                     .tracking(0.4)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Text(totalDurationLabel)
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
@@ -180,8 +182,8 @@ struct LiveSessionPill: View {
                 .foregroundStyle(.primary.opacity(0.85))
                 .lineLimit(1)
             Text(activityStore.workflowIdentity)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .padding(.horizontal, 12)

@@ -124,15 +124,24 @@ nonisolated enum WorkflowContextCapture {
     let urlString = event.url ?? sanitizedURL(from: event.windowTitle)
     guard let urlString, let url = URL(string: urlString) else { return [] }
     let label = event.windowTitle ?? url.host ?? "Page"
-    if label == "New Tab" || urlString.starts(with: "chrome://newtab") || urlString.starts(with: "edge://newtab") || urlString.starts(with: "brave://newtab") {
+    
+    let t = label.trimmingCharacters(in: .whitespacesAndNewlines)
+    let u = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+    let lowerT = t.lowercased()
+    let lowerU = u.lowercased()
+    
+    if t.isEmpty || u.isEmpty { return [] }
+    if lowerT == "new tab" || lowerT == "start page" || lowerT == "favorites" || lowerT == "untitled" { return [] }
+    if lowerU == "about:blank" || lowerU.hasPrefix("chrome://") || lowerU.hasPrefix("edge://") || lowerU.hasPrefix("brave://") || lowerU.hasPrefix("favorites://") || lowerU.hasPrefix("topsites://") {
         return []
     }
+    
     let key = "browser:\(url.absoluteString)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
       kind: .browserPage,
-      label: String(label.prefix(120)),
+      label: String(t.prefix(120)),
       bundleId: event.appBundleId,
       url: url.absoluteString,
       path: nil,

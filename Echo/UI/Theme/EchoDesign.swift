@@ -4,47 +4,52 @@ import AppKit
 // MARK: - Palette
 
 enum EchoPalette {
-    static let graphite = Color(red: 0.11, green: 0.11, blue: 0.12)
-    static let graphiteElevated = Color(red: 0.15, green: 0.15, blue: 0.16)
-    static let indigo = Color(red: 0.38, green: 0.40, blue: 0.52)
-    static let indigoSoft = Color(red: 0.48, green: 0.50, blue: 0.60)
-    static let warmHighlight = Color(red: 0.72, green: 0.64, blue: 0.54)
-    static let live = Color(red: 0.45, green: 0.62, blue: 0.48)
-    static let stroke = Color.white.opacity(0.08)
-    static let strokeBright = Color.white.opacity(0.12)
+    static let graphite = Color(red: 0.04, green: 0.04, blue: 0.04)          // #0A0A0A - Midnight Base
+    static let sidebar = Color(red: 0.067, green: 0.067, blue: 0.067)        // #111111 - Sidebar
+    static let graphiteElevated = Color(red: 0.09, green: 0.09, blue: 0.09) // #171717 - Cards/Panels
+    static let stroke = Color(red: 0.15, green: 0.15, blue: 0.15)            // #262626 - Borders/Dividers
+    static let strokeBright = Color(red: 0.22, green: 0.22, blue: 0.22)      // Active borders
+    
+    static let accent = Color(red: 0.89, green: 0.89, blue: 0.91)            // #E4E4E7 - Muted Primary Text
+    static let indigo = accent                                                // Mapping active accent
+    static let indigoSoft = Color(red: 0.63, green: 0.63, blue: 0.67)        // #A1A1AA - Secondary Zinc
+    static let warmHighlight = Color(red: 0.72, green: 0.72, blue: 0.75)     // Muted neutral gray
+    
+    static let live = Color(red: 0.13, green: 0.77, blue: 0.37)              // #22C55E - Success
+    static let warning = Color(red: 0.96, green: 0.62, blue: 0.04)           // #F59E0B - Warning
+    static let destructive = Color(red: 0.94, green: 0.27, blue: 0.27)       // #EF4444 - Error
+    
+    static let glowBlue = Color(white: 0.75)
+    static let glowPurple = Color(white: 0.55)
+    
+    static var premiumGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color(white: 0.88), Color(white: 0.63)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 }
 
 enum EchoDesign {
 
     static let containerRadius: CGFloat = 24
-    static let cardCornerRadius: CGFloat = 18
-    static let pillRadius: CGFloat = 12
-    static let badgeRadius: CGFloat = 8
+    static let cardCornerRadius: CGFloat = 16
+    static let pillRadius: CGFloat = 10
+    static let badgeRadius: CGFloat = 6
     static let cornerRadius: CGFloat = cardCornerRadius
-    static let sectionSpacing: CGFloat = 20
-    static let cardPadding: CGFloat = 16
-    static let subtle = Animation.easeOut(duration: 0.22)
+    static let sectionSpacing: CGFloat = 16
+    static let cardPadding: CGFloat = 18
+    static let subtle = Animation.spring(response: 0.26, dampingFraction: 0.76)
 
     static var ambientBackground: some View {
-        ZStack {
-            Color(nsColor: .windowBackgroundColor)
-            LinearGradient(
-                colors: [
-                    EchoPalette.graphite.opacity(0.35),
-                    Color.clear,
-                    EchoPalette.indigo.opacity(0.06)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
+        EchoPalette.graphite.ignoresSafeArea()
     }
 
     static var heroWash: LinearGradient {
         LinearGradient(
             colors: [
-                EchoPalette.indigo.opacity(0.14),
-                EchoPalette.warmHighlight.opacity(0.05),
+                Color.white.opacity(0.02),
                 Color.clear
             ],
             startPoint: .topLeading,
@@ -56,22 +61,20 @@ enum EchoDesign {
 // MARK: - Card
 
 struct EchoCard: ViewModifier {
-    var material: Material = .ultraThinMaterial
-
     func body(content: Content) -> some View {
         content
-            .background(material, in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
+            .background(EchoPalette.graphiteElevated, in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
                     .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
     }
 }
 
 extension View {
     func echoCard(material: Material = .ultraThinMaterial) -> some View {
-        modifier(EchoCard(material: material))
+        modifier(EchoCard())
     }
 
     func echoAmbientBackground() -> some View {
@@ -98,13 +101,37 @@ struct EchoHoverHighlight: ViewModifier {
                         lineWidth: 0.5
                     )
             )
-            .onHover { hovering = $0 }
+            .onHover { hovering in
+                self.hovering = hovering
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+    }
+}
+
+struct EchoPointingCursor: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
     }
 }
 
 extension View {
     func echoHoverHighlight() -> some View {
         modifier(EchoHoverHighlight())
+    }
+
+    func echoPointingCursor() -> some View {
+        modifier(EchoPointingCursor())
     }
 }
 

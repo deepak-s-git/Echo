@@ -1,4 +1,5 @@
 import AppKit
+import SQLite3
 
 /// Fetches browser tab metadata via AppleScript. Privacy: prefer active-tab-only APIs.
 struct BrowserTabScraper {
@@ -49,10 +50,10 @@ struct BrowserTabScraper {
         }
 
         let result = runJXA(script)
-        guard let item = result?.first, let url = item["url"], let title = item["title"], !url.isEmpty else {
+        guard let item = result?.first, let url = item["url"], let title = item["title"] else {
             return nil
         }
-        if title == "New Tab" || url.starts(with: "chrome://newtab") || url.starts(with: "edge://newtab") || url.starts(with: "brave://newtab") {
+        guard isValidTab(url: url, title: title) else {
             return nil
         }
         var profileName: String? = nil
@@ -125,21 +126,20 @@ struct BrowserTabScraper {
         
         guard let result = runJXA(script) else { return nil }
         
-        // All tabs in a single Chrome window share the same profile.
-        // Resolve once from the first valid URL to avoid redundant file reads.
-        var resolvedProfile: String? = nil
-        var didResolve = false
+        // Gather all valid URLs to resolve the profile for the entire window
+        var validURLs: [String] = []
+        for item in result {
+            guard let url = item["url"], let title = item["title"] else { continue }
+            guard isValidTab(url: url, title: title) else { continue }
+            validURLs.append(url)
+        }
+
+        let resolvedProfile = (browser == .chrome && !validURLs.isEmpty) ? chromeProfile(forURLs: validURLs) : nil
 
         var tabs: [BrowserTab] = []
         for item in result {
-            guard let url = item["url"], let title = item["title"], !url.isEmpty else { continue }
-            if title == "New Tab" || url.starts(with: "chrome://newtab") || url.starts(with: "edge://newtab") || url.starts(with: "brave://newtab") {
-                continue
-            }
-            if browser == .chrome && !didResolve {
-                resolvedProfile = chromeProfile(forURL: url)
-                didResolve = true
-            }
+            guard let url = item["url"], let title = item["title"] else { continue }
+            guard isValidTab(url: url, title: title) else { continue }
             tabs.append(BrowserTab(
                 id: UUID(),
                 url: url,
@@ -155,15 +155,40 @@ struct BrowserTabScraper {
         return tabs.isEmpty ? nil : tabs
     }
 
+    private static func isValidTab(url: String, title: String) -> Bool {
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let u = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerT = t.lowercased()
+        let lowerU = u.lowercased()
+        
+        if t.isEmpty || u.isEmpty { return false }
+        if lowerT == "new tab" || lowerT == "start page" || lowerT == "favorites" || lowerT == "untitled" { return false }
+        if lowerU == "about:blank" || lowerU.hasPrefix("chrome://") || lowerU.hasPrefix("edge://") || lowerU.hasPrefix("brave://") || lowerU.hasPrefix("favorites://") || lowerU.hasPrefix("topsites://") {
+            return false
+        }
+        return true
+    }
+
     // MARK: - Script runner
 
     private static func bundleIdFor(_ browser: BrowserTab.Browser) -> String? {
         bundleToAppName.first { $0.value.0 == browser }?.key
     }
 
-    /// Determines which Chrome profile directory contains the given URL by searching
-    /// each profile's session files for the URL string.
+    struct HistoryMatch {
+        let score: Int // 3 = Exact, 2 = Clean Path, 1 = Host, 0 = None
+        let lastVisitTime: Double
+    }
+
+    /// Determines which Chrome profile directory contains the given URL by querying
+    /// each profile's SQLite History database for the URL or host match.
     private static func chromeProfile(forURL url: String) -> String? {
+        chromeProfile(forURLs: [url])
+    }
+
+    /// Resolves the most likely Chrome profile for a list of URLs from the same window
+    /// using a robust majority-voting algorithm across all high-confidence history matches.
+    private static func chromeProfile(forURLs urls: [String]) -> String? {
         let base = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Google/Chrome")
         guard let contents = try? FileManager.default.contentsOfDirectory(
@@ -178,65 +203,188 @@ struct BrowserTabScraper {
                                       "hyphen-data", "WidevineCdm", "pnacl",
                                       "extensions_crx_cache", "Subresource Filter"]
 
-        struct ProfileCandidate {
-            let name: String
-            let latestFile: URL
-            let mtime: Date
-            let data: Data
-        }
-
-        var candidates: [ProfileCandidate] = []
-
-        for profileURL in contents {
+        let profiles = contents.compactMap { profileURL -> String? in
             let isDir = (try? profileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            guard isDir else { continue }
+            guard isDir else { return nil }
             let profile = profileURL.lastPathComponent
-            guard !skipDirs.contains(profile),
-                  profile != "System Profile" else { continue }
-
-            let sessionsDir = profileURL.appendingPathComponent("Sessions")
-            guard let files = try? FileManager.default.contentsOfDirectory(
-                at: sessionsDir, includingPropertiesForKeys: [.contentModificationDateKey]
-            ) else { continue }
-
-            let tabsFiles = files
-                .filter { $0.lastPathComponent.hasPrefix("Tabs_") }
-                .sorted { f1, f2 in
-                    let d1 = (try? f1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                    let d2 = (try? f2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                    return d1 > d2
-                }
-
-            guard let latestFile = tabsFiles.first,
-                  let mtime = (try? latestFile.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate),
-                  let data = try? Data(contentsOf: latestFile) else { continue }
-
-            candidates.append(ProfileCandidate(name: profile, latestFile: latestFile, mtime: mtime, data: data))
+            guard !skipDirs.contains(profile), profile != "System Profile" else { return nil }
+            return profile
         }
 
-        // Sort candidates newest-first by session file modification date
-        candidates.sort { $0.mtime > $1.mtime }
+        var profileVotes: [String: Int] = [:]
+        
+        // 1. First Pass: Majority-voting based on high-confidence matches (Score >= 2: Exact or Clean Path matches)
+        for url in urls {
+            var bestProfileForUrl: String? = nil
+            var highestScoreForUrl = 0
+            var highestTimeForUrl: Double = 0
 
-        // 1. Try exact URL match
-        if let urlData = url.data(using: .utf8) {
-            for candidate in candidates {
-                if candidate.data.range(of: urlData) != nil {
-                    return candidate.name
+            for profile in profiles {
+                let profileURL = base.appendingPathComponent(profile)
+                if let match = checkURLInHistoryDetails(profilePath: profileURL, urlString: url) {
+                    if match.score > highestScoreForUrl {
+                        highestScoreForUrl = match.score
+                        bestProfileForUrl = profile
+                        highestTimeForUrl = match.lastVisitTime
+                    } else if match.score == highestScoreForUrl && match.score > 0 {
+                        if match.lastVisitTime > highestTimeForUrl {
+                            bestProfileForUrl = profile
+                            highestTimeForUrl = match.lastVisitTime
+                        }
+                    }
                 }
+            }
+
+            // Only vote if it is a high-confidence match (Score >= 2)
+            if let matchedProfile = bestProfileForUrl, highestScoreForUrl >= 2 {
+                profileVotes[matchedProfile, default: 0] += 1
             }
         }
 
-        // 2. Try host/domain match
-        if let host = URL(string: url)?.host, let hostData = host.data(using: .utf8) {
-            for candidate in candidates {
-                if candidate.data.range(of: hostData) != nil {
-                    return candidate.name
+        if let bestProfile = profileVotes.max(by: { $0.value < $1.value })?.key {
+            return bestProfile
+        }
+
+        // 2. Second Pass: Fallback voting based on any match (Score >= 1, e.g. host match)
+        var fallbackVotes: [String: Int] = [:]
+        for url in urls {
+            var bestProfileForUrl: String? = nil
+            var highestScoreForUrl = 0
+            var highestTimeForUrl: Double = 0
+
+            for profile in profiles {
+                let profileURL = base.appendingPathComponent(profile)
+                if let match = checkURLInHistoryDetails(profilePath: profileURL, urlString: url) {
+                    if match.score > highestScoreForUrl {
+                        highestScoreForUrl = match.score
+                        bestProfileForUrl = profile
+                        highestTimeForUrl = match.lastVisitTime
+                    } else if match.score == highestScoreForUrl && match.score > 0 {
+                        if match.lastVisitTime > highestTimeForUrl {
+                            bestProfileForUrl = profile
+                            highestTimeForUrl = match.lastVisitTime
+                        }
+                    }
                 }
+            }
+
+            if let matchedProfile = bestProfileForUrl, highestScoreForUrl > 0 {
+                fallbackVotes[matchedProfile, default: 0] += 1
             }
         }
 
-        // 3. Fallback: most recently modified profile
-        return candidates.first?.name
+        if let bestProfile = fallbackVotes.max(by: { $0.value < $1.value })?.key {
+            return bestProfile
+        }
+
+        // 3. Ultimate Fallback: Most recently modified profile folder
+        var fallbackCandidates: [(name: String, mtime: Date)] = []
+        for profile in profiles {
+            let profileURL = base.appendingPathComponent(profile)
+            let historyPath = profileURL.appendingPathComponent("History")
+            if let mtime = (try? historyPath.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) {
+                fallbackCandidates.append((name: profile, mtime: mtime))
+            }
+        }
+        fallbackCandidates.sort { $0.mtime > $1.mtime }
+        return fallbackCandidates.first?.name
+    }
+
+    private static func checkURLInHistoryDetails(profilePath: URL, urlString: String) -> HistoryMatch? {
+        let tempBase = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: tempBase, withIntermediateDirectories: true)
+        
+        let tempURL = tempBase.appendingPathComponent("History")
+        let tempWalURL = tempBase.appendingPathComponent("History-wal")
+        let tempShmURL = tempBase.appendingPathComponent("History-shm")
+        
+        let historyPath = profilePath.appendingPathComponent("History")
+        let walPath = profilePath.appendingPathComponent("History-wal")
+        let shmPath = profilePath.appendingPathComponent("History-shm")
+        
+        guard FileManager.default.fileExists(atPath: historyPath.path) else {
+            try? FileManager.default.removeItem(at: tempBase)
+            return nil
+        }
+        
+        do {
+            try FileManager.default.copyItem(at: historyPath, to: tempURL)
+            if FileManager.default.fileExists(atPath: walPath.path) {
+                try FileManager.default.copyItem(at: walPath, to: tempWalURL)
+            }
+            if FileManager.default.fileExists(atPath: shmPath.path) {
+                try FileManager.default.copyItem(at: shmPath, to: tempShmURL)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tempBase)
+            return nil
+        }
+        
+        defer {
+            try? FileManager.default.removeItem(at: tempBase)
+        }
+        
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(tempURL.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            return nil
+        }
+        defer {
+            sqlite3_close(db)
+        }
+        
+        // A. Exact URL match (Score 3)
+        var statementExact: OpaquePointer?
+        let queryExact = "SELECT last_visit_time FROM urls WHERE url = ? LIMIT 1"
+        if sqlite3_prepare_v2(db, queryExact, -1, &statementExact, nil) == SQLITE_OK {
+            sqlite3_bind_text(statementExact, 1, urlString.cString(using: .utf8), -1, nil)
+            if sqlite3_step(statementExact) == SQLITE_ROW {
+                let lastVisitTime = sqlite3_column_double(statementExact, 0)
+                sqlite3_finalize(statementExact)
+                return HistoryMatch(score: 3, lastVisitTime: lastVisitTime)
+            }
+            sqlite3_finalize(statementExact)
+        }
+        
+        // B. Clean URL match (stripped query parameters and fragments) (Score 2)
+        var cleanURLString = urlString
+        if let urlObj = URL(string: urlString), let host = urlObj.host, let scheme = urlObj.scheme {
+            cleanURLString = "\(scheme)://\(host)\(urlObj.path)"
+        }
+        if cleanURLString != urlString {
+            var statementClean: OpaquePointer?
+            let queryClean = "SELECT last_visit_time FROM urls WHERE url = ? LIMIT 1"
+            if sqlite3_prepare_v2(db, queryClean, -1, &statementClean, nil) == SQLITE_OK {
+                sqlite3_bind_text(statementClean, 1, cleanURLString.cString(using: .utf8), -1, nil)
+                if sqlite3_step(statementClean) == SQLITE_ROW {
+                    let lastVisitTime = sqlite3_column_double(statementClean, 0)
+                    sqlite3_finalize(statementClean)
+                    return HistoryMatch(score: 2, lastVisitTime: lastVisitTime)
+                }
+                sqlite3_finalize(statementClean)
+            }
+        }
+        
+        // C. Domain/host match fallback (Score 1)
+        if let host = URL(string: urlString)?.host {
+            var statementLike: OpaquePointer?
+            let queryLike = "SELECT last_visit_time FROM urls WHERE url LIKE ? ORDER BY last_visit_time DESC LIMIT 1"
+            if sqlite3_prepare_v2(db, queryLike, -1, &statementLike, nil) == SQLITE_OK {
+                let likePattern = "%\(host)%"
+                sqlite3_bind_text(statementLike, 1, likePattern.cString(using: .utf8), -1, nil)
+                if sqlite3_step(statementLike) == SQLITE_ROW {
+                    let lastVisitTime = sqlite3_column_double(statementLike, 0)
+                    sqlite3_finalize(statementLike)
+                    return HistoryMatch(score: 1, lastVisitTime: lastVisitTime)
+                }
+                sqlite3_finalize(statementLike)
+            }
+        }
+        
+        return nil
+    }
+
+    private static func checkURLInHistory(profilePath: URL, urlString: String) -> Double? {
+        checkURLInHistoryDetails(profilePath: profilePath, urlString: urlString)?.lastVisitTime
     }
 
     private static func runJXA(_ script: String) -> [[String: String]]? {

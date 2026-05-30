@@ -110,8 +110,8 @@ struct TimelineView: View {
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(1)
                     Text(activityStore.workflowIdentity)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
@@ -173,19 +173,20 @@ private struct WorkflowThreadCard: View {
                         .multilineTextAlignment(.leading)
 
                     Text("Total · \(summary.totalDuration.shortLabel)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(EchoPalette.indigoSoft)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.secondary)
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: 6) {
                         Text(summary.latestActiveLabel)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.secondary.opacity(0.85))
                         if summary.appCount > 0 {
-                            Text("· \(summary.appCount) apps")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.tertiary)
+                            Text("·")
+                                .foregroundStyle(.secondary)
+                            Text("\(summary.appCount) apps")
+                                .foregroundStyle(.secondary.opacity(0.85))
                         }
                     }
+                    .font(.system(size: 11))
                 }
 
                 Spacer(minLength: 8)
@@ -207,11 +208,14 @@ private struct WorkflowThreadCard: View {
                             .foregroundStyle(.secondary)
                         Image(systemName: logsExpanded ? "chevron.up" : "chevron.down")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                         Spacer()
                         Text("\(summary.segments.count)")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.quaternary)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(EchoPalette.indigoSoft)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(EchoPalette.indigo.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
                     }
                     .padding(.horizontal, EchoDesign.cardPadding)
                     .padding(.vertical, 10)
@@ -261,13 +265,9 @@ private struct WorkflowThreadCard: View {
         .scaleEffect(hovering ? 1.005 : 1)
         .animation(.easeOut(duration: 0.15), value: hovering)
         .contentShape(Rectangle())
+        .echoPointingCursor()
         .onHover { hovering in
             self.hovering = hovering
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
         }
         .onTapGesture {
             if summary.segments.count == 1, let only = summary.segments.first {

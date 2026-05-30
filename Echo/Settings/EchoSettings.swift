@@ -53,6 +53,10 @@ final class EchoSettings: ObservableObject {
         didSet { defaults.set(browserCaptureDelaySeconds, forKey: Keys.browserCaptureDelaySeconds) }
     }
 
+    @Published var tabEligibilitySeconds: Double {
+        didSet { defaults.set(tabEligibilitySeconds, forKey: Keys.tabEligibilitySeconds) }
+    }
+
     // MARK: - Privacy
 
     @Published var dataRetentionDays: Int {
@@ -109,6 +113,7 @@ final class EchoSettings: ObservableObject {
         trackBrowserTabs = defaults.object(forKey: Keys.trackBrowserTabs) as? Bool ?? true
         recordWindowTitles = defaults.object(forKey: Keys.recordWindowTitles) as? Bool ?? true
         browserCaptureDelaySeconds = defaults.object(forKey: Keys.browserCaptureDelaySeconds) as? Double ?? 1.2
+        tabEligibilitySeconds = defaults.object(forKey: Keys.tabEligibilitySeconds) as? Double ?? 12.0
 
         // Privacy
         dataRetentionDays = defaults.object(forKey: Keys.dataRetentionDays) as? Int ?? 90
@@ -197,6 +202,7 @@ final class EchoSettings: ObservableObject {
         static let trackBrowserTabs = "echo.settings.trackBrowserTabs"
         static let recordWindowTitles = "echo.settings.recordWindowTitles"
         static let browserCaptureDelaySeconds = "echo.settings.browserCaptureDelaySeconds"
+        static let tabEligibilitySeconds = "echo.settings.tabEligibilitySeconds"
         static let dataRetentionDays = "echo.settings.dataRetentionDays"
         static let appTheme = "echo.settings.appTheme"
         static let showFocusScoreRing = "echo.settings.showFocusScoreRing"

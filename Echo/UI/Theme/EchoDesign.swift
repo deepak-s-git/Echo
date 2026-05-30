@@ -4,27 +4,85 @@ import AppKit
 // MARK: - Palette
 
 enum EchoPalette {
-    static let graphite = Color(red: 0.04, green: 0.04, blue: 0.04)          // #0A0A0A - Midnight Base
-    static let sidebar = Color(red: 0.067, green: 0.067, blue: 0.067)        // #111111 - Sidebar
-    static let graphiteElevated = Color(red: 0.09, green: 0.09, blue: 0.09) // #171717 - Cards/Panels
-    static let stroke = Color(red: 0.15, green: 0.15, blue: 0.15)            // #262626 - Borders/Dividers
-    static let strokeBright = Color(red: 0.22, green: 0.22, blue: 0.22)      // Active borders
+    private static func adaptive(
+        dark: NSColor,
+        light: NSColor
+    ) -> Color {
+        Color(nsColor: NSColor(name: nil) { app in
+            app.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+        })
+    }
     
-    static let accent = Color(red: 0.89, green: 0.89, blue: 0.91)            // #E4E4E7 - Muted Primary Text
-    static let indigo = accent                                                // Mapping active accent
-    static let indigoSoft = Color(red: 0.63, green: 0.63, blue: 0.67)        // #A1A1AA - Secondary Zinc
-    static let warmHighlight = Color(red: 0.72, green: 0.72, blue: 0.75)     // Muted neutral gray
+    static let graphite = adaptive(
+        dark: NSColor(red: 0.04, green: 0.04, blue: 0.04, alpha: 1.0),
+        light: NSColor(red: 0.96, green: 0.96, blue: 0.97, alpha: 1.0)
+    )
     
-    static let live = Color(red: 0.13, green: 0.77, blue: 0.37)              // #22C55E - Success
-    static let warning = Color(red: 0.96, green: 0.62, blue: 0.04)           // #F59E0B - Warning
-    static let destructive = Color(red: 0.94, green: 0.27, blue: 0.27)       // #EF4444 - Error
+    static let sidebar = adaptive(
+        dark: NSColor(red: 0.067, green: 0.067, blue: 0.067, alpha: 1.0),
+        light: NSColor(red: 0.92, green: 0.92, blue: 0.92, alpha: 1.0)
+    )
     
-    static let glowBlue = Color(white: 0.75)
-    static let glowPurple = Color(white: 0.55)
+    static let graphiteElevated = adaptive(
+        dark: NSColor(red: 0.09, green: 0.09, blue: 0.09, alpha: 1.0),
+        light: NSColor(white: 1.0, alpha: 1.0)
+    )
+    
+    static let stroke = adaptive(
+        dark: NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
+        light: NSColor(red: 0.88, green: 0.88, blue: 0.90, alpha: 1.0)
+    )
+    
+    static let strokeBright = adaptive(
+        dark: NSColor(red: 0.22, green: 0.22, blue: 0.22, alpha: 1.0),
+        light: NSColor(red: 0.80, green: 0.80, blue: 0.82, alpha: 1.0)
+    )
+    
+    static let accent = adaptive(
+        dark: NSColor(red: 0.89, green: 0.89, blue: 0.91, alpha: 1.0),
+        light: NSColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.0)
+    )
+    
+    static let indigo = accent
+    
+    static let indigoSoft = adaptive(
+        dark: NSColor(red: 0.63, green: 0.63, blue: 0.67, alpha: 1.0),
+        light: NSColor(red: 0.44, green: 0.44, blue: 0.48, alpha: 1.0)
+    )
+    
+    static let warmHighlight = adaptive(
+        dark: NSColor(red: 0.72, green: 0.72, blue: 0.75, alpha: 1.0),
+        light: NSColor(red: 0.50, green: 0.50, blue: 0.52, alpha: 1.0)
+    )
+    
+    static let live = adaptive(
+        dark: NSColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1.0),
+        light: NSColor(red: 0.08, green: 0.50, blue: 0.24, alpha: 1.0)
+    )
+    
+    static let warning = adaptive(
+        dark: NSColor(red: 0.96, green: 0.62, blue: 0.04, alpha: 1.0),
+        light: NSColor(red: 0.70, green: 0.32, blue: 0.04, alpha: 1.0)
+    )
+    
+    static let destructive = adaptive(
+        dark: NSColor(red: 0.94, green: 0.27, blue: 0.27, alpha: 1.0),
+        light: NSColor(red: 0.86, green: 0.15, blue: 0.15, alpha: 1.0)
+    )
+    
+    static let glowBlue = adaptive(
+        dark: NSColor(white: 0.75, alpha: 1.0),
+        light: NSColor(white: 0.20, alpha: 1.0)
+    )
+    
+    static let glowPurple = adaptive(
+        dark: NSColor(white: 0.55, alpha: 1.0),
+        light: NSColor(white: 0.40, alpha: 1.0)
+    )
     
     static var premiumGradient: LinearGradient {
         LinearGradient(
-            colors: [Color(white: 0.88), Color(white: 0.63)],
+            colors: [accent, indigoSoft],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )

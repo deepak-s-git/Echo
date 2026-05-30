@@ -27,17 +27,32 @@ nonisolated enum RestoreWeighting {
         plan: WorkflowRestorePlan,
         pinnedKeys: Set<String> = []
     ) -> [SelectableItem] {
-        let focusByBundle = focusDurationByBundle(events)
-        let focusByURL = focusDurationByURL(events)
+        let sorted = events.sorted { $0.timestamp < $1.timestamp }
+        var eventDurations: [UUID: TimeInterval] = [:]
+        for i in 0..<sorted.count {
+            let event = sorted[i]
+            if i < sorted.count - 1 {
+                let nextEvent = sorted[i + 1]
+                eventDurations[event.id] = nextEvent.timestamp.timeIntervalSince(event.timestamp)
+            } else {
+                eventDurations[event.id] = event.duration > 0 ? event.duration : 60.0
+            }
+        }
+
+        let focusByBundle = focusDurationByBundle(events, eventDurations: eventDurations)
+        let focusByURL = focusDurationByURL(events, eventDurations: eventDurations)
+        let focusByPath = focusDurationByPath(events, eventDurations: eventDurations)
 
         return plan.items.map { item in
             let key = itemKey(item)
-            let duration = focusDuration(for: item, bundleMap: focusByBundle, urlMap: focusByURL)
+            let duration = focusDuration(
+                for: item,
+                bundleMap: focusByBundle,
+                urlMap: focusByURL,
+                pathMap: focusByPath
+            )
             let selected = pinnedKeys.contains(key)
                 || duration >= minimumFocusDuration
-                || item.kind == .browserPage
-                || item.kind == .document
-                || item.kind == .workspace
             return SelectableItem(
                 item: item,
                 focusDuration: duration,
@@ -87,30 +102,126 @@ nonisolated enum RestoreWeighting {
         }
     }
 
-    private nonisolated static func focusDurationByBundle(_ events: [ActivityEvent]) -> [String: TimeInterval] {
+    private nonisolated static func focusDurationByBundle(
+        _ events: [ActivityEvent],
+        eventDurations: [UUID: TimeInterval]
+    ) -> [String: TimeInterval] {
         var map: [String: TimeInterval] = [:]
         for event in events where event.type == .appFocus || event.type == .appSwitch {
-            let d = event.duration > 0 ? event.duration : 1
+            let d = eventDurations[event.id] ?? (event.duration > 0 ? event.duration : 1)
             map[event.appBundleId, default: 0] += d
         }
         return map
     }
 
-    private nonisolated static func focusDurationByURL(_ events: [ActivityEvent]) -> [String: TimeInterval] {
+    private nonisolated static func focusDurationByURL(
+        _ events: [ActivityEvent],
+        eventDurations: [UUID: TimeInterval]
+    ) -> [String: TimeInterval] {
         var map: [String: TimeInterval] = [:]
         for event in events {
-            guard event.type == .browserTab, let url = event.url else { continue }
-            map[url, default: 0] += event.duration > 0 ? event.duration : 1
+            let isBrowser = event.type == .browserTab || 
+                (event.type == .appFocus && (
+                    event.appBundleId.contains("Chrome") ||
+                    event.appBundleId.contains("Safari") ||
+                    event.appBundleId.contains("Arc") ||
+                    event.appBundleId.contains("Brave") ||
+                    event.appBundleId.contains("Edge")
+                ))
+            guard isBrowser, let url = event.url else { continue }
+            let normalized = normalizeURL(url)
+            let d = eventDurations[event.id] ?? (event.duration > 0 ? event.duration : 1)
+            map[normalized, default: 0] += d
         }
         return map
+    }
+
+    private nonisolated static func normalizeURL(_ urlString: String) -> String {
+        guard let url = URL(string: urlString) else {
+            return urlString.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        var host = url.host ?? ""
+        if host.hasPrefix("www.") {
+            host = String(host.dropFirst(4))
+        }
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return "\(host)/\(path)".lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private nonisolated static func focusDurationByPath(
+        _ events: [ActivityEvent],
+        eventDurations: [UUID: TimeInterval]
+    ) -> [String: TimeInterval] {
+        var map: [String: TimeInterval] = [:]
+        for event in events where event.type == .appFocus || event.type == .appSwitch {
+            guard let path = extractPath(from: event) else { continue }
+            let normalized = path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let d = eventDurations[event.id] ?? (event.duration > 0 ? event.duration : 1)
+            map[normalized, default: 0] += d
+        }
+        return map
+    }
+
+    private nonisolated static func extractPath(from event: ActivityEvent) -> String? {
+        if let urlStr = event.url, urlStr.hasPrefix("file://"), let url = URL(string: urlStr) {
+            return url.path
+        }
+        guard let title = event.windowTitle else { return nil }
+        if title.hasPrefix("/"), FileManager.default.fileExists(atPath: title) {
+            return title
+        }
+        if let range = title.range(of: "/Users/") ?? title.range(of: "/Volumes/") {
+            let path = String(title[range.lowerBound...])
+            let trimmed = path.components(separatedBy: " — ").first
+                ?? path.components(separatedBy: " – ").first
+                ?? path
+            return trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        
+        let separators = [" — ", " – ", " - "]
+        var candidates = [title]
+        for sep in separators {
+            candidates = candidates.flatMap { $0.components(separatedBy: sep) }
+        }
+        for candidate in candidates {
+            let trimmed = candidate.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasSuffix(".xcworkspace") || trimmed.hasSuffix(".xcodeproj")
+                || trimmed.hasSuffix(".code-workspace") {
+                return trimmed
+            }
+            if let range = trimmed.range(of: "/Users/") ?? trimmed.range(of: "/Volumes/") {
+                let path = String(trimmed[range.lowerBound...])
+                let tr = path.components(separatedBy: " — ").first
+                    ?? path.components(separatedBy: " – ").first
+                    ?? path
+                let trimmedPath = tr.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedPath.hasSuffix(".xcworkspace") || trimmedPath.hasSuffix(".xcodeproj")
+                    || trimmedPath.hasSuffix(".code-workspace") {
+                    return trimmedPath
+                }
+            }
+        }
+        return nil
     }
 
     private nonisolated static func focusDuration(
         for item: RestoreItem,
         bundleMap: [String: TimeInterval],
-        urlMap: [String: TimeInterval]
+        urlMap: [String: TimeInterval],
+        pathMap: [String: TimeInterval]
     ) -> TimeInterval {
-        if let url = item.url, let d = urlMap[url] { return d }
+        if let url = item.url {
+            let normalized = normalizeURL(url)
+            if let d = urlMap[normalized] { return d }
+        }
+        if let path = item.path {
+            let normalized = path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if let d = pathMap[normalized] { return d }
+        }
+        if let cwd = item.workingDirectory {
+            let normalized = cwd.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if let d = pathMap[normalized] { return d }
+        }
         if let bundleId = item.bundleId, let d = bundleMap[bundleId] { return d }
         return 0
     }

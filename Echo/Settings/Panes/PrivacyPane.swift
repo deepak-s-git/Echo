@@ -50,6 +50,7 @@ struct PrivacyPane: View {
                             .font(.system(size: 12, weight: .medium))
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                            .echoPointingCursor()
                         }
                     }
                 }
@@ -111,6 +112,7 @@ struct PrivacyPane: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .echoPointingCursor()
                 }
 
                 SettingsRow(

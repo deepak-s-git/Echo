@@ -59,6 +59,9 @@ final class SessionRepository: Sendable {
     func deleteSession(id: UUID) async throws {
         let key = id.uuidString
         try await database.writeAsync { db in
+            let session = try Session.filter(Column("id") == key).fetchOne(db)
+            let threadId = session?.workflowThreadId
+            
             try db.execute(
                 sql: "DELETE FROM activities WHERE sessionId = ?",
                 arguments: [key]
@@ -71,8 +74,18 @@ final class SessionRepository: Sendable {
                 sql: "DELETE FROM sessions WHERE id = ?",
                 arguments: [key]
             )
+            
+            if let threadId {
+                let count = try Session.filter(Column("workflowThreadId") == threadId).fetchCount(db)
+                if count == 0 {
+                    try db.execute(
+                        sql: "DELETE FROM workflow_threads WHERE id = ?",
+                        arguments: [threadId]
+                    )
+                }
+            }
         }
-        ActivityPersistenceLogger.log("Deleted session \(key) and related rows")
+        ActivityPersistenceLogger.log("Deleted session \(key) and parent thread if empty")
     }
 
     func updateMetadata(sessionId: UUID, title: String, tags: [String]) async throws {
@@ -300,11 +313,12 @@ final class SessionRepository: Sendable {
                 .order(Column("lastActiveAt").desc)
                 .limit(limit)
                 .fetchAll(db)
-            return try threads.map { thread in
+            return try threads.compactMap { thread in
                 let segments = try Session
                     .filter(Column("workflowThreadId") == thread.id.uuidString)
                     .order(Column("startedAt").desc)
                     .fetchAll(db)
+                guard !segments.isEmpty else { return nil }
                 return WorkflowThreadSummary(thread: thread, segments: segments)
             }
         }
@@ -433,12 +447,15 @@ final class SessionRepository: Sendable {
             diagnostics.record(.restorePlanMissing)
         }
 
+        var seen = Set<String>()
         let contexts = events.compactMap { event -> BrowserContextEntry? in
             guard event.type == .browserTab || event.url != nil else { return nil }
             let host = event.url?
                 .replacingOccurrences(of: "https://", with: "")
                 .replacingOccurrences(of: "http://", with: "")
                 .components(separatedBy: "/").first ?? event.appName
+            let lowerHost = host.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !lowerHost.isEmpty && seen.insert(lowerHost).inserted else { return nil }
             return BrowserContextEntry(
                 id: event.id,
                 domain: host,

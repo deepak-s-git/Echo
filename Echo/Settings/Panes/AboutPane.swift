@@ -39,7 +39,7 @@ struct AboutPane: View {
                                     )
                                 )
                                 .frame(width: 60, height: 60)
-                                .shadow(color: EchoPalette.indigo.opacity(0.3), radius: 10, y: 4)
+                                .shadow(color: Color.black.opacity(0.25), radius: 6, y: 3)
 
                             // Echo logo glyph
                             ZStack {
@@ -212,7 +212,10 @@ private struct AboutLinkRow: View {
             .animation(EchoDesign.subtle, value: hovering)
 
             if showDivider {
-                Divider().padding(.leading, 56)
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
+                    .padding(.leading, 56)
             }
         }
     }
@@ -267,7 +270,10 @@ private struct AcknowledgementRow: View {
             .animation(EchoDesign.subtle, value: hovering)
 
             if showDivider {
-                Divider().padding(.leading, 56)
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
+                    .padding(.leading, 56)
             }
         }
     }

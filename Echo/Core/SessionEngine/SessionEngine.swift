@@ -656,6 +656,9 @@ actor SessionEngine {
             if event.windowTitle != nil {
                 pendingEvents[lastIdx].windowTitle = event.windowTitle
             }
+            if event.profileName != nil {
+                pendingEvents[lastIdx].profileName = event.profileName
+            }
         }
         return isRedundant
     }
@@ -758,7 +761,8 @@ actor SessionEngine {
         let memory = WorkflowMemoryBuilder.build(session: session, events: events)
         session.tabCount = memory.browserContexts.count
 
-        let contextual = WorkflowContextCapture.items(from: events)
+        let tabEligibility = await MainActor.run { EchoSettings.shared.tabEligibilitySeconds }
+        let contextual = WorkflowContextCapture.items(from: events, tabEligibility: tabEligibility)
         let plan = mergeRestorePlan(primary: contextual, secondary: memory.restorePlan)
 
         do {

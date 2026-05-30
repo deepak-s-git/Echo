@@ -319,6 +319,9 @@ final class ActivityStore: ObservableObject {
         guard let lastIdx = eventBuffer.indices.last else { return }
         eventBuffer[lastIdx].windowTitle = event.windowTitle
         eventBuffer[lastIdx].url = event.url
+        if event.profileName != nil {
+            eventBuffer[lastIdx].profileName = event.profileName
+        }
         recentEvents = eventBuffer
         applyInstantFocus(eventBuffer[lastIdx])
         scheduleTimelineRebuild()

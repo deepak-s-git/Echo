@@ -14,14 +14,16 @@ struct TrackingPane: View {
                 icon: "waveform.circle.fill",
                 title: "Tracking",
                 subtitle: "What Echo watches and what it ignores",
-                color: EchoPalette.indigoSoft
+                color: EchoPalette.indigo
             )
+
+            let rose = EchoPalette.indigoSoft
 
             // MARK: Activity Capture
             SettingsGroup(label: "Activity Capture") {
                 SettingsToggleRow(
                     icon: "safari",
-                    iconColor: EchoPalette.indigoSoft,
+                    iconColor: rose,
                     label: "Track browser tabs",
                     description: "Capture active URLs from Safari, Chrome, Arc & more",
                     isOn: $settings.trackBrowserTabs,
@@ -30,7 +32,7 @@ struct TrackingPane: View {
 
                 SettingsToggleRow(
                     icon: "text.cursor",
-                    iconColor: EchoPalette.indigoSoft,
+                    iconColor: rose,
                     label: "Record window titles",
                     description: "Helps identify project context — no keystroke data is read",
                     isOn: $settings.recordWindowTitles,
@@ -39,12 +41,23 @@ struct TrackingPane: View {
 
                 SettingsSliderRow(
                     icon: "clock.badge.checkmark",
-                    iconColor: EchoPalette.indigoSoft,
+                    iconColor: rose,
                     label: "Browser tab capture delay",
                     value: $settings.browserCaptureDelaySeconds,
                     range: 0.5...5.0,
                     step: 0.1,
                     valueFormatter: { String(format: "%.1fs", $0) },
+                    showDivider: true
+                )
+
+                SettingsSliderRow(
+                    icon: "timer",
+                    iconColor: rose,
+                    label: "Tab eligibility threshold",
+                    value: $settings.tabEligibilitySeconds,
+                    range: 1.0...60.0,
+                    step: 1.0,
+                    valueFormatter: { String(format: "%.0fs", $0) },
                     showDivider: false
                 )
             }
@@ -67,7 +80,10 @@ struct TrackingPane: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
 
-                Divider().padding(.leading, 56)
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
+                    .padding(.leading, 56)
 
                 // App list
                 if settings.ignoredBundleIds.isEmpty {
@@ -95,7 +111,10 @@ struct TrackingPane: View {
                     }
                 }
 
-                Divider().padding(.leading, 16)
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
+                    .padding(.leading, 16)
 
                 // Add buttons
                 HStack(spacing: 10) {
@@ -104,10 +123,10 @@ struct TrackingPane: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(EchoPalette.indigoSoft)
+                                .foregroundStyle(rose)
                             Text("Add running app…")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(EchoPalette.indigoSoft)
+                                .foregroundStyle(rose)
                         }
                     }
                     .buttonStyle(.plain)
@@ -204,7 +223,10 @@ private struct IgnoredAppRow: View {
             .onHover { hovering = $0 }
 
             if showDivider {
-                Divider().padding(.leading, 56)
+                Rectangle()
+                    .fill(EchoPalette.stroke)
+                    .frame(height: 0.5)
+                    .padding(.leading, 56)
             }
         }
     }
@@ -307,7 +329,9 @@ private struct RunningAppPickerSheet: View {
             .padding(.top, 20)
             .padding(.bottom, 14)
 
-            Divider()
+            Rectangle()
+                .fill(EchoPalette.stroke)
+                .frame(height: 0.5)
 
             // Search
             HStack(spacing: 8) {
@@ -322,7 +346,9 @@ private struct RunningAppPickerSheet: View {
             .padding(.vertical, 9)
             .background(Color.primary.opacity(0.04))
 
-            Divider()
+            Rectangle()
+                .fill(EchoPalette.stroke)
+                .frame(height: 0.5)
 
             // List
             ScrollView {
@@ -332,13 +358,18 @@ private struct RunningAppPickerSheet: View {
                             onSelect(app.bundleId)
                             isPresented = false
                         }
-                        Divider().padding(.leading, 50)
+                        Rectangle()
+                            .fill(EchoPalette.stroke)
+                            .frame(height: 0.5)
+                            .padding(.leading, 50)
                     }
                 }
             }
             .frame(height: 280)
 
-            Divider()
+            Rectangle()
+                .fill(EchoPalette.stroke)
+                .frame(height: 0.5)
 
             Button("Cancel") { isPresented = false }
                 .buttonStyle(.bordered)

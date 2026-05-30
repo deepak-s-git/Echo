@@ -127,6 +127,17 @@ nonisolated enum SessionFinalizationRunner {
         var items: [RestoreItem] = []
         for var item in primary + secondary.items {
             if item.kind == .browserPage || item.kind == .url {
+                let t = item.label.trimmingCharacters(in: .whitespacesAndNewlines)
+                let u = (item.url ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let lowerT = t.lowercased()
+                let lowerU = u.lowercased()
+                
+                if t.isEmpty || u.isEmpty { continue }
+                if lowerT == "new tab" || lowerT == "start page" || lowerT == "favorites" || lowerT == "untitled" || lowerT == "empty" { continue }
+                if lowerU == "about:blank" || lowerU.hasPrefix("chrome://") || lowerU.hasPrefix("edge://") || lowerU.hasPrefix("brave://") || lowerU.hasPrefix("favorites://") || lowerU.hasPrefix("topsites://") {
+                    continue
+                }
+
                 if item.bundleId == "com.google.Chrome" && item.profileName == nil {
                     item.profileName = defaultChromeProfile
                 }

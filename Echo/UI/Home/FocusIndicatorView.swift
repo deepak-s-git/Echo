@@ -7,12 +7,12 @@ struct FocusIndicatorView: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.primary.opacity(0.05), lineWidth: 8)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 8)
 
             Circle()
                 .trim(from: 0, to: score)
                 .stroke(
-                    EchoPalette.indigo.opacity(0.75),
+                    EchoPalette.premiumGradient,
                     style: StrokeStyle(lineWidth: 8, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
@@ -22,8 +22,8 @@ struct FocusIndicatorView: View {
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                 Text(label)
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 60)
             }

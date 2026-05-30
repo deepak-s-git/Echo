@@ -21,8 +21,12 @@ struct ActivityFeedView: View, Equatable {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(events.count) events")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.quaternary)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(EchoPalette.indigoSoft)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(EchoPalette.indigo.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(EchoPalette.indigo.opacity(0.24), lineWidth: 0.5))
             }
 
             if displayEvents.isEmpty {
@@ -59,7 +63,8 @@ private struct ActivityFeedRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AppIconView(bundleId: event.appBundleId, size: 28)
+            AppIconView(bundleId: event.appBundleId, size: 26)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
@@ -67,22 +72,27 @@ private struct ActivityFeedRow: View {
                         bundleId: event.appBundleId,
                         rawName: event.appName
                     ))
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
                     Spacer()
                     Text(event.timestamp, style: .time)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.secondary)
                 }
 
                 Text(subtitle)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondary.opacity(0.85))
                     .lineLimit(1)
             }
         }
-        .padding(.vertical, 9)
-        .padding(.horizontal, 2)
-        .background(hovering ? Color.primary.opacity(0.03) : .clear)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                .fill(hovering ? Color.primary.opacity(0.03) : .clear)
+        )
+        .echoPointingCursor()
         .onHover { hovering = $0 }
     }
 

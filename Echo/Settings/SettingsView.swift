@@ -54,7 +54,7 @@ struct SettingsView: View {
                 .frame(minWidth: 500, minHeight: 460)
         }
         .frame(minWidth: 700, minHeight: 460)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(EchoPalette.graphite)
     }
 }
 
@@ -144,6 +144,7 @@ private struct SettingsSidebarRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 7)
+            .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                     .fill(
@@ -154,6 +155,7 @@ private struct SettingsSidebarRow: View {
             )
         }
         .buttonStyle(.plain)
+        .echoPointingCursor()
         .onHover { hovering = $0 }
         .animation(EchoDesign.subtle, value: isSelected)
         .animation(EchoDesign.subtle, value: hovering)
@@ -194,9 +196,9 @@ private struct SettingsPaneContainer: View {
 
     private var settingsPaneBackground: some View {
         ZStack {
-            Color(NSColor.windowBackgroundColor)
+            EchoPalette.graphiteElevated
             LinearGradient(
-                colors: [pane.accentColor.opacity(0.04), Color.clear],
+                colors: [pane.accentColor.opacity(0.08), Color.clear],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

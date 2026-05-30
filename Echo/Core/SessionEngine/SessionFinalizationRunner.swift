@@ -69,7 +69,8 @@ nonisolated enum SessionFinalizationRunner {
         let tabs = await captureBrowserTabs(events: events)
         EchoLog.browserCapture("Snapshot tabs: \(tabs.count)")
 
-        let contextual = WorkflowContextCapture.items(from: events)
+        let tabEligibility = await MainActor.run { EchoSettings.shared.tabEligibilitySeconds }
+        let contextual = WorkflowContextCapture.items(from: events, tabEligibility: tabEligibility)
         let plan = mergeRestorePlan(primary: contextual, secondary: memory.restorePlan, tabs: tabs)
 
         do {
@@ -123,6 +124,16 @@ nonisolated enum SessionFinalizationRunner {
         tabs: [BrowserTab]
     ) -> WorkflowRestorePlan {
         let defaultChromeProfile = tabs.first(where: { $0.browser == .chrome })?.profileName
+        
+        // Build a URL-to-Profile map from the active tabs scraped at finalization (highly accurate window-level voting)
+        var urlToProfileMap: [String: String] = [:]
+        for tab in tabs {
+            if let profile = tab.profileName {
+                let normalized = normalizeURL(tab.url)
+                urlToProfileMap[normalized] = profile
+            }
+        }
+        
         var seen = Set<String>()
         var items: [RestoreItem] = []
         for var item in primary + secondary.items {
@@ -136,6 +147,14 @@ nonisolated enum SessionFinalizationRunner {
                 if lowerT == "new tab" || lowerT == "start page" || lowerT == "favorites" || lowerT == "untitled" || lowerT == "empty" { continue }
                 if lowerU == "about:blank" || lowerU.hasPrefix("chrome://") || lowerU.hasPrefix("edge://") || lowerU.hasPrefix("brave://") || lowerU.hasPrefix("favorites://") || lowerU.hasPrefix("topsites://") {
                     continue
+                }
+
+                // Try to resolve the profile using our snapshot tab profile map first (overcoming active write delays)
+                if item.profileName == nil, let uStr = item.url {
+                    let normalized = normalizeURL(uStr)
+                    if let resolved = urlToProfileMap[normalized] {
+                        item.profileName = resolved
+                    }
                 }
 
                 if item.bundleId == "com.google.Chrome" && item.profileName == nil {
@@ -160,5 +179,17 @@ nonisolated enum SessionFinalizationRunner {
             items.append(item)
         }
         return WorkflowRestorePlan(items: items, createdAt: secondary.createdAt)
+    }
+
+    private static func normalizeURL(_ urlString: String) -> String {
+        guard let url = URL(string: urlString) else {
+            return urlString.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        var host = url.host ?? ""
+        if host.hasPrefix("www.") {
+            host = String(host.dropFirst(4))
+        }
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return "\(host)/\(path)".lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 }

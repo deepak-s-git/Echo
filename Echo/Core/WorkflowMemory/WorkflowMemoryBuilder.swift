@@ -226,10 +226,15 @@ nonisolated enum WorkflowRestorePlanBuilder {
         events: [ActivityEvent],
         browserContexts: [BrowserContextEntry]
     ) -> WorkflowRestorePlan {
+        let threshold = {
+            let val = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
+            return val > 0 ? val : 12.0
+        }()
+
         var items: [RestoreItem] = []
         var seen = Set<String>()
 
-        for item in WorkflowContextCapture.items(from: events) {
+        for item in WorkflowContextCapture.items(from: events, tabEligibility: threshold) {
             let key = restoreKey(item)
             guard seen.insert(key).inserted else { continue }
             items.append(item)
@@ -254,8 +259,47 @@ nonisolated enum WorkflowRestorePlanBuilder {
             ))
         }
 
+        let sorted = events.sorted { $0.timestamp < $1.timestamp }
+        var eventDurations: [UUID: TimeInterval] = [:]
+        for i in 0..<sorted.count {
+            let event = sorted[i]
+            if i < sorted.count - 1 {
+                let nextEvent = sorted[i + 1]
+                eventDurations[event.id] = nextEvent.timestamp.timeIntervalSince(event.timestamp)
+            } else {
+                eventDurations[event.id] = 60.0
+            }
+        }
+
+        var domainDurations: [String: TimeInterval] = [:]
+        for event in sorted {
+            let d = eventDurations[event.id] ?? 0.0
+            let host = domain(from: event.url) ?? event.appName
+            domainDurations[host.lowercased(), default: 0] += d
+        }
+
+        var urlDurations: [String: TimeInterval] = [:]
+        for event in sorted {
+            let d = eventDurations[event.id] ?? 0.0
+            let urlString = event.url ?? {
+                guard let title = event.windowTitle, title.contains(".") else { return nil }
+                if title.hasPrefix("http") { return title }
+                return "https://\(title)"
+            }()
+            if let urlString {
+                let normalized = normalizeURL(urlString)
+                urlDurations[normalized, default: 0] += d
+            }
+        }
+
         for ctx in browserContexts.suffix(8) {
-            guard let url = sanitizedURL(from: ctx), seen.insert("url:\(url)").inserted else { continue }
+            let totalD = domainDurations[ctx.domain.lowercased()] ?? 0.0
+            if totalD < threshold { continue }
+            guard let url = sanitizedURL(from: ctx) else { continue }
+            
+            let normalized = normalizeURL(url)
+            let urlD = urlDurations[normalized] ?? 0.0
+            if urlD < threshold { continue }
             
             let t = ctx.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let u = url.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -267,6 +311,37 @@ nonisolated enum WorkflowRestorePlanBuilder {
             if lowerU == "about:blank" || lowerU.hasPrefix("chrome://") || lowerU.hasPrefix("edge://") || lowerU.hasPrefix("brave://") || lowerU.hasPrefix("favorites://") || lowerU.hasPrefix("topsites://") {
                 continue
             }
+
+            // Detect local PDF or local file in browser context
+            let isPDF = lowerT.contains(".pdf") || lowerU.contains(".pdf")
+            let isLocal = lowerU.hasPrefix("file://") || lowerU.contains("/users/") || lowerU.contains("/volumes/")
+
+            if isPDF || isLocal {
+                let cleanLabel: String
+                if isPDF, let range = t.lowercased().range(of: ".pdf") {
+                    cleanLabel = String(t[..<range.upperBound])
+                } else if isLocal {
+                    cleanLabel = (u as NSString).lastPathComponent
+                } else {
+                    cleanLabel = t
+                }
+                
+                let path = lowerU.hasPrefix("file://") ? URL(string: u)?.path : u
+                let key = "doc:\(cleanLabel)"
+                guard seen.insert(key).inserted else { continue }
+                items.append(RestoreItem(
+                    id: UUID(),
+                    kind: .document,
+                    label: cleanLabel,
+                    bundleId: nil, // set to nil to group under Files & Documents!
+                    url: url,
+                    path: path,
+                    workingDirectory: nil
+                ))
+                continue
+            }
+
+            guard seen.insert("url:\(url)").inserted else { continue }
 
             items.append(RestoreItem(
                 id: UUID(),
@@ -339,6 +414,25 @@ nonisolated enum WorkflowRestorePlanBuilder {
             else { d[e.appBundleId, default: 0] += 1 }
         }
         return d
+    }
+
+    private static func normalizeURL(_ urlString: String) -> String {
+        guard let url = URL(string: urlString) else {
+            return urlString.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        var host = url.host ?? ""
+        if host.hasPrefix("www.") {
+            host = String(host.dropFirst(4))
+        }
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return "\(host)/\(path)".lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private static func domain(from urlString: String?) -> String? {
+        guard let urlString, let url = URL(string: urlString), let host = url.host else {
+            return nil
+        }
+        return host.replacingOccurrences(of: "www.", with: "")
     }
 
     private static func sanitizedURL(from ctx: BrowserContextEntry) -> String? {

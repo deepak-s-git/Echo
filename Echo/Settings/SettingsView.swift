@@ -27,8 +27,8 @@ struct SettingsView: View {
 
         var accentColor: Color {
             switch self {
-            case .general: return .secondary
-            case .tracking: return EchoPalette.indigoSoft
+            case .general: return Color(red: 0.28, green: 0.58, blue: 0.88)
+            case .tracking: return Color(red: 0.88, green: 0.38, blue: 0.48)
             case .privacy: return Color(red: 0.45, green: 0.72, blue: 0.55)
             case .appearance: return Color(red: 0.72, green: 0.48, blue: 0.88)
             case .notifications: return Color(red: 0.95, green: 0.65, blue: 0.30)
@@ -47,7 +47,9 @@ struct SettingsView: View {
             SettingsSidebar(selectedPane: $selectedPane)
                 .frame(width: 196)
 
-            Divider()
+            Rectangle()
+                .fill(EchoPalette.stroke)
+                .frame(width: 0.5)
 
             // Detail pane — fills remaining space
             SettingsPaneContainer(pane: selectedPane)
@@ -84,7 +86,9 @@ private struct SettingsSidebar: View {
             .padding(.top, 22)
             .padding(.bottom, 14)
 
-            Divider()
+            Rectangle()
+                .fill(EchoPalette.stroke)
+                .frame(height: 0.5)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 6)
 
@@ -107,7 +111,7 @@ private struct SettingsSidebar: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.ultraThinMaterial)
+        .background(EchoPalette.sidebar)
     }
 }
 
@@ -196,9 +200,9 @@ private struct SettingsPaneContainer: View {
 
     private var settingsPaneBackground: some View {
         ZStack {
-            EchoPalette.graphiteElevated
+            EchoPalette.graphite
             LinearGradient(
-                colors: [pane.accentColor.opacity(0.08), Color.clear],
+                colors: [pane.accentColor.opacity(0.04), Color.clear],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

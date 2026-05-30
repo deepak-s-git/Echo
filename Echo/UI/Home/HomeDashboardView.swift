@@ -96,7 +96,7 @@ private struct HomeHeroSection: View {
                         systemImage: "clock.arrow.circlepath"
                     )
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(EchoPalette.indigoSoft)
+                    .foregroundStyle(Color.secondary)
 
                     Label(
                         "Block \(blockDuration.sessionDurationFormatted)",
@@ -107,8 +107,12 @@ private struct HomeHeroSection: View {
 
                     if appCount > 0 {
                         Label("\(appCount) apps", systemImage: "square.grid.2x2")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(EchoPalette.indigoSoft)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(EchoPalette.indigo.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(EchoPalette.indigo.opacity(0.2), lineWidth: 0.5))
                     }
                 }
             }
@@ -161,12 +165,12 @@ private struct HomeCurrentAppSection: View {
                     }
             }
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("In focus now")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(EchoPalette.indigoSoft)
                     .textCase(.uppercase)
-                    .tracking(0.4)
+                    .tracking(1.2)
 
                 Text(resolvedAppName)
                     .font(.system(size: 18, weight: .semibold))
@@ -174,7 +178,7 @@ private struct HomeCurrentAppSection: View {
 
                 Text(focusLabel)
                     .font(.system(size: 12))
-                    .foregroundStyle(EchoPalette.indigoSoft)
+                    .foregroundStyle(Color.secondary)
             }
 
             Spacer()

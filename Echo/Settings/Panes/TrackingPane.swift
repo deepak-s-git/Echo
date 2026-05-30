@@ -111,6 +111,7 @@ struct TrackingPane: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .echoPointingCursor()
 
                     Text("or")
                         .font(.system(size: 11))
@@ -128,6 +129,7 @@ struct TrackingPane: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .echoPointingCursor()
 
                     Spacer()
                 }
@@ -192,6 +194,7 @@ private struct IgnoredAppRow: View {
                             .foregroundStyle(Color.red.opacity(0.7))
                     }
                     .buttonStyle(.plain)
+                    .echoPointingCursor()
                     .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -240,11 +243,13 @@ private struct AddBundleIdSheet: View {
                 Button("Cancel") { isPresented = false }
                     .keyboardShortcut(.cancelAction)
                     .buttonStyle(.bordered)
+                    .echoPointingCursor()
 
                 Button("Add") { confirm() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .echoPointingCursor()
             }
         }
         .padding(28)
@@ -337,6 +342,7 @@ private struct RunningAppPickerSheet: View {
 
             Button("Cancel") { isPresented = false }
                 .buttonStyle(.bordered)
+                .echoPointingCursor()
                 .padding(16)
         }
         .frame(width: 360)
@@ -376,6 +382,7 @@ private struct RunningAppRow: View {
             .background(hovering ? Color.primary.opacity(0.04) : Color.clear)
         }
         .buttonStyle(.plain)
+        .echoPointingCursor()
         .onHover { hovering = $0 }
         .animation(EchoDesign.subtle, value: hovering)
     }

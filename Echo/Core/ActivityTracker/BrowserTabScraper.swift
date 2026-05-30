@@ -58,7 +58,8 @@ struct BrowserTabScraper {
         }
         var profileName: String? = nil
         if browser == .chrome {
-            profileName = chromeProfile(forURL: url)
+            let sessionMap = sessionURLsForProfiles()
+            profileName = chromeProfile(forURLs: [url], sessionMap: sessionMap)
         }
 
         return BrowserTab(
@@ -108,38 +109,56 @@ struct BrowserTabScraper {
 
     @MainActor
     private static func runChromeStyleTabList(appName: String, browser: BrowserTab.Browser) -> [BrowserTab]? {
-
         let script = """
         try {
             var app = Application('\(appName)');
-            var tabs = [];
-            if (app.windows.length > 0) {
-                var win = app.windows[0];
-                for (var j = 0; j < win.tabs.length; j++) {
-                    var tab = win.tabs[j];
-                    try { tabs.push({url: tab.url(), title: tab.name()}); } catch(e) {}
-                }
+            var flatTabs = [];
+            for (var i = 0; i < app.windows.length; i++) {
+                var win = app.windows[i];
+                try {
+                    for (var j = 0; j < win.tabs.length; j++) {
+                        var tab = win.tabs[j];
+                        try {
+                            flatTabs.push({
+                                url: tab.url(),
+                                title: tab.name(),
+                                windowIndex: i.toString()
+                            });
+                        } catch(e) {}
+                    }
+                } catch(e) {}
             }
-            JSON.stringify(tabs);
+            JSON.stringify(flatTabs);
         } catch(e) { JSON.stringify(null); }
         """
         
         guard let result = runJXA(script) else { return nil }
         
-        // Gather all valid URLs to resolve the profile for the entire window
-        var validURLs: [String] = []
-        for item in result {
-            guard let url = item["url"], let title = item["title"] else { continue }
-            guard isValidTab(url: url, title: title) else { continue }
-            validURLs.append(url)
+        // Pre-compute session-based URL map once for all windows
+        let sessionMap = (browser == .chrome) ? sessionURLsForProfiles() : [:]
+        
+        // Group the scraped tabs by windowIndex to perform window-level profile resolution
+        let groupedByWindow = Dictionary(grouping: result, by: { $0["windowIndex"] ?? "0" })
+        var resolvedWindowProfiles: [String: String?] = [:]
+        
+        for (windowIndex, windowItems) in groupedByWindow {
+            var validURLs: [String] = []
+            for item in windowItems {
+                guard let url = item["url"], let title = item["title"] else { continue }
+                guard isValidTab(url: url, title: title) else { continue }
+                validURLs.append(url)
+            }
+            let profile = (browser == .chrome && !validURLs.isEmpty) ? chromeProfile(forURLs: validURLs, sessionMap: sessionMap) : nil
+            resolvedWindowProfiles[windowIndex] = profile
         }
-
-        let resolvedProfile = (browser == .chrome && !validURLs.isEmpty) ? chromeProfile(forURLs: validURLs) : nil
 
         var tabs: [BrowserTab] = []
         for item in result {
             guard let url = item["url"], let title = item["title"] else { continue }
             guard isValidTab(url: url, title: title) else { continue }
+            let wIndex = item["windowIndex"] ?? "0"
+            let resolvedProfile = resolvedWindowProfiles[wIndex] ?? nil
+            
             tabs.append(BrowserTab(
                 id: UUID(),
                 url: url,
@@ -180,15 +199,160 @@ struct BrowserTabScraper {
         let lastVisitTime: Double
     }
 
-    /// Determines which Chrome profile directory contains the given URL by querying
-    /// each profile's SQLite History database for the URL or host match.
-    private static func chromeProfile(forURL url: String) -> String? {
-        chromeProfile(forURLs: [url])
+    // MARK: - Session-Based Chrome Profile Resolution
+
+    /// Reads each Chrome profile's most recent SNSS Session file to build
+    /// a map of which normalized hosts are currently open in each profile.
+    /// This is the ground-truth source for window-to-profile assignment.
+    private static func sessionURLsForProfiles() -> [String: Set<String>] {
+        let base = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Google/Chrome")
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: base, includingPropertiesForKeys: [.isDirectoryKey]
+        ) else { return [:] }
+
+        let profileDirs = contents.compactMap { url -> String? in
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            guard isDir else { return nil }
+            let name = url.lastPathComponent
+            // Only consider real profile directories
+            guard name == "Default" || name.hasPrefix("Profile ") else { return nil }
+            return name
+        }
+
+        var result: [String: Set<String>] = [:]
+        let httpBytes  = [UInt8]("http://".utf8)
+        let httpsBytes = [UInt8]("https://".utf8)
+
+        for profileDir in profileDirs {
+            let sessionsDir = base.appendingPathComponent(profileDir).appendingPathComponent("Sessions")
+            guard let sessionFiles = try? FileManager.default.contentsOfDirectory(
+                at: sessionsDir,
+                includingPropertiesForKeys: [.contentModificationDateKey]
+            ) else { continue }
+
+            // Find the most recently modified Session_ file (not Tabs_)
+            let sessionOnlyFiles = sessionFiles.filter { $0.lastPathComponent.hasPrefix("Session_") }
+            guard let newestSession = sessionOnlyFiles.max(by: {
+                let d1 = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                let d2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                return d1 < d2
+            }) else { continue }
+
+            guard let data = try? Data(contentsOf: newestSession) else { continue }
+            let bytes = [UInt8](data)
+            var hosts = Set<String>()
+
+            // Scan the raw bytes for http:// and https:// URL patterns
+            var i = 0
+            while i < bytes.count {
+                var prefixLen = 0
+                if i + httpsBytes.count <= bytes.count,
+                   Array(bytes[i..<i+httpsBytes.count]) == httpsBytes {
+                    prefixLen = httpsBytes.count
+                } else if i + httpBytes.count <= bytes.count,
+                          Array(bytes[i..<i+httpBytes.count]) == httpBytes {
+                    prefixLen = httpBytes.count
+                }
+
+                guard prefixLen > 0 else { i += 1; continue }
+
+                // Read until a non-URL byte (space, control char, null, quote, etc.)
+                var end = i + prefixLen
+                while end < bytes.count {
+                    let b = bytes[end]
+                    if b < 0x21 || b == 0x22 || b == 0x27 || b == 0x3C ||
+                       b == 0x3E || b == 0x7B || b == 0x7D || b == 0x7F { break }
+                    end += 1
+                }
+                let urlLen = end - i
+                if urlLen > prefixLen + 3, urlLen < 2048,
+                   let urlStr = String(bytes: bytes[i..<end], encoding: .utf8),
+                   let urlObj = URL(string: urlStr),
+                   let host = urlObj.host {
+                    // Normalize: strip www. and lowercase
+                    var h = host.lowercased()
+                    if h.hasPrefix("www.") { h = String(h.dropFirst(4)) }
+                    // Skip noise domains
+                    if !h.contains("googlevideo.com") &&
+                       !h.contains("doubleclick.net") &&
+                       !h.contains("adtrafficquality") &&
+                       !h.contains("gstatic.com") {
+                        hosts.insert(h)
+                    }
+                }
+                i = end
+            }
+
+            if !hosts.isEmpty {
+                result[profileDir] = hosts
+            }
+        }
+        return result
     }
 
-    /// Resolves the most likely Chrome profile for a list of URLs from the same window
-    /// using a robust majority-voting algorithm across all high-confidence history matches.
-    private static func chromeProfile(forURLs urls: [String]) -> String? {
+    /// Resolves the Chrome profile for a window's URLs using session file data.
+    /// Profiles that exclusively own a host get strong votes; shared hosts get weaker votes.
+    private static func chromeProfileFromSessions(
+        forWindowURLs urls: [String],
+        sessionMap: [String: Set<String>]
+    ) -> String? {
+        guard !sessionMap.isEmpty else { return nil }
+
+        // Extract normalized hosts from the window's URLs
+        var windowHosts = Set<String>()
+        for urlStr in urls {
+            guard let urlObj = URL(string: urlStr), let host = urlObj.host else { continue }
+            var h = host.lowercased()
+            if h.hasPrefix("www.") { h = String(h.dropFirst(4)) }
+            windowHosts.insert(h)
+        }
+        guard !windowHosts.isEmpty else { return nil }
+
+        // For each host, determine how many profiles claim it
+        var hostOwnerCount: [String: Int] = [:]
+        for host in windowHosts {
+            var count = 0
+            for (_, hosts) in sessionMap {
+                if hosts.contains(host) { count += 1 }
+            }
+            hostOwnerCount[host] = count
+        }
+
+        // Score each profile: exclusive hosts = +3, shared hosts = +1
+        var profileScores: [String: Int] = [:]
+        for (profileDir, profileHosts) in sessionMap {
+            var score = 0
+            for host in windowHosts {
+                if profileHosts.contains(host) {
+                    let owners = hostOwnerCount[host] ?? 1
+                    score += (owners == 1) ? 3 : 1
+                }
+            }
+            if score > 0 {
+                profileScores[profileDir] = score
+            }
+        }
+
+        // Return the profile with the highest score, with tie-breaking by profile name for stability
+        let sorted = profileScores.sorted {
+            if $0.value != $1.value { return $0.value > $1.value }
+            return $0.key < $1.key
+        }
+        return sorted.first?.key
+    }
+
+    // MARK: - Chrome Profile Resolution (Session-first, History-fallback)
+
+    /// Resolves the most likely Chrome profile for a set of URLs from the same window.
+    /// Uses session-based resolution first, falls back to History DB queries.
+    private static func chromeProfile(forURLs urls: [String], sessionMap: [String: Set<String>] = [:]) -> String? {
+        // 1. PRIMARY: Session-based resolution (reads current tab state per profile)
+        if let sessionResult = chromeProfileFromSessions(forWindowURLs: urls, sessionMap: sessionMap) {
+            return sessionResult
+        }
+
+        // 2. SECONDARY: Fall back to History DB voting
         let base = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Google/Chrome")
         guard let contents = try? FileManager.default.contentsOfDirectory(
@@ -213,7 +377,7 @@ struct BrowserTabScraper {
 
         var profileVotes: [String: Int] = [:]
         
-        // 1. First Pass: Majority-voting based on high-confidence matches (Score >= 2: Exact or Clean Path matches)
+        // High-confidence History matches (Score >= 2: Exact or Clean Path)
         for url in urls {
             var bestProfileForUrl: String? = nil
             var highestScoreForUrl = 0
@@ -235,7 +399,6 @@ struct BrowserTabScraper {
                 }
             }
 
-            // Only vote if it is a high-confidence match (Score >= 2)
             if let matchedProfile = bestProfileForUrl, highestScoreForUrl >= 2 {
                 profileVotes[matchedProfile, default: 0] += 1
             }
@@ -245,45 +408,31 @@ struct BrowserTabScraper {
             return bestProfile
         }
 
-        // 2. Second Pass: Fallback voting based on any match (Score >= 1, e.g. host match)
-        var fallbackVotes: [String: Int] = [:]
-        for url in urls {
-            var bestProfileForUrl: String? = nil
-            var highestScoreForUrl = 0
-            var highestTimeForUrl: Double = 0
-
-            for profile in profiles {
-                let profileURL = base.appendingPathComponent(profile)
-                if let match = checkURLInHistoryDetails(profilePath: profileURL, urlString: url) {
-                    if match.score > highestScoreForUrl {
-                        highestScoreForUrl = match.score
-                        bestProfileForUrl = profile
-                        highestTimeForUrl = match.lastVisitTime
-                    } else if match.score == highestScoreForUrl && match.score > 0 {
-                        if match.lastVisitTime > highestTimeForUrl {
-                            bestProfileForUrl = profile
-                            highestTimeForUrl = match.lastVisitTime
-                        }
-                    }
-                }
-            }
-
-            if let matchedProfile = bestProfileForUrl, highestScoreForUrl > 0 {
-                fallbackVotes[matchedProfile, default: 0] += 1
-            }
-        }
-
-        if let bestProfile = fallbackVotes.max(by: { $0.value < $1.value })?.key {
-            return bestProfile
-        }
-
-        // 3. Ultimate Fallback: Most recently modified profile folder
+        // 3. ULTIMATE FALLBACK: Most recently modified profile folder
         var fallbackCandidates: [(name: String, mtime: Date)] = []
         for profile in profiles {
             let profileURL = base.appendingPathComponent(profile)
-            let historyPath = profileURL.appendingPathComponent("History")
-            if let mtime = (try? historyPath.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) {
-                fallbackCandidates.append((name: profile, mtime: mtime))
+            var filesToCheck = [
+                profileURL.appendingPathComponent("History"),
+                profileURL.appendingPathComponent("History-wal"),
+                profileURL.appendingPathComponent("Preferences"),
+                profileURL.appendingPathComponent("Sessions")
+            ]
+            
+            if let sessionsContents = try? FileManager.default.contentsOfDirectory(at: profileURL.appendingPathComponent("Sessions"), includingPropertiesForKeys: [.contentModificationDateKey]) {
+                filesToCheck.append(contentsOf: sessionsContents)
+            }
+            
+            var maxMtime = Date.distantPast
+            for file in filesToCheck {
+                if let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) {
+                    if mtime > maxMtime {
+                        maxMtime = mtime
+                    }
+                }
+            }
+            if maxMtime > Date.distantPast {
+                fallbackCandidates.append((name: profile, mtime: maxMtime))
             }
         }
         fallbackCandidates.sort { $0.mtime > $1.mtime }
@@ -308,17 +457,24 @@ struct BrowserTabScraper {
         }
         
         do {
-            try FileManager.default.copyItem(at: historyPath, to: tempURL)
-            if FileManager.default.fileExists(atPath: walPath.path) {
-                try FileManager.default.copyItem(at: walPath, to: tempWalURL)
-            }
-            if FileManager.default.fileExists(atPath: shmPath.path) {
-                try FileManager.default.copyItem(at: shmPath, to: tempShmURL)
-            }
+            let data = try Data(contentsOf: historyPath)
+            try data.write(to: tempURL)
         } catch {
             try? FileManager.default.removeItem(at: tempBase)
             return nil
         }
+        
+        if FileManager.default.fileExists(atPath: walPath.path) {
+            if let data = try? Data(contentsOf: walPath) {
+                try? data.write(to: tempWalURL)
+            }
+        }
+        if FileManager.default.fileExists(atPath: shmPath.path) {
+            if let data = try? Data(contentsOf: shmPath) {
+                try? data.write(to: tempShmURL)
+            }
+        }
+
         
         defer {
             try? FileManager.default.removeItem(at: tempBase)

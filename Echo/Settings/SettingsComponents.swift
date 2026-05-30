@@ -25,8 +25,8 @@ struct SettingsPaneHeader: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -43,9 +43,9 @@ struct SettingsGroup<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(label.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .tracking(0.8)
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(EchoPalette.indigoSoft)
+                .tracking(1.0)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
 
@@ -109,8 +109,8 @@ struct SettingsRow<Content: View>: View {
                         .foregroundStyle(.primary)
                     if let description {
                         Text(description)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -276,6 +276,7 @@ struct SettingsDestructiveButton: View {
             )
         }
         .buttonStyle(.plain)
+        .echoPointingCursor()
         .onHover { hovering = $0 }
         .animation(EchoDesign.subtle, value: hovering)
     }

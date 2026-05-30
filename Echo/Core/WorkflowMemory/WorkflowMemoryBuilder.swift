@@ -87,9 +87,12 @@ nonisolated enum WorkflowMemoryBuilder {
     }
 
     private static func buildBrowserContexts(from events: [ActivityEvent]) -> [BrowserContextEntry] {
-        events.compactMap { event -> BrowserContextEntry? in
+        var seen = Set<String>()
+        return events.compactMap { event -> BrowserContextEntry? in
             guard event.type == .browserTab || event.url != nil else { return nil }
             let host = domain(from: event.url) ?? event.appName
+            let lowerHost = host.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !lowerHost.isEmpty && seen.insert(lowerHost).inserted else { return nil }
             let title = event.windowTitle ?? host
             return BrowserContextEntry(
                 id: event.id,

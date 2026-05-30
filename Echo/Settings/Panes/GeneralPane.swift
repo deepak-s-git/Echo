@@ -10,14 +10,16 @@ struct GeneralPane: View {
                 icon: "gearshape.fill",
                 title: "General",
                 subtitle: "App behavior, session timing & menu bar",
-                color: .secondary
+                color: EchoPalette.indigo
             )
+
+            let steelBlue = EchoPalette.indigoSoft
 
             // MARK: Session Timing
             SettingsGroup(label: "Session Timing") {
                 SettingsSliderRow(
                     icon: "moon.zzz",
-                    iconColor: EchoPalette.indigoSoft,
+                    iconColor: steelBlue,
                     label: "Idle timeout",
                     value: $settings.idleTimeoutMinutes,
                     range: 1...30,
@@ -30,7 +32,7 @@ struct GeneralPane: View {
 
                 SettingsSliderRow(
                     icon: "timer",
-                    iconColor: EchoPalette.indigoSoft,
+                    iconColor: steelBlue,
                     label: "Minimum session duration",
                     value: $settings.minimumSessionSeconds,
                     range: 10...300,
@@ -46,7 +48,7 @@ struct GeneralPane: View {
             SettingsGroup(label: "Startup") {
                 SettingsToggleRow(
                     icon: "power",
-                    iconColor: EchoPalette.indigoSoft,
+                    iconColor: steelBlue,
                     label: "Launch at login",
                     description: "Automatically start Echo when you log in",
                     isOn: $settings.launchAtLogin,
@@ -58,7 +60,7 @@ struct GeneralPane: View {
             SettingsGroup(label: "Menu Bar") {
                 SettingsToggleRow(
                     icon: "menubar.rectangle",
-                    iconColor: EchoPalette.indigoSoft,
+                    iconColor: steelBlue,
                     label: "Show in menu bar",
                     description: "Always-visible status and quick controls",
                     isOn: $settings.showInMenuBar,
@@ -67,7 +69,7 @@ struct GeneralPane: View {
             }
 
             // MARK: Info card
-            IdleTimeoutInfoCard(minutes: settings.idleTimeoutMinutes)
+            IdleTimeoutInfoCard(minutes: settings.idleTimeoutMinutes, steelBlue: steelBlue)
         }
     }
 }
@@ -76,12 +78,13 @@ struct GeneralPane: View {
 
 private struct IdleTimeoutInfoCard: View {
     let minutes: Double
+    let steelBlue: Color
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "info.circle")
                 .font(.system(size: 14))
-                .foregroundStyle(EchoPalette.indigoSoft)
+                .foregroundStyle(steelBlue)
 
             Text("Sessions automatically end after **\(Int(minutes)) minute\(minutes == 1 ? "" : "s")** of inactivity. You can also end them manually anytime.")
                 .font(.system(size: 12))
@@ -93,11 +96,11 @@ private struct IdleTimeoutInfoCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                .fill(EchoPalette.indigo.opacity(0.06))
+                .fill(steelBlue.opacity(0.06))
         )
         .overlay(
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                .strokeBorder(EchoPalette.indigo.opacity(0.12), lineWidth: 0.5)
+                .strokeBorder(steelBlue.opacity(0.12), lineWidth: 0.5)
         )
     }
 }

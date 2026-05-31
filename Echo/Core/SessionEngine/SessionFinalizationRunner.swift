@@ -150,7 +150,7 @@ nonisolated enum SessionFinalizationRunner {
                 }
 
                 // Try to resolve the profile using our snapshot tab profile map first (overcoming active write delays)
-                if item.profileName == nil, let uStr = item.url {
+                if let uStr = item.url {
                     let normalized = normalizeURL(uStr)
                     if let resolved = urlToProfileMap[normalized] {
                         item.profileName = resolved
@@ -165,10 +165,10 @@ nonisolated enum SessionFinalizationRunner {
             switch item.kind {
             case .application: key = "app:\(item.bundleId ?? "")"
             case .url, .browserPage:
-                if let u = item.url, let host = URL(string: u)?.host {
-                    key = "page:\(host):\(item.label)"
+                if let u = item.url {
+                    key = "page:\(normalizeURL(u))"
                 } else {
-                    key = "url:\(item.url ?? "")"
+                    key = "url:\(item.label)"
                 }
             case .folder: key = "folder:\(item.path ?? "")"
             case .document: key = "doc:\(item.path ?? "")"
@@ -189,7 +189,22 @@ nonisolated enum SessionFinalizationRunner {
         if host.hasPrefix("www.") {
             host = String(host.dropFirst(4))
         }
-        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return "\(host)/\(path)".lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        
+        let lowerHost = host.lowercased()
+        if lowerHost != "youtu.be" {
+            path = path.lowercased()
+        }
+        
+        var normalized = "\(host.lowercased())/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        
+        if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+            if let components = URLComponents(string: urlString) {
+                if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value {
+                    normalized += "?v=\(vParam)"
+                }
+            }
+        }
+        return normalized
     }
 }

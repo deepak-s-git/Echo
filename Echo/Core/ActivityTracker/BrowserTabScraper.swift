@@ -43,8 +43,23 @@ struct BrowserTabScraper {
             script = """
             try {
                 var app = Application('\(appName)');
-                var tab = app.windows[0].activeTab();
-                JSON.stringify({url: tab.url(), title: tab.name()});
+                if (app.windows.length > 0) {
+                    var win = app.windows[0];
+                    var tab = win.activeTab();
+                    var urls = [];
+                    for (var j = 0; j < win.tabs.length; j++) {
+                        try {
+                            urls.push(win.tabs[j].url());
+                        } catch(e) {}
+                    }
+                    JSON.stringify({
+                        url: tab.url(),
+                        title: tab.name(),
+                        windowUrls: urls.join('|')
+                    });
+                } else {
+                    JSON.stringify(null);
+                }
             } catch(e) { JSON.stringify(null); }
             """
         }
@@ -59,7 +74,14 @@ struct BrowserTabScraper {
         var profileName: String? = nil
         if browser == .chrome {
             let sessionMap = sessionURLsForProfiles()
-            profileName = chromeProfile(forURLs: [url], sessionMap: sessionMap)
+            var allUrls = [url]
+            if let windowUrlsStr = item["windowUrls"] {
+                let parsedUrls = windowUrlsStr.components(separatedBy: "|").filter { !$0.isEmpty }
+                if !parsedUrls.isEmpty {
+                    allUrls = parsedUrls
+                }
+            }
+            profileName = chromeProfile(forURLs: allUrls, sessionMap: sessionMap)
         }
 
         return BrowserTab(

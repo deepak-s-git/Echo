@@ -47,8 +47,8 @@ struct RestoreSelectionSheet: View {
                             .padding(.horizontal, 18)
                             .padding(.vertical, 8)
                             .foregroundStyle(Color.primary.opacity(0.85))
-                            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+                            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
                     .echoPointingCursor()
@@ -73,11 +73,17 @@ struct RestoreSelectionSheet: View {
                                     .fill(Color.secondary.opacity(0.12))
                             } else {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(EchoPalette.premiumGradient)
+                                    .fill(Color.primary.opacity(0.10))
                             }
                         }
-                        .foregroundStyle(selected.isEmpty ? Color.secondary : Color.white)
-                        .shadow(color: selected.isEmpty ? .clear : EchoPalette.indigo.opacity(0.2), radius: 6, y: 2)
+                        .foregroundStyle(selected.isEmpty ? Color.secondary : Color.primary)
+                        .overlay {
+                            if !selected.isEmpty {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
+                            }
+                        }
+                        .shadow(color: .clear, radius: 0)
                     }
                     .buttonStyle(.plain)
                     .disabled(selected.isEmpty)
@@ -474,7 +480,7 @@ private struct AppGroupSection: View {
                     .padding(.horizontal, 12)
                     .background {
                         RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                            .fill(isAppSelected ? EchoPalette.indigo.opacity(0.04) : Color.white.opacity(0.01))
+                            .fill(isAppSelected ? EchoPalette.indigo.opacity(0.04) : Color.primary.opacity(0.01))
                     }
                     .overlay(
                         RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
@@ -494,7 +500,7 @@ private struct AppGroupSection: View {
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(Color.secondary)
                             .frame(width: 24, height: 24)
-                            .background(Color.white.opacity(0.02), in: RoundedRectangle(cornerRadius: 6))
+                            .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
                     .echoPointingCursor()
@@ -532,7 +538,7 @@ private struct AppGroupSection: View {
                                     }
                                     .padding(.vertical, 4)
                                     .padding(.horizontal, 8)
-                                    .background(Color.white.opacity(0.015), in: RoundedRectangle(cornerRadius: 6))
+                                    .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 6))
                                 }
                                 .buttonStyle(.plain)
                                 .echoPointingCursor()
@@ -628,11 +634,11 @@ private struct RestoreItemRow: View {
             .padding(.horizontal, 12)
             .background {
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .fill(isSelected ? EchoPalette.indigo.opacity(0.08) : (hovering ? Color.white.opacity(0.03) : Color.clear))
+                    .fill(isSelected ? EchoPalette.indigo.opacity(0.08) : (hovering ? Color.primary.opacity(0.03) : Color.clear))
             }
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .strokeBorder(isSelected ? EchoPalette.indigo.opacity(0.35) : (hovering ? Color.white.opacity(0.12) : EchoPalette.stroke), lineWidth: 0.5)
+                    .strokeBorder(isSelected ? EchoPalette.indigo.opacity(0.35) : (hovering ? Color.primary.opacity(0.12) : EchoPalette.stroke), lineWidth: 0.5)
             )
             .scaleEffect(hovering ? 1.006 : 1.0)
             .animation(EchoDesign.subtle, value: hovering)

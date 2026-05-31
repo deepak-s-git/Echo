@@ -10,10 +10,10 @@ struct GeneralPane: View {
                 icon: "gearshape.fill",
                 title: "General",
                 subtitle: "App behavior, session timing & menu bar",
-                color: EchoPalette.indigo
+                color: Color(red: 0.28, green: 0.58, blue: 0.88)
             )
 
-            let steelBlue = EchoPalette.indigoSoft
+            let steelBlue = Color(red: 0.28, green: 0.58, blue: 0.88)
 
             // MARK: Session Timing
             SettingsGroup(label: "Session Timing") {

@@ -50,8 +50,23 @@ nonisolated enum WorkflowContextCapture {
     if host.hasPrefix("www.") {
         host = String(host.dropFirst(4))
     }
-    let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    return "\(host)/\(path)".lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    
+    let lowerHost = host.lowercased()
+    if lowerHost != "youtu.be" {
+        path = path.lowercased()
+    }
+    
+    var normalized = "\(host.lowercased())/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    
+    if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+        if let components = URLComponents(string: urlString) {
+            if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value {
+                normalized += "?v=\(vParam)"
+            }
+        }
+    }
+    return normalized
   }
 
   static func itemsForEvent(_ event: ActivityEvent, duration: TimeInterval, urlDurations: [String: TimeInterval] = [:], tabEligibility: Double? = nil, seen: inout Set<String>) -> [RestoreItem] {
@@ -237,7 +252,7 @@ nonisolated enum WorkflowContextCapture {
         return []
     }
     
-    let key = "browser:\(url.absoluteString)"
+    let key = "browser:\(normalizeURL(url.absoluteString))"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),

@@ -341,7 +341,7 @@ nonisolated enum WorkflowRestorePlanBuilder {
                 continue
             }
 
-            guard seen.insert("url:\(url)").inserted else { continue }
+            guard seen.insert("page:\(normalizeURL(url))").inserted else { continue }
 
             items.append(RestoreItem(
                 id: UUID(),
@@ -386,10 +386,10 @@ nonisolated enum WorkflowRestorePlanBuilder {
         switch item.kind {
         case .application: return "app:\(item.bundleId ?? "")"
         case .url, .browserPage:
-            if let u = item.url, let host = URL(string: u)?.host {
-                return "page:\(host):\(item.label)"
+            if let u = item.url {
+                return "page:\(normalizeURL(u))"
             }
-            return "url:\(item.url ?? "")"
+            return "url:\(item.label)"
         case .folder: return "folder:\(item.path ?? "")"
         case .document: return "doc:\(item.path ?? "")"
         case .terminalDirectory: return "term:\(item.workingDirectory ?? "")"
@@ -424,8 +424,23 @@ nonisolated enum WorkflowRestorePlanBuilder {
         if host.hasPrefix("www.") {
             host = String(host.dropFirst(4))
         }
-        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return "\(host)/\(path)".lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        
+        let lowerHost = host.lowercased()
+        if lowerHost != "youtu.be" {
+            path = path.lowercased()
+        }
+        
+        var normalized = "\(host.lowercased())/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        
+        if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+            if let components = URLComponents(string: urlString) {
+                if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value {
+                    normalized += "?v=\(vParam)"
+                }
+            }
+        }
+        return normalized
     }
 
     private static func domain(from urlString: String?) -> String? {

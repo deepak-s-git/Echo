@@ -177,6 +177,7 @@ struct SettingsSliderRow: View {
     let icon: String?
     let iconColor: Color
     let label: String
+    var description: String? = nil
     @Binding var value: Double
     let range: ClosedRange<Double>
     let step: Double
@@ -198,10 +199,17 @@ struct SettingsSliderRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(label)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.primary)
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(label)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.primary)
+                            if let description {
+                                Text(description)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         Spacer()
                         Text(valueFormatter(value))
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))

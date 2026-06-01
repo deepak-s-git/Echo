@@ -130,7 +130,11 @@ struct TimelineView: View {
                     Spacer()
                 } else if sessionStore.workflowThreads.isEmpty {
                     Spacer()
-                    emptyTimeline
+                    HStack {
+                        Spacer()
+                        emptyTimeline
+                        Spacer()
+                    }
                     Spacer()
                 } else {
                     ScrollView {

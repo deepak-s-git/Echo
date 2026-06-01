@@ -356,12 +356,15 @@ struct BrowserTabScraper {
             }
         }
 
-        // Return the profile with the highest score, with tie-breaking by profile name for stability
-        let sorted = profileScores.sorted {
-            if $0.value != $1.value { return $0.value > $1.value }
-            return $0.key < $1.key
+        // Return the profile with the highest score. If there's a tie for the highest score,
+        // session-based voting is ambiguous (e.g. shared domains like gmail.com). We return nil
+        // to allow history-based SQLite timestamp voting to break the tie with 100% precision.
+        let sorted = profileScores.sorted { $0.value > $1.value }
+        guard let first = sorted.first else { return nil }
+        if sorted.count > 1 && sorted[1].value == first.value {
+            return nil
         }
-        return sorted.first?.key
+        return first.key
     }
 
     // MARK: - Chrome Profile Resolution (Session-first, History-fallback)

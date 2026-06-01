@@ -7,7 +7,17 @@ struct TimelineView: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var continuityStore: ContinuityStore
     @EnvironmentObject var sessionControl: SessionControlStore
+    
     @State private var expandedLogsThreadIds: Set<UUID> = []
+    
+    // Alerts & Confirmations
+    @State private var threadToDelete: WorkflowThreadSummary? = nil
+    @State private var showingEraseConfirmation = false
+    @State private var showingBulkDeleteConfirmation = false
+    
+    // Multi-select Select Mode
+    @State private var isSelectMode = false
+    @State private var selectedThreadIds = Set<UUID>()
 
     var body: some View {
         Group {
@@ -30,57 +40,209 @@ struct TimelineView: View {
         ZStack {
             EchoDesign.ambientBackground.ignoresSafeArea()
 
-            if sessionStore.isLoading {
-                ProgressView("Loading memories…")
-            } else if sessionStore.workflowThreads.isEmpty {
-                emptyTimeline
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        if activityStore.isRecording {
-                            SessionControlBar(compact: false)
-                                .padding(.bottom, 4)
-                            liveBanner
+            VStack(alignment: .leading, spacing: 0) {
+                // Top Header Bar
+                HStack(spacing: 16) {
+                    if isSelectMode {
+                        Text("Select Workflows")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                        
+                        Button("Cancel") {
+                            withAnimation(EchoDesign.subtle) {
+                                isSelectMode = false
+                                selectedThreadIds.removeAll()
+                            }
                         }
+                        .buttonStyle(.bordered)
+                        .echoPointingCursor()
+                        
+                        Button(action: {
+                            showingBulkDeleteConfirmation = true
+                        }) {
+                            Text("Delete Selected (\(selectedThreadIds.count))")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.red)
+                        .disabled(selectedThreadIds.isEmpty)
+                        .echoPointingCursor()
+                    } else {
+                        Text("Timeline")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                        
+                        Menu {
+                            Button(action: {
+                                withAnimation(EchoDesign.subtle) {
+                                    isSelectMode = true
+                                    selectedThreadIds.removeAll()
+                                }
+                            }) {
+                                Label("Delete Workflows", systemImage: "checklist")
+                            }
+                            
+                            Button(role: .destructive, action: {
+                                showingEraseConfirmation = true
+                            }) {
+                                Label("Erase Timeline", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 18))
+                                .foregroundStyle(Color.secondary)
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(.plain)
+                        .echoPointingCursor()
+                    }
+                }
+                .padding(.horizontal, EchoDesign.containerRadius)
+                .padding(.top, EchoDesign.containerRadius)
+                .padding(.bottom, 12)
 
-                        ForEach(sessionStore.workflowThreads) { summary in
-                            WorkflowThreadCard(
-                                summary: summary,
-                                logsExpanded: expandedLogsThreadIds.contains(summary.id),
-                                onToggleLogs: {
-                                    if expandedLogsThreadIds.contains(summary.id) {
-                                        expandedLogsThreadIds.remove(summary.id)
-                                    } else {
-                                        expandedLogsThreadIds.insert(summary.id)
+                if sessionStore.isLoading {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        ProgressView("Loading memories…")
+                        Spacer()
+                    }
+                    Spacer()
+                } else if sessionStore.workflowThreads.isEmpty {
+                    Spacer()
+                    emptyTimeline
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            if activityStore.isRecording && !isSelectMode {
+                                SessionControlBar(compact: false)
+                                    .padding(.bottom, 4)
+                                liveBanner
+                            }
+
+                            ForEach(sessionStore.workflowThreads) { summary in
+                                HStack(spacing: 12) {
+                                    if isSelectMode {
+                                        let isSelected = selectedThreadIds.contains(summary.id)
+                                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 18, weight: .medium))
+                                            .foregroundStyle(isSelected ? Color.red : Color.primary.opacity(0.35))
+                                            .frame(width: 24, height: 24)
                                     }
-                                },
-                                onSelectSegment: { appStore.openSessionDetail($0) }
-                            )
-                            .contextMenu {
-                                Button("Rename workflow…") {
-                                    appStore.renameThreadDraft = WorkflowThreadRenameDraft(
-                                        threadId: summary.id,
-                                        title: summary.displayTitle,
-                                        tags: summary.thread.tags
+
+                                    WorkflowThreadCard(
+                                        summary: summary,
+                                        logsExpanded: expandedLogsThreadIds.contains(summary.id),
+                                        onToggleLogs: {
+                                            if expandedLogsThreadIds.contains(summary.id) {
+                                                expandedLogsThreadIds.remove(summary.id)
+                                            } else {
+                                                expandedLogsThreadIds.insert(summary.id)
+                                            }
+                                        },
+                                        onSelectSegment: { appStore.openSessionDetail($0) }
                                     )
+                                    .disabled(isSelectMode)
+                                    .contextMenu {
+                                        if !isSelectMode {
+                                            Button("Rename workflow…") {
+                                                appStore.renameThreadDraft = WorkflowThreadRenameDraft(
+                                                    threadId: summary.id,
+                                                    title: summary.displayTitle,
+                                                    tags: summary.thread.tags
+                                                )
+                                            }
+                                            Button("Archive") {
+                                                Task { await sessionControl.archiveWorkflowThread(id: summary.id) }
+                                            }
+                                            Button("Delete workflow…", role: .destructive) {
+                                                threadToDelete = summary
+                                            }
+                                        }
+                                    }
                                 }
-                                Button("Archive") {
-                                    Task { await sessionControl.archiveWorkflowThread(id: summary.id) }
-                                }
-                                Button("Delete workflow…", role: .destructive) {
-                                    Task {
-                                        await sessionControl.deleteWorkflowThread(
-                                            id: summary.id,
-                                            appStore: appStore
-                                        )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if isSelectMode {
+                                        if selectedThreadIds.contains(summary.id) {
+                                            selectedThreadIds.remove(summary.id)
+                                        } else {
+                                            selectedThreadIds.insert(summary.id)
+                                        }
+                                    } else {
+                                        if summary.segments.count == 1, let only = summary.segments.first {
+                                            appStore.openSessionDetail(only.id)
+                                        } else {
+                                            if expandedLogsThreadIds.contains(summary.id) {
+                                                expandedLogsThreadIds.remove(summary.id)
+                                            } else {
+                                                expandedLogsThreadIds.insert(summary.id)
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
+                        .padding(.horizontal, EchoDesign.containerRadius)
+                        .padding(.bottom, EchoDesign.containerRadius)
                     }
-                    .padding(EchoDesign.containerRadius)
                 }
             }
+        }
+        .alert(item: $threadToDelete) { summary in
+            Alert(
+                title: Text("Delete Workflow"),
+                message: Text("Are you sure you want to permanently delete \"\(summary.displayTitle)\"? This will erase all its recorded sessions and cannot be undone."),
+                primaryButton: .destructive(Text("Delete")) {
+                    Task {
+                        await sessionControl.deleteWorkflowThread(
+                            id: summary.id,
+                            appStore: appStore
+                        )
+                    }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert(isPresented: $showingEraseConfirmation) {
+            Alert(
+                title: Text("Erase Entire Timeline"),
+                message: Text("Are you sure you want to permanently delete all workflows and sessions? This will completely clear your database and cannot be undone."),
+                primaryButton: .destructive(Text("Erase All")) {
+                    Task {
+                        await sessionControl.clearAllData()
+                    }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert(isPresented: $showingBulkDeleteConfirmation) {
+            Alert(
+                title: Text("Delete Selected Workflows"),
+                message: Text("Are you sure you want to permanently delete the \(selectedThreadIds.count) selected workflows and all their sessions? This cannot be undone."),
+                primaryButton: .destructive(Text("Delete")) {
+                    let ids = selectedThreadIds
+                    withAnimation(EchoDesign.subtle) {
+                        isSelectMode = false
+                        selectedThreadIds.removeAll()
+                    }
+                    Task {
+                        for id in ids {
+                            await sessionControl.deleteWorkflowThread(
+                                id: id,
+                                appStore: appStore
+                            )
+                        }
+                    }
+                },
+                secondaryButton: .cancel()
+            )
         }
         .sheet(item: $appStore.renameSessionDraft) { draft in
             SessionRenameSheet(draft: draft)

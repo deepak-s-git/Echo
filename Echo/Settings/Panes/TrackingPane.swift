@@ -43,8 +43,9 @@ struct TrackingPane: View {
                     icon: "clock.badge.checkmark",
                     iconColor: rose,
                     label: "Browser tab capture delay",
+                    description: "How long to wait before logging a tab switch.",
                     value: $settings.browserCaptureDelaySeconds,
-                    range: 0.5...5.0,
+                    range: 0.5...15.0,
                     step: 0.1,
                     valueFormatter: { String(format: "%.1fs", $0) },
                     showDivider: true
@@ -54,6 +55,7 @@ struct TrackingPane: View {
                     icon: "timer",
                     iconColor: rose,
                     label: "Tab eligibility threshold",
+                    description: "Minimum focus time to auto-select a tab.",
                     value: $settings.tabEligibilitySeconds,
                     range: 1.0...60.0,
                     step: 1.0,

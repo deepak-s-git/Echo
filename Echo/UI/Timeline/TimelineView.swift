@@ -11,9 +11,24 @@ struct TimelineView: View {
     @State private var expandedLogsThreadIds: Set<UUID> = []
     
     // Alerts & Confirmations
-    @State private var threadToDelete: WorkflowThreadSummary? = nil
-    @State private var showingEraseConfirmation = false
-    @State private var showingBulkDeleteConfirmation = false
+    private enum ActiveAlert: Identifiable {
+        case deleteSingle(WorkflowThreadSummary)
+        case eraseAll
+        case bulkDelete(count: Int)
+        
+        var id: String {
+            switch self {
+            case .deleteSingle(let summary):
+                return "delete-single-\(summary.id.uuidString)"
+            case .eraseAll:
+                return "erase-all"
+            case .bulkDelete(let count):
+                return "bulk-delete-\(count)"
+            }
+        }
+    }
+    
+    @State private var activeAlert: ActiveAlert? = nil
     
     // Multi-select Select Mode
     @State private var isSelectMode = false
@@ -60,7 +75,7 @@ struct TimelineView: View {
                         .echoPointingCursor()
                         
                         Button(action: {
-                            showingBulkDeleteConfirmation = true
+                            activeAlert = .bulkDelete(count: selectedThreadIds.count)
                         }) {
                             Text("Delete Selected (\(selectedThreadIds.count))")
                                 .font(.system(size: 13, weight: .semibold))
@@ -87,7 +102,7 @@ struct TimelineView: View {
                             }
                             
                             Button(role: .destructive, action: {
-                                showingEraseConfirmation = true
+                                activeAlert = .eraseAll
                             }) {
                                 Label("Erase Timeline", systemImage: "trash")
                             }
@@ -162,7 +177,7 @@ struct TimelineView: View {
                                                 Task { await sessionControl.archiveWorkflowThread(id: summary.id) }
                                             }
                                             Button("Delete workflow…", role: .destructive) {
-                                                threadToDelete = summary
+                                                activeAlert = .deleteSingle(summary)
                                             }
                                         }
                                     }
@@ -195,54 +210,55 @@ struct TimelineView: View {
                 }
             }
         }
-        .alert(item: $threadToDelete) { summary in
-            Alert(
-                title: Text("Delete Workflow"),
-                message: Text("Are you sure you want to permanently delete \"\(summary.displayTitle)\"? This will erase all its recorded sessions and cannot be undone."),
-                primaryButton: .destructive(Text("Delete")) {
-                    Task {
-                        await sessionControl.deleteWorkflowThread(
-                            id: summary.id,
-                            appStore: appStore
-                        )
-                    }
-                },
-                secondaryButton: .cancel()
-            )
-        }
-        .alert(isPresented: $showingEraseConfirmation) {
-            Alert(
-                title: Text("Erase Entire Timeline"),
-                message: Text("Are you sure you want to permanently delete all workflows and sessions? This will completely clear your database and cannot be undone."),
-                primaryButton: .destructive(Text("Erase All")) {
-                    Task {
-                        await sessionControl.clearAllData()
-                    }
-                },
-                secondaryButton: .cancel()
-            )
-        }
-        .alert(isPresented: $showingBulkDeleteConfirmation) {
-            Alert(
-                title: Text("Delete Selected Workflows"),
-                message: Text("Are you sure you want to permanently delete the \(selectedThreadIds.count) selected workflows and all their sessions? This cannot be undone."),
-                primaryButton: .destructive(Text("Delete")) {
-                    let ids = selectedThreadIds
-                    withAnimation(EchoDesign.subtle) {
-                        isSelectMode = false
-                        selectedThreadIds.removeAll()
-                    }
-                    Task {
-                        for id in ids {
+        .alert(item: $activeAlert) { alertType in
+            switch alertType {
+            case .deleteSingle(let summary):
+                return Alert(
+                    title: Text("Delete Workflow"),
+                    message: Text("Are you sure you want to permanently delete \"\(summary.displayTitle)\"? This will erase all its recorded sessions and cannot be undone."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        Task {
                             await sessionControl.deleteWorkflowThread(
-                                id: id,
+                                id: summary.id,
                                 appStore: appStore
                             )
                         }
-                    }
-                },
-                secondaryButton: .cancel()
-            )
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .eraseAll:
+                return Alert(
+                    title: Text("Erase Entire Timeline"),
+                    message: Text("Are you sure you want to permanently delete all workflows and sessions? This will completely clear your database and cannot be undone."),
+                    primaryButton: .destructive(Text("Erase All")) {
+                        Task {
+                            await sessionControl.clearAllData()
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .bulkDelete(let count):
+                return Alert(
+                    title: Text("Delete Selected Workflows"),
+                    message: Text("Are you sure you want to permanently delete the \(count) selected workflows and all their sessions? This cannot be undone."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        let ids = selectedThreadIds
+                        withAnimation(EchoDesign.subtle) {
+                            isSelectMode = false
+                            selectedThreadIds.removeAll()
+                        }
+                        Task {
+                            for id in ids {
+                                await sessionControl.deleteWorkflowThread(
+                                    id: id,
+                                    appStore: appStore
+                                )
+                            }
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
         }
         .sheet(item: $appStore.renameSessionDraft) { draft in
             SessionRenameSheet(draft: draft)

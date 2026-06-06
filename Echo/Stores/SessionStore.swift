@@ -16,6 +16,16 @@ final class SessionStore: ObservableObject {
     @Published private(set) var continueWorkflowThread: WorkflowThread?
     @Published private(set) var workflowThreads: [WorkflowThreadSummary] = []
 
+    private let continuationKey = "echo.latestContinuationCandidate"
+    private var refreshTimer: AnyCancellable?
+
+    struct ContinuationCandidate: Codable {
+        let threadId: UUID
+        let title: String
+        let endTime: Date
+        let expirationTime: Date
+    }
+
     var activeSession: Session? {
         recentSessions.first(where: \.isActive)
     }
@@ -44,15 +54,97 @@ final class SessionStore: ObservableObject {
         guard let repository else { return }
         do {
             workflowThreads = try await repository.fetchWorkflowThreads()
+            await refreshContinuationThread()
         } catch {
             loadError = error
         }
     }
 
-    init() {}
+    init() {
+        startContinuationTimer()
+    }
 
     func configure(repository: SessionRepository) {
         self.repository = repository
+        Task {
+            await refreshContinuationThread()
+        }
+    }
+
+    func saveContinuationCandidate(threadId: UUID, title: String, endTime: Date) {
+        let expirationTime = endTime.addingTimeInterval(60 * 60) // 60 minutes
+        let candidate = ContinuationCandidate(
+            threadId: threadId,
+            title: title,
+            endTime: endTime,
+            expirationTime: expirationTime
+        )
+        if let data = try? JSONEncoder().encode(candidate) {
+            UserDefaults.standard.set(data, forKey: continuationKey)
+        }
+        Task {
+            await refreshContinuationThread()
+        }
+    }
+
+    func clearContinuationCandidate() {
+        UserDefaults.standard.removeObject(forKey: continuationKey)
+        continueWorkflowThread = nil
+    }
+
+    func loadContinuationCandidate() -> ContinuationCandidate? {
+        guard let data = UserDefaults.standard.data(forKey: continuationKey),
+              let candidate = try? JSONDecoder().decode(ContinuationCandidate.self, from: data) else {
+            return nil
+        }
+        return candidate
+    }
+
+    func getActiveContinuationThread() async -> WorkflowThread? {
+        guard let candidate = loadContinuationCandidate() else { return nil }
+        
+        // 1. Check expiration time
+        guard Date() < candidate.expirationTime else {
+            clearContinuationCandidate()
+            return nil
+        }
+        
+        // 2. Fetch the thread from the repository to verify it still exists and is not archived
+        guard let repository else { return nil }
+        do {
+            if let thread = try await repository.fetchThread(id: candidate.threadId) {
+                if thread.status == .archived {
+                    return nil
+                }
+                // Check if it still has at least one ended segment in the database
+                if let _ = try await repository.fetchLastEndedSegment(threadId: thread.id) {
+                    return thread
+                }
+            }
+        } catch {
+            return nil
+        }
+        
+        return nil
+    }
+
+    func refreshContinuationThread() async {
+        let thread = await getActiveContinuationThread()
+        if continueWorkflowThread?.id != thread?.id || continueWorkflowThread?.title != thread?.title || continueWorkflowThread?.lastActiveAt != thread?.lastActiveAt {
+            continueWorkflowThread = thread
+        }
+    }
+
+    private func startContinuationTimer() {
+        refreshTimer = Timer.publish(every: 15, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                Task {
+                    await self.refreshContinuationThread()
+                    self.objectWillChange.send()
+                }
+            }
     }
 
     func loadRecent() async {
@@ -65,6 +157,7 @@ final class SessionStore: ObservableObject {
             async let threads = repository.fetchWorkflowThreads()
             recentSessions = try await sessions
             workflowThreads = try await threads
+            await refreshContinuationThread()
         } catch {
             loadError = error
         }
@@ -81,7 +174,11 @@ final class SessionStore: ObservableObject {
 
     func workflowThreadDidEnd(_ thread: WorkflowThread) {
         workflowThreadDidUpdate(thread)
-        continueWorkflowThread = thread
+        saveContinuationCandidate(
+            threadId: thread.id,
+            title: thread.title ?? "Untitled workflow",
+            endTime: thread.lastActiveAt
+        )
     }
 
     func removeWorkflowThreadOptimistically(id: UUID) {
@@ -89,6 +186,10 @@ final class SessionStore: ObservableObject {
         recentSessions.removeAll { $0.workflowThreadId == id }
         if continueWorkflowThread?.id == id {
             continueWorkflowThread = nil
+        }
+        let candidate = loadContinuationCandidate()
+        if candidate?.threadId == id {
+            clearContinuationCandidate()
         }
     }
 

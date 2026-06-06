@@ -203,6 +203,9 @@ final class ServiceContainer {
         try? await sessionRepository.clearAll()
         // Reset UI stores
         activityStore.enterIdleMode()
+        await MainActor.run {
+            sessionStore.clearContinuationCandidate()
+        }
         await sessionStore.loadRecent()
         await continuityStore.refresh(activeSession: nil, recent: [])
     }

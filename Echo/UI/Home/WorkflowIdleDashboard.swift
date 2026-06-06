@@ -57,14 +57,26 @@ struct WorkflowIdleDashboard: View {
         }
         .padding(24)
         .echoCard(material: .thinMaterial)
+        .onAppear {
+            Task {
+                await sessionStore.refreshContinuationThread()
+            }
+        }
     }
 
     private func continueSubtitle(for thread: WorkflowThread) -> String {
         let title = thread.title ?? "Untitled workflow"
-        if thread.totalAccumulatedDuration > 0 {
-            return "\(title) · \(thread.totalAccumulatedDuration.shortLabel) total"
+        let diff = Date().timeIntervalSince(thread.lastActiveAt)
+        let minutes = Int(diff / 60)
+        let timeString: String
+        if minutes <= 0 {
+            timeString = "just now"
+        } else if minutes == 1 {
+            timeString = "1 minute ago"
+        } else {
+            timeString = "\(minutes) minutes ago"
         }
-        return title
+        return "\(title) · Ended \(timeString)"
     }
 }
 

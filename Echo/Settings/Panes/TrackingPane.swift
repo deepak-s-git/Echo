@@ -64,7 +64,35 @@ struct TrackingPane: View {
                 )
             }
 
-            // MARK: Ignored Apps
+            // MARK: Disclaimer Info Box
+            let totalThreshold = settings.browserCaptureDelaySeconds + settings.tabEligibilitySeconds
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(rose)
+                    .padding(.top, 2)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Cumulative Tab Timing Rule")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Text("To prevent performance overhead from rapid clicking, Echo waits **\(String(format: "%.1fs", settings.browserCaptureDelaySeconds))** before scraping a new tab. After scraping, you must actively hold focus for **\(String(format: "%.0fs", settings.tabEligibilitySeconds))** for the tab to be considered restorable.\n\nCombined, a tab must be active for at least **\(String(format: "%.1fs", totalThreshold))** total to appear in your saved workflow.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(4)
+                }
+                Spacer()
+            }
+            .padding(16)
+            .background(rose.opacity(0.06), in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .strokeBorder(rose.opacity(0.2), lineWidth: 0.5)
+            )
+            .padding(.bottom, 20)
+
+            // MARK: - Ignored Apps
             SettingsGroup(label: "Ignored Apps") {
                 // Explanation row
                 HStack(spacing: 12) {

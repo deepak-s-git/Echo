@@ -69,8 +69,10 @@ nonisolated enum SessionFinalizationRunner {
         let tabs = await captureBrowserTabs(events: events)
         EchoLog.browserCapture("Snapshot tabs: \(tabs.count)")
 
-        let tabEligibility = await MainActor.run { EchoSettings.shared.tabEligibilitySeconds }
-        let contextual = WorkflowContextCapture.items(from: events, tabEligibility: tabEligibility)
+        let tabEligibility = await MainActor.run {
+            EchoSettings.shared.browserCaptureDelaySeconds + EchoSettings.shared.tabEligibilitySeconds
+        }
+        let contextual = WorkflowContextCapture.items(from: events, tabEligibility: tabEligibility, sessionEndDate: session.endedAt)
         let plan = mergeRestorePlan(primary: contextual, secondary: memory.restorePlan, tabs: tabs)
 
         do {
@@ -178,7 +180,8 @@ nonisolated enum SessionFinalizationRunner {
             guard seen.insert(key).inserted else { continue }
             items.append(item)
         }
-        return WorkflowRestorePlan(items: items, createdAt: secondary.createdAt)
+        let filtered = filterPrefixURLs(items)
+        return WorkflowRestorePlan(items: filtered, createdAt: secondary.createdAt)
     }
 
     private static func normalizeURL(_ urlString: String) -> String {
@@ -189,22 +192,63 @@ nonisolated enum SessionFinalizationRunner {
         if host.hasPrefix("www.") {
             host = String(host.dropFirst(4))
         }
+        let lowerHost = host.lowercased()
         var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         
-        let lowerHost = host.lowercased()
         if lowerHost != "youtu.be" {
             path = path.lowercased()
         }
         
-        var normalized = "\(host.lowercased())/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var normalized = "\(lowerHost)/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         
-        if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
-            if let components = URLComponents(string: urlString) {
-                if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value {
+        if let components = URLComponents(string: urlString), let queryItems = components.queryItems {
+            if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+                if let vParam = queryItems.first(where: { $0.name == "v" })?.value {
                     normalized += "?v=\(vParam)"
+                }
+            } else if lowerHost.contains("google.") {
+                if let qParam = queryItems.first(where: { $0.name == "q" })?.value {
+                    normalized += "?q=\(qParam)"
                 }
             }
         }
         return normalized
+    }
+
+    private static func filterPrefixURLs(_ items: [RestoreItem]) -> [RestoreItem] {
+        let browserItems = items.filter { $0.kind == .browserPage || $0.kind == .url }
+        let otherItems = items.filter { $0.kind != .browserPage && $0.kind != .url }
+        
+        var filteredBrowser: [RestoreItem] = []
+        let sortedBrowser = browserItems.sorted { item1, item2 in
+            let u1 = item1.url ?? ""
+            let u2 = item2.url ?? ""
+            return normalizeURL(u1).count > normalizeURL(u2).count
+        }
+        
+        var seenDeeper = Set<String>()
+        for item in sortedBrowser {
+            guard let u = item.url else {
+                filteredBrowser.append(item)
+                continue
+            }
+            let normalized = normalizeURL(u)
+            let profile = item.profileName ?? "default"
+            let profileKey = "\(profile):\(normalized)"
+            
+            let isPrefix = seenDeeper.contains { deeper in
+                deeper == profileKey || deeper.hasPrefix(profileKey + "/")
+            }
+            
+            if isPrefix {
+                continue
+            }
+            
+            seenDeeper.insert(profileKey)
+            filteredBrowser.append(item)
+        }
+        
+        let allowedIds = Set(filteredBrowser.map(\.id) + otherItems.map(\.id))
+        return items.filter { allowedIds.contains($0.id) }
     }
 }

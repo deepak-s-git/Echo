@@ -82,6 +82,17 @@ final class SessionRepository: Sendable {
                         sql: "DELETE FROM workflow_threads WHERE id = ?",
                         arguments: [threadId]
                     )
+                } else {
+                    let activeCount = try Session
+                        .filter(Column("workflowThreadId") == threadId)
+                        .filter(Column("endedAt") == nil)
+                        .fetchCount(db)
+                    if activeCount == 0 {
+                        try db.execute(
+                            sql: "UPDATE workflow_threads SET statusRaw = 'idle' WHERE id = ?",
+                            arguments: [threadId]
+                        )
+                    }
                 }
             }
         }

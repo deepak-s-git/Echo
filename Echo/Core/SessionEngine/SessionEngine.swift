@@ -84,6 +84,21 @@ actor SessionEngine {
         EchoLog.lifecycle("Continue fell back to new workflow")
     }
 
+    func continueWorkflowThread(id: UUID) async {
+        guard !isRecordingEnabled else { return }
+        isRecordingEnabled = true
+        await idleMonitor.setMonitoringEnabled(true)
+        await activityTracker?.setCapturePaused(false)
+
+        if let thread = try? await repository.fetchThread(id: id) {
+            await armRecording(on: thread)
+            EchoLog.lifecycle("Continued workflow thread \(thread.id.uuidString) — awaiting first activity")
+            return
+        }
+        await beginNewWorkflow()
+        EchoLog.lifecycle("Continue workflow thread fell back to new workflow")
+    }
+
     func cancelRecording() async {
         guard isRecordingEnabled else { return }
         isRecordingEnabled = false

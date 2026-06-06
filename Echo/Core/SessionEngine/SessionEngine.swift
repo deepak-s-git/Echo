@@ -119,6 +119,11 @@ actor SessionEngine {
             recordingThread = nil          // must clear — beginNewWorkflow guards on this
             isRecordingEnabled = false
             isSessionPaused = false
+            pendingEvents = []
+            titlePersistTask?.cancel()
+            titlePersistTask = nil
+            browserCaptureTask?.cancel()
+            browserCaptureTask = nil
             await activityTracker?.setCapturePaused(true)
             await idleMonitor.setMonitoringEnabled(false)
             await activityStore.enterIdleMode()
@@ -142,6 +147,11 @@ actor SessionEngine {
             recordingThread = nil
             isRecordingEnabled = false
             isSessionPaused = false
+            pendingEvents = []
+            titlePersistTask?.cancel()
+            titlePersistTask = nil
+            browserCaptureTask?.cancel()
+            browserCaptureTask = nil
             await activityTracker?.setCapturePaused(true)
             await idleMonitor.setMonitoringEnabled(false)
             await activityStore.enterIdleMode()
@@ -299,6 +309,14 @@ actor SessionEngine {
                     if let capturedTitle, !capturedTitle.isEmpty { thread.title = capturedTitle }
                     thread.lastActiveAt = endedAt
                     try? await repo.saveThread(thread)
+                    let savedThread = thread
+                    await MainActor.run { [weak self] in
+                        self?.sessionStore.saveContinuationCandidate(
+                            threadId: savedThread.id,
+                            title: savedThread.title ?? "Untitled workflow",
+                            endTime: endedAt
+                        )
+                    }
                 }
             }
             await SessionFinalizationRunner.finalize(
@@ -411,18 +429,13 @@ actor SessionEngine {
             ActivityPersistenceLogger.log("Launch orphan cleanup failed", error: error)
         }
 
-        let continueThread = try? await repository.fetchMostRecentContinuableThread()
         await MainActor.run {
-            sessionStore.setContinueWorkflowThread(continueThread)
             activityStore.enterIdleMode()
         }
     }
 
     private func findContinueThread() async -> WorkflowThread? {
-        if let cached = await MainActor.run(body: { sessionStore.continueWorkflowThread }) {
-            return cached
-        }
-        return try? await repository.fetchMostRecentContinuableThread()
+        await MainActor.run(body: { sessionStore.continueWorkflowThread })
     }
 
     private func armRecording(on thread: WorkflowThread) async {
@@ -491,17 +504,11 @@ actor SessionEngine {
 
     private func restoreContextFromLastSegment(_ segment: Session) async {
         guard let plan = segment.restorePlan, !plan.items.isEmpty else { return }
-        let events = (try? await repository.fetchActivities(sessionId: segment.id)) ?? []
-        let weighted = RestoreWeighting.buildSelectableItems(from: events, plan: plan)
-        var filtered = RestoreWeighting.filteredPlan(from: weighted)
-        if filtered.items.isEmpty {
-            filtered = RestoreWeighting.fallbackPlan(from: events, plan: plan)
-        }
         await activityStore.setRestoring(true)
-        _ = await WorkflowRestoreRunner.restore(plan: filtered)
+        _ = await WorkflowRestoreRunner.restore(plan: plan)
         await activityStore.setRestoring(false)
         EchoLog.restore(
-            "Restored context from segment \(segment.id.uuidString) — \(filtered.items.count) items"
+            "Restored context from segment \(segment.id.uuidString) — \(plan.items.count) items"
         )
     }
 
@@ -776,8 +783,10 @@ actor SessionEngine {
         let memory = WorkflowMemoryBuilder.build(session: session, events: events)
         session.tabCount = memory.browserContexts.count
 
-        let tabEligibility = await MainActor.run { EchoSettings.shared.tabEligibilitySeconds }
-        let contextual = WorkflowContextCapture.items(from: events, tabEligibility: tabEligibility)
+        let tabEligibility = await MainActor.run {
+            EchoSettings.shared.browserCaptureDelaySeconds + EchoSettings.shared.tabEligibilitySeconds
+        }
+        let contextual = WorkflowContextCapture.items(from: events, tabEligibility: tabEligibility, sessionEndDate: session.endedAt)
         let plan = mergeRestorePlan(primary: contextual, secondary: memory.restorePlan)
 
         do {
@@ -824,18 +833,91 @@ actor SessionEngine {
             guard seen.insert(key).inserted else { continue }
             items.append(item)
         }
-        return WorkflowRestorePlan(items: items, createdAt: secondary.createdAt)
+        let filtered = filterPrefixURLs(items)
+        return WorkflowRestorePlan(items: filtered, createdAt: secondary.createdAt)
     }
 
     private func restoreKey(_ item: RestoreItem) -> String {
         switch item.kind {
         case .application: return "app:\(item.bundleId ?? "")"
-        case .url, .browserPage: return "url:\(item.url ?? "")"
+        case .url, .browserPage:
+            if let u = item.url {
+                return "page:\(normalizeURL(u))"
+            }
+            return "url:\(item.label)"
         case .folder: return "folder:\(item.path ?? "")"
         case .document: return "doc:\(item.path ?? "")"
         case .terminalDirectory: return "term:\(item.workingDirectory ?? "")"
         case .workspace: return "ws:\(item.path ?? "")"
         }
+    }
+
+    private func normalizeURL(_ urlString: String) -> String {
+        guard let url = URL(string: urlString) else {
+            return urlString.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        var host = url.host ?? ""
+        if host.hasPrefix("www.") {
+            host = String(host.dropFirst(4))
+        }
+        let lowerHost = host.lowercased()
+        var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        
+        if lowerHost != "youtu.be" {
+            path = path.lowercased()
+        }
+        
+        var normalized = "\(lowerHost)/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        
+        if let components = URLComponents(string: urlString), let queryItems = components.queryItems {
+            if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+                if let vParam = queryItems.first(where: { $0.name == "v" })?.value {
+                    normalized += "?v=\(vParam)"
+                }
+            } else if lowerHost.contains("google.") {
+                if let qParam = queryItems.first(where: { $0.name == "q" })?.value {
+                    normalized += "?q=\(qParam)"
+                }
+            }
+        }
+        return normalized
+    }
+
+    private func filterPrefixURLs(_ items: [RestoreItem]) -> [RestoreItem] {
+        let browserItems = items.filter { $0.kind == .browserPage || $0.kind == .url }
+        let otherItems = items.filter { $0.kind != .browserPage && $0.kind != .url }
+        
+        var filteredBrowser: [RestoreItem] = []
+        let sortedBrowser = browserItems.sorted { item1, item2 in
+            let u1 = item1.url ?? ""
+            let u2 = item2.url ?? ""
+            return normalizeURL(u1).count > normalizeURL(u2).count
+        }
+        
+        var seenDeeper = Set<String>()
+        for item in sortedBrowser {
+            guard let u = item.url else {
+                filteredBrowser.append(item)
+                continue
+            }
+            let normalized = normalizeURL(u)
+            let profile = item.profileName ?? "default"
+            let profileKey = "\(profile):\(normalized)"
+            
+            let isPrefix = seenDeeper.contains { deeper in
+                deeper == profileKey || deeper.hasPrefix(profileKey + "/")
+            }
+            
+            if isPrefix {
+                continue
+            }
+            
+            seenDeeper.insert(profileKey)
+            filteredBrowser.append(item)
+        }
+        
+        let allowedIds = Set(filteredBrowser.map(\.id) + otherItems.map(\.id))
+        return items.filter { allowedIds.contains($0.id) }
     }
 
     private func captureBrowserTabsForSnapshot(events: [ActivityEvent]) async -> [BrowserTab] {

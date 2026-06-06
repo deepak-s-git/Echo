@@ -69,8 +69,8 @@ final class SessionControlStore: ObservableObject {
     }
 
     func deleteSession(id: UUID, appStore: AppStore) async {
-        appStore.dismissEndSession()
         await container?.deleteSession(id: id)
+        appStore.dismissEndSession()
         appStore.popSessionDetail()
     }
 
@@ -79,8 +79,8 @@ final class SessionControlStore: ObservableObject {
     }
 
     func deleteWorkflowThread(id: UUID, appStore: AppStore) async {
-        appStore.popSessionDetail()
         await container?.deleteWorkflowThread(id: id)
+        appStore.popSessionDetail()
     }
 
     func archiveWorkflowThread(id: UUID) async {

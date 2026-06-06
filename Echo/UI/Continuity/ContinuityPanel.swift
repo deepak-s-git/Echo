@@ -35,7 +35,7 @@ struct ContinuityPanel: View {
             if let thread = sessionStore.continueWorkflowThread {
                 continuityButton(
                     title: "Continue Previous Workflow",
-                    subtitle: thread.title ?? "Resume recording",
+                    subtitle: "\(thread.title ?? "Untitled workflow") · Ended \(relativeTimeString(for: thread.lastActiveAt))",
                     icon: "clock.arrow.circlepath"
                 ) {
                     Task { await sessionControl.continuePreviousSession() }
@@ -85,10 +85,23 @@ struct ContinuityPanel: View {
         .padding(20)
         .echoCard()
         .task {
+            await sessionStore.refreshContinuationThread()
             await continuityStore.refresh(
                 activeSession: sessionStore.activeSession,
                 recent: sessionStore.recentSessions
             )
+        }
+    }
+
+    private func relativeTimeString(for date: Date) -> String {
+        let diff = Date().timeIntervalSince(date)
+        let minutes = Int(diff / 60)
+        if minutes <= 0 {
+            return "just now"
+        } else if minutes == 1 {
+            return "1 minute ago"
+        } else {
+            return "\(minutes) minutes ago"
         }
     }
 

@@ -105,6 +105,15 @@ final class ServiceContainer {
         )
     }
 
+    func continueWorkflowThread(id: UUID) async {
+        await sessionEngine.continueWorkflowThread(id: id)
+        await sessionStore.loadRecent()
+        await continuityStore.refresh(
+            activeSession: sessionStore.activeSession,
+            recent: sessionStore.recentSessions
+        )
+    }
+
     func pauseCurrentSession() async {
         await sessionEngine.pauseSession()
     }

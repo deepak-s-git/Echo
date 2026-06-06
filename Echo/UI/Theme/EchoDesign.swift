@@ -45,6 +45,8 @@ enum EchoPalette {
     
     static let indigo = accent
     
+    static let vibrantBlue = Color(red: 0.31, green: 0.45, blue: 0.90)
+    
     static let indigoSoft = adaptive(
         dark: NSColor(red: 0.63, green: 0.63, blue: 0.67, alpha: 1.0),
         light: NSColor(red: 0.44, green: 0.44, blue: 0.48, alpha: 1.0)

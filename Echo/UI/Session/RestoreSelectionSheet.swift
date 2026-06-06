@@ -107,7 +107,7 @@ struct RestoreSelectionSheet: View {
                                     .fill(Color.secondary.opacity(0.12))
                             } else {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(EchoPalette.indigo)
+                                    .fill(EchoPalette.vibrantBlue)
                             }
                         }
                         .foregroundStyle(selected.isEmpty ? Color.secondary : Color.white)
@@ -117,7 +117,7 @@ struct RestoreSelectionSheet: View {
                                     .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
                             }
                         }
-                        .shadow(color: selected.isEmpty ? .clear : EchoPalette.indigo.opacity(0.3), radius: 6, y: 2)
+                        .shadow(color: selected.isEmpty ? .clear : EchoPalette.vibrantBlue.opacity(0.35), radius: 6, y: 2)
                     }
                     .buttonStyle(.plain)
                     .disabled(selected.isEmpty)

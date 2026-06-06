@@ -21,6 +21,10 @@ final class SessionControlStore: ObservableObject {
         await container?.continuePreviousSession()
     }
 
+    func continueWorkflowThread(id: UUID) async {
+        await container?.continueWorkflowThread(id: id)
+    }
+
     func pauseSession() async {
         await container?.pauseCurrentSession()
     }

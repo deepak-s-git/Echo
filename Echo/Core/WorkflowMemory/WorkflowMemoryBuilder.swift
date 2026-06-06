@@ -227,16 +227,25 @@ nonisolated enum WorkflowRestorePlanBuilder {
         browserContexts: [BrowserContextEntry]
     ) -> WorkflowRestorePlan {
         let threshold = {
-            let val = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
-            return val > 0 ? val : 12.0
+            let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
+            let hold = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
+            let actualDelay = delay > 0 ? delay : 1.2
+            let actualHold = hold > 0 ? hold : 12.0
+            return actualDelay + actualHold
         }()
 
         var items: [RestoreItem] = []
         var seen = Set<String>()
 
-        for item in WorkflowContextCapture.items(from: events, tabEligibility: threshold) {
+        for item in WorkflowContextCapture.items(from: events, tabEligibility: threshold, sessionEndDate: session.endedAt) {
             let key = restoreKey(item)
             guard seen.insert(key).inserted else { continue }
+            if item.kind == .browserPage || item.kind == .url, let u = item.url {
+                let host = URL(string: u)?.host?.lowercased() ?? ""
+                let profile = item.profileName ?? "default"
+                let titleKey = "title:\(profile):\(host):\(item.label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
+                _ = seen.insert(titleKey)
+            }
             items.append(item)
         }
 
@@ -261,13 +270,16 @@ nonisolated enum WorkflowRestorePlanBuilder {
 
         let sorted = events.sorted { $0.timestamp < $1.timestamp }
         var eventDurations: [UUID: TimeInterval] = [:]
-        for i in 0..<sorted.count {
-            let event = sorted[i]
-            if i < sorted.count - 1 {
-                let nextEvent = sorted[i + 1]
+        let focusEvents = sorted.filter { $0.type == .appFocus || $0.type == .appSwitch }
+        for i in 0..<focusEvents.count {
+            let event = focusEvents[i]
+            if i < focusEvents.count - 1 {
+                let nextEvent = focusEvents[i + 1]
                 eventDurations[event.id] = nextEvent.timestamp.timeIntervalSince(event.timestamp)
             } else {
-                eventDurations[event.id] = 60.0
+                let lastEventTimestamp = session.endedAt ?? sorted.last?.timestamp ?? event.timestamp
+                let duration = lastEventTimestamp.timeIntervalSince(event.timestamp)
+                eventDurations[event.id] = max(duration, 0.0)
             }
         }
 
@@ -341,7 +353,12 @@ nonisolated enum WorkflowRestorePlanBuilder {
                 continue
             }
 
+            let host = URL(string: url)?.host?.lowercased() ?? ctx.domain.lowercased()
+            let profile = ctx.profileName ?? "default"
+            let titleKey = "title:\(profile):\(host):\(lowerT)"
+
             guard seen.insert("page:\(normalizeURL(url))").inserted else { continue }
+            guard seen.insert(titleKey).inserted else { continue }
 
             items.append(RestoreItem(
                 id: UUID(),
@@ -379,7 +396,8 @@ nonisolated enum WorkflowRestorePlanBuilder {
             ))
         }
 
-        return WorkflowRestorePlan(items: items, createdAt: session.endedAt ?? Date())
+        let filtered = filterPrefixURLs(items)
+        return WorkflowRestorePlan(items: filtered, createdAt: session.endedAt ?? Date())
     }
 
     private static func restoreKey(_ item: RestoreItem) -> String {
@@ -424,19 +442,23 @@ nonisolated enum WorkflowRestorePlanBuilder {
         if host.hasPrefix("www.") {
             host = String(host.dropFirst(4))
         }
+        let lowerHost = host.lowercased()
         var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         
-        let lowerHost = host.lowercased()
         if lowerHost != "youtu.be" {
             path = path.lowercased()
         }
         
-        var normalized = "\(host.lowercased())/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var normalized = "\(lowerHost)/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         
-        if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
-            if let components = URLComponents(string: urlString) {
-                if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value {
+        if let components = URLComponents(string: urlString), let queryItems = components.queryItems {
+            if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+                if let vParam = queryItems.first(where: { $0.name == "v" })?.value {
                     normalized += "?v=\(vParam)"
+                }
+            } else if lowerHost.contains("google.") {
+                if let qParam = queryItems.first(where: { $0.name == "q" })?.value {
+                    normalized += "?q=\(qParam)"
                 }
             }
         }
@@ -483,5 +505,42 @@ nonisolated enum WorkflowRestorePlanBuilder {
             }
         }
         return nil
+    }
+
+    private static func filterPrefixURLs(_ items: [RestoreItem]) -> [RestoreItem] {
+        let browserItems = items.filter { $0.kind == .browserPage || $0.kind == .url }
+        let otherItems = items.filter { $0.kind != .browserPage && $0.kind != .url }
+        
+        var filteredBrowser: [RestoreItem] = []
+        let sortedBrowser = browserItems.sorted { item1, item2 in
+            let u1 = item1.url ?? ""
+            let u2 = item2.url ?? ""
+            return normalizeURL(u1).count > normalizeURL(u2).count
+        }
+        
+        var seenDeeper = Set<String>()
+        for item in sortedBrowser {
+            guard let u = item.url else {
+                filteredBrowser.append(item)
+                continue
+            }
+            let normalized = normalizeURL(u)
+            let profile = item.profileName ?? "default"
+            let profileKey = "\(profile):\(normalized)"
+            
+            let isPrefix = seenDeeper.contains { deeper in
+                deeper == profileKey || deeper.hasPrefix(profileKey + "/")
+            }
+            
+            if isPrefix {
+                continue
+            }
+            
+            seenDeeper.insert(profileKey)
+            filteredBrowser.append(item)
+        }
+        
+        let allowedIds = Set(filteredBrowser.map(\.id) + otherItems.map(\.id))
+        return items.filter { allowedIds.contains($0.id) }
     }
 }

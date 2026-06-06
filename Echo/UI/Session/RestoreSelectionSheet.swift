@@ -107,17 +107,16 @@ struct RestoreSelectionSheet: View {
                                     .fill(Color.secondary.opacity(0.12))
                             } else {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(EchoPalette.vibrantBlue)
+                                    .fill(Color.primary.opacity(0.06))
                             }
                         }
-                        .foregroundStyle(selected.isEmpty ? Color.secondary : Color.white)
+                        .foregroundStyle(selected.isEmpty ? Color.secondary : Color.primary)
                         .overlay {
                             if !selected.isEmpty {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
                             }
                         }
-                        .shadow(color: selected.isEmpty ? .clear : EchoPalette.vibrantBlue.opacity(0.35), radius: 6, y: 2)
                     }
                     .buttonStyle(.plain)
                     .disabled(selected.isEmpty)
@@ -168,6 +167,11 @@ struct RestoreSelectionSheet: View {
         
         // Find all items that match the target item physically
         for i in 0..<items.count {
+            if i == index {
+                items[i].isSelected = isSelected
+                continue
+            }
+            
             let other = items[i].item
             var isMatch = false
             
@@ -175,10 +179,14 @@ struct RestoreSelectionSheet: View {
                 isMatch = targetItem.bundleId == other.bundleId
             } else if (targetItem.kind == .url || targetItem.kind == .browserPage) &&
                       (other.kind == .url || other.kind == .browserPage) {
-                isMatch = targetItem.url == other.url
+                isMatch = targetItem.url == other.url && targetItem.url != nil
             } else if (targetItem.kind == .document || targetItem.kind == .folder || targetItem.kind == .workspace) &&
                       (other.kind == .document || other.kind == .folder || other.kind == .workspace) {
-                isMatch = targetItem.path == other.path && targetItem.path != nil
+                if targetItem.path != nil {
+                    isMatch = targetItem.path == other.path
+                } else if targetItem.url != nil {
+                    isMatch = targetItem.url == other.url
+                }
             } else if targetItem.kind == .terminalDirectory && other.kind == .terminalDirectory {
                 isMatch = targetItem.workingDirectory == other.workingDirectory && targetItem.workingDirectory != nil
             }

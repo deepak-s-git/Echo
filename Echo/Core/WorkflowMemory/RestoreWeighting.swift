@@ -144,19 +144,23 @@ nonisolated enum RestoreWeighting {
         if host.hasPrefix("www.") {
             host = String(host.dropFirst(4))
         }
+        let lowerHost = host.lowercased()
         var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         
-        let lowerHost = host.lowercased()
         if lowerHost != "youtu.be" {
             path = path.lowercased()
         }
         
-        var normalized = "\(host.lowercased())/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var normalized = "\(lowerHost)/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         
-        if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
-            if let components = URLComponents(string: urlString) {
-                if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value {
+        if let components = URLComponents(string: urlString), let queryItems = components.queryItems {
+            if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+                if let vParam = queryItems.first(where: { $0.name == "v" })?.value {
                     normalized += "?v=\(vParam)"
+                }
+            } else if lowerHost.contains("google.") {
+                if let qParam = queryItems.first(where: { $0.name == "q" })?.value {
+                    normalized += "?q=\(qParam)"
                 }
             }
         }

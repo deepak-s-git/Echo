@@ -5,6 +5,7 @@ struct SessionDetailView: View {
 
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionDetailStore: SessionDetailStore
+    @EnvironmentObject var sessionControl: SessionControlStore
     @State private var showDiagnostics = false
 
     var body: some View {
@@ -81,6 +82,16 @@ struct SessionDetailView: View {
                 items: $sessionDetailStore.selectableRestoreItems,
                 onRestore: {
                     Task { await sessionDetailStore.restoreSelectedItems() }
+                },
+                onRestoreAndContinue: {
+                    Task {
+                        await sessionDetailStore.restoreSelectedItems()
+                        if let threadId = sessionDetailStore.memory?.session.workflowThreadId {
+                            await sessionControl.continueWorkflowThread(id: threadId)
+                            appStore.popSessionDetail()
+                            appStore.selectTab(.timeline)
+                        }
+                    }
                 },
                 onCancel: {
                     sessionDetailStore.showRestoreSelection = false

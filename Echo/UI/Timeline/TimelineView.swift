@@ -194,16 +194,6 @@ struct TimelineView: View {
                                         } else {
                                             selectedThreadIds.insert(summary.id)
                                         }
-                                    } else {
-                                        if summary.segments.count == 1, let only = summary.segments.first {
-                                            appStore.openSessionDetail(only.id)
-                                        } else {
-                                            if expandedLogsThreadIds.contains(summary.id) {
-                                                expandedLogsThreadIds.remove(summary.id)
-                                            } else {
-                                                expandedLogsThreadIds.insert(summary.id)
-                                            }
-                                        }
                                     }
                                 }
                             }
@@ -340,96 +330,102 @@ private struct WorkflowThreadCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 14) {
-                Image(systemName: summary.activeSegment != nil ? "circle.fill" : "circle")
-                    .font(.system(size: 8))
-                    .foregroundStyle(
-                        summary.activeSegment != nil ? EchoPalette.live : Color.secondary.opacity(0.45)
-                    )
+            // Header Row (Clickable to Expand/Collapse)
+            HStack(alignment: .top, spacing: 14) {
+                // Dynamic Icon based on category cluster of latest segment
+                let cluster = summary.segments.first?.cluster ?? .mixed
+                Image(systemName: cluster.icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(EchoPalette.indigo)
+                    .frame(width: 36, height: 36)
+                    .background(EchoPalette.indigo.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.top, 2)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(summary.displayTitle)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    Text("Total · \(summary.totalDuration.shortLabel)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.secondary)
-
-                    HStack(spacing: 6) {
-                        Text(summary.latestActiveLabel)
-                            .foregroundStyle(.secondary.opacity(0.85))
-                        if summary.appCount > 0 {
-                            Text("·")
-                                .foregroundStyle(.secondary)
-                            Text("\(summary.appCount) apps")
-                                .foregroundStyle(.secondary.opacity(0.85))
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(summary.displayTitle)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        
+                        if summary.segments.count > 1 {
+                            let count = summary.segments.count
+                            Text("↺ Continued \(count - 1) \(count - 1 == 1 ? "time" : "times")")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(EchoPalette.indigo.opacity(0.12), in: Capsule())
+                                .foregroundStyle(EchoPalette.indigo)
                         }
                     }
-                    .font(.system(size: 11))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Last Active: \(summary.latestActiveLabel)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        
+                        HStack(spacing: 8) {
+                            Text("Total Time: \(summary.totalDuration.shortLabel)")
+                            Text("·")
+                            Text("\(summary.segments.count) \(summary.segments.count == 1 ? "Session" : "Sessions")")
+                            if summary.appCount > 0 {
+                                Text("·")
+                                Text("\(summary.appCount) apps")
+                            }
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary.opacity(0.85))
+                    }
                 }
 
                 Spacer(minLength: 8)
 
+                // Rotating Chevron
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.quaternary)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary.opacity(0.7))
+                    .rotationEffect(.degrees(logsExpanded ? 90 : 0))
+                    .padding(.top, 12)
             }
             .padding(EchoDesign.cardPadding)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onToggleLogs()
+            }
 
-            if !summary.segments.isEmpty {
+            // Expanded Session History
+            if logsExpanded && !summary.segments.isEmpty {
                 Divider().opacity(0.35)
                     .padding(.horizontal, EchoDesign.cardPadding)
 
-                Button(action: onToggleLogs) {
+                VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 6) {
-                        Text("Activity logs")
+                        Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Image(systemName: logsExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(summary.segments.count)")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(EchoPalette.indigoSoft)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(EchoPalette.indigo.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+                        Text("Session History")
+                            .font(.system(size: 11, weight: .semibold))
                     }
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, EchoDesign.cardPadding)
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
+                    .padding(.top, 12)
+                    .padding(.bottom, 6)
 
-                if logsExpanded {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(summary.segments) { segment in
-                            let log = WorkflowSegment(session: segment)
-                            Button {
-                                onSelectSegment(segment.id)
-                            } label: {
-                                HStack {
-                                    Text(log.activityLogLabel)
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.primary.opacity(0.85))
-                                    Spacer()
-                                }
-                                .padding(.horizontal, EchoDesign.cardPadding)
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(.plain)
-
-                            if segment.id != summary.segments.last?.id {
-                                Divider().opacity(0.2)
-                                    .padding(.leading, EchoDesign.cardPadding)
-                            }
+                    let chronologicalSegments = summary.segments.sorted(by: { $0.startedAt < $1.startedAt })
+                    ForEach(Array(chronologicalSegments.enumerated()), id: \.element.id) { index, segment in
+                        SessionHistoryRow(
+                            index: index + 1,
+                            segment: segment,
+                            onTap: { onSelectSegment(segment.id) }
+                        )
+                        
+                        if segment.id != chronologicalSegments.last?.id {
+                            Divider().opacity(0.15)
+                                .padding(.leading, EchoDesign.cardPadding + 16)
                         }
                     }
-                    .padding(.bottom, 10)
                 }
+                .padding(.bottom, 10)
             }
         }
         .background(
@@ -444,19 +440,71 @@ private struct WorkflowThreadCard: View {
                 )
         )
         .shadow(color: .black.opacity(hovering ? 0.06 : 0.03), radius: hovering ? 10 : 5, y: 2)
-        .scaleEffect(hovering ? 1.005 : 1)
+        .scaleEffect(hovering ? 1.002 : 1)
         .animation(.easeOut(duration: 0.15), value: hovering)
-        .contentShape(Rectangle())
-        .echoPointingCursor()
         .onHover { hovering in
             self.hovering = hovering
         }
-        .onTapGesture {
-            if summary.segments.count == 1, let only = summary.segments.first {
-                onSelectSegment(only.id)
-            } else {
-                onToggleLogs()
+    }
+}
+
+private struct SessionHistoryRow: View {
+    let index: Int
+    let segment: Session
+    let onTap: () -> Void
+    
+    @State private var hovering = false
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: segment.isActive ? "play.circle.fill" : "circle.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(segment.isActive ? EchoPalette.live : Color.secondary.opacity(0.6))
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Session \(index)")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(segment.isActive ? EchoPalette.live : .primary)
+                    
+                    Text(formatSessionTimeRange(segment))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Text("Duration: \(segment.duration.shortLabel)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary.opacity(0.8))
             }
+            .padding(.vertical, 10)
+            .padding(.horizontal, EchoDesign.cardPadding)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(hovering ? Color.primary.opacity(0.04) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .echoPointingCursor()
+    }
+    
+    private func formatSessionTimeRange(_ segment: Session) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMM d" // e.g., Jun 6
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mm a" // e.g., 4:17 PM
+        
+        let dateStr = dateFormatter.string(from: segment.startedAt)
+        let startStr = timeFormatter.string(from: segment.startedAt)
+        
+        if let endedAt = segment.endedAt {
+            let endStr = timeFormatter.string(from: endedAt)
+            return "\(dateStr) • \(startStr) - \(endStr)"
+        } else {
+            return "\(dateStr) • \(startStr) - Active"
         }
     }
 }

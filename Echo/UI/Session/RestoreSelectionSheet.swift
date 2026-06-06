@@ -3,6 +3,7 @@ import SwiftUI
 struct RestoreSelectionSheet: View {
     @Binding var items: [RestoreWeighting.SelectableItem]
     let onRestore: () -> Void
+    let onRestoreAndContinue: () -> Void
     let onCancel: () -> Void
 
     var body: some View {
@@ -40,11 +41,11 @@ struct RestoreSelectionSheet: View {
 
                 Divider().opacity(0.35)
 
-                HStack {
+                HStack(spacing: 12) {
                     Button(action: onCancel) {
                         Text("Cancel")
                             .font(.system(size: 13, weight: .semibold))
-                            .padding(.horizontal, 18)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .foregroundStyle(Color.primary.opacity(0.85))
                             .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
@@ -56,16 +57,17 @@ struct RestoreSelectionSheet: View {
                     Spacer()
                     
                     let selected = items.filter(\.isSelected)
+                    
                     Button {
                         onRestore()
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.uturn.backward")
                                 .font(.system(size: 11, weight: .bold))
-                            Text(selected.isEmpty ? "Restore Selected" : "Restore \(selected.count) Items")
+                            Text("Restore")
                                 .font(.system(size: 13, weight: .semibold))
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background {
                             if selected.isEmpty {
@@ -73,7 +75,7 @@ struct RestoreSelectionSheet: View {
                                     .fill(Color.secondary.opacity(0.12))
                             } else {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.primary.opacity(0.10))
+                                    .fill(Color.primary.opacity(0.06))
                             }
                         }
                         .foregroundStyle(selected.isEmpty ? Color.secondary : Color.primary)
@@ -83,7 +85,39 @@ struct RestoreSelectionSheet: View {
                                     .strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
                             }
                         }
-                        .shadow(color: .clear, radius: 0)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selected.isEmpty)
+                    .echoPointingCursor()
+
+                    Button {
+                        onRestoreAndContinue()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Restore & Continue Workflow")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .background {
+                            if selected.isEmpty {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.secondary.opacity(0.12))
+                            } else {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(EchoPalette.indigo)
+                            }
+                        }
+                        .foregroundStyle(selected.isEmpty ? Color.secondary : Color.white)
+                        .overlay {
+                            if !selected.isEmpty {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                            }
+                        }
+                        .shadow(color: selected.isEmpty ? .clear : EchoPalette.indigo.opacity(0.3), radius: 6, y: 2)
                     }
                     .buttonStyle(.plain)
                     .disabled(selected.isEmpty)

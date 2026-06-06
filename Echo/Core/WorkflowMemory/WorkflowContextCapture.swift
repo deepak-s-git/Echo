@@ -3,10 +3,13 @@ import Foundation
 /// Extracts restorable working context from window titles, URLs, and bundle IDs.
 nonisolated enum WorkflowContextCapture {
 
-  static func items(from events: [ActivityEvent], tabEligibility: Double? = nil) -> [RestoreItem] {
+  static func items(from events: [ActivityEvent], tabEligibility: Double? = nil, sessionEndDate: Date? = nil) -> [RestoreItem] {
     let threshold = tabEligibility ?? {
-        let val = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
-        return val > 0 ? val : 12.0
+        let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
+        let hold = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
+        let actualDelay = delay > 0 ? delay : 1.2
+        let actualHold = hold > 0 ? hold : 12.0
+        return actualDelay + actualHold
     }()
 
     var items: [RestoreItem] = []
@@ -15,13 +18,18 @@ nonisolated enum WorkflowContextCapture {
     let sorted = events.sorted { $0.timestamp < $1.timestamp }
     var eventDurations: [UUID: TimeInterval] = [:]
     
-    for i in 0..<sorted.count {
-        let event = sorted[i]
-        if i < sorted.count - 1 {
-            let nextEvent = sorted[i + 1]
+    // Filter events to only appFocus and appSwitch to track actual user focus changes
+    let focusEvents = sorted.filter { $0.type == .appFocus || $0.type == .appSwitch }
+    
+    for i in 0..<focusEvents.count {
+        let event = focusEvents[i]
+        if i < focusEvents.count - 1 {
+            let nextEvent = focusEvents[i + 1]
             eventDurations[event.id] = nextEvent.timestamp.timeIntervalSince(event.timestamp)
         } else {
-            eventDurations[event.id] = 60.0
+            let lastEventTimestamp = sessionEndDate ?? sorted.last?.timestamp ?? event.timestamp
+            let duration = lastEventTimestamp.timeIntervalSince(event.timestamp)
+            eventDurations[event.id] = max(duration, 0.0)
         }
     }
 
@@ -35,11 +43,71 @@ nonisolated enum WorkflowContextCapture {
         }
     }
 
+    // Capture tab focus intervals for logging
+    var urlIntervals: [String: [(start: Date, end: Date, duration: TimeInterval)]] = [:]
+    for i in 0..<focusEvents.count {
+        let event = focusEvents[i]
+        guard BrowserContextService.isBrowser(event.appBundleId) else { continue }
+        if let urlString = event.url ?? sanitizedURL(from: event.windowTitle) {
+            let normalized = normalizeURL(urlString)
+            let start = event.timestamp
+            let end: Date
+            let duration: TimeInterval
+            if i < focusEvents.count - 1 {
+                end = focusEvents[i + 1].timestamp
+                duration = end.timeIntervalSince(start)
+            } else {
+                end = sessionEndDate ?? sorted.last?.timestamp ?? start
+                duration = max(end.timeIntervalSince(start), 0.0)
+            }
+            urlIntervals[normalized, default: []].append((start: start, end: end, duration: duration))
+        }
+    }
+
+    // Collect all browser URLs present in this session (focused and background scraped)
+    var allBrowserURLs = Set<String>()
+    for event in sorted {
+        guard BrowserContextService.isBrowser(event.appBundleId) else { continue }
+        if let urlString = event.url ?? sanitizedURL(from: event.windowTitle) {
+            allBrowserURLs.insert(normalizeURL(urlString))
+        }
+    }
+
+    // Emit detailed audit logs for all browser URLs
+    SessionDetailLogger.log("[TabAudit] Detailed audit for browser URLs in session:")
+    for url in allBrowserURLs.sorted() {
+        let intervals = urlIntervals[url] ?? []
+        let accumulated = urlDurations[url] ?? 0.0
+        let qualified = accumulated >= threshold
+        
+        SessionDetailLogger.log("[TabAudit] URL: \(url)")
+        if intervals.isEmpty {
+            SessionDetailLogger.log("  - No active focus intervals (always background tab).")
+        } else {
+            for interval in intervals {
+                SessionDetailLogger.log("  - Interval: Focused \(interval.start) -> \(interval.end) (Duration: \(interval.duration)s)")
+            }
+        }
+        SessionDetailLogger.log("  - Accumulated Focus Duration: \(accumulated)s")
+        SessionDetailLogger.log("  - Threshold Value: \(threshold)s")
+        SessionDetailLogger.log("  - Qualified for Persistence: \(qualified ? "YES" : "NO")")
+        
+        let reason: String
+        if qualified {
+            reason = "Accumulated duration \(accumulated)s meets or exceeds threshold \(threshold)s."
+        } else if intervals.isEmpty {
+            reason = "Background tab captured via scraper; never actively focused/activated by the user."
+        } else {
+            reason = "Accumulated duration \(accumulated)s is below threshold \(threshold)s."
+        }
+        SessionDetailLogger.log("  - Reason for Decision: \(reason)")
+    }
+
     for event in sorted.reversed() {
       let duration = eventDurations[event.id] ?? 0
       items.append(contentsOf: itemsForEvent(event, duration: duration, urlDurations: urlDurations, tabEligibility: threshold, seen: &seen))
     }
-    return items
+    return filterPrefixURLs(items)
   }
 
   private static func normalizeURL(_ urlString: String) -> String {
@@ -50,19 +118,23 @@ nonisolated enum WorkflowContextCapture {
     if host.hasPrefix("www.") {
         host = String(host.dropFirst(4))
     }
+    let lowerHost = host.lowercased()
     var path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     
-    let lowerHost = host.lowercased()
     if lowerHost != "youtu.be" {
         path = path.lowercased()
     }
     
-    var normalized = "\(host.lowercased())/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    var normalized = "\(lowerHost)/\(path)".trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     
-    if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
-        if let components = URLComponents(string: urlString) {
-            if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value {
+    if let components = URLComponents(string: urlString), let queryItems = components.queryItems {
+        if lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be") {
+            if let vParam = queryItems.first(where: { $0.name == "v" })?.value {
                 normalized += "?v=\(vParam)"
+            }
+        } else if lowerHost.contains("google.") {
+            if let qParam = queryItems.first(where: { $0.name == "q" })?.value {
+                normalized += "?q=\(qParam)"
             }
         }
     }
@@ -71,8 +143,11 @@ nonisolated enum WorkflowContextCapture {
 
   static func itemsForEvent(_ event: ActivityEvent, duration: TimeInterval, urlDurations: [String: TimeInterval] = [:], tabEligibility: Double? = nil, seen: inout Set<String>) -> [RestoreItem] {
     let threshold = tabEligibility ?? {
-        let val = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
-        return val > 0 ? val : 12.0
+        let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
+        let hold = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
+        let actualDelay = delay > 0 ? delay : 1.2
+        let actualHold = hold > 0 ? hold : 12.0
+        return actualDelay + actualHold
     }()
 
     switch event.appBundleId {
@@ -252,8 +327,14 @@ nonisolated enum WorkflowContextCapture {
         return []
     }
     
-    let key = "browser:\(normalizeURL(url.absoluteString))"
+    let normalizedURLString = normalizeURL(url.absoluteString)
+    let key = "browser:\(normalizedURLString)"
+    let profile = event.profileName ?? "default"
+    let host = url.host?.lowercased() ?? ""
+    let titleKey = "title:\(profile):\(host):\(lowerT)"
+    
     guard seen.insert(key).inserted else { return [] }
+    guard seen.insert(titleKey).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
       kind: .browserPage,
@@ -371,5 +452,43 @@ nonisolated enum WorkflowContextCapture {
       "dev.warp.Warp-Stable",
       "co.zeit.hyper"
     ].contains(bundleId)
+  }
+
+
+  private static func filterPrefixURLs(_ items: [RestoreItem]) -> [RestoreItem] {
+    let browserItems = items.filter { $0.kind == .browserPage || $0.kind == .url }
+    let otherItems = items.filter { $0.kind != .browserPage && $0.kind != .url }
+    
+    var filteredBrowser: [RestoreItem] = []
+    let sortedBrowser = browserItems.sorted { item1, item2 in
+        let u1 = item1.url ?? ""
+        let u2 = item2.url ?? ""
+        return normalizeURL(u1).count > normalizeURL(u2).count
+    }
+    
+    var seenDeeper = Set<String>()
+    for item in sortedBrowser {
+        guard let u = item.url else {
+            filteredBrowser.append(item)
+            continue
+        }
+        let normalized = normalizeURL(u)
+        let profile = item.profileName ?? "default"
+        let profileKey = "\(profile):\(normalized)"
+        
+        let isPrefix = seenDeeper.contains { deeper in
+            deeper == profileKey || deeper.hasPrefix(profileKey + "/")
+        }
+        
+        if isPrefix {
+            continue
+        }
+        
+        seenDeeper.insert(profileKey)
+        filteredBrowser.append(item)
+    }
+    
+    let allowedIds = Set(filteredBrowser.map(\.id) + otherItems.map(\.id))
+    return items.filter { allowedIds.contains($0.id) }
   }
 }

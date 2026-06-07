@@ -33,6 +33,31 @@ struct MiniTimelineView: View, Equatable {
         return secs > 0 ? "\(mins)m \(secs)s" : "\(mins)m"
     }
 
+    private func centerXForBead(at index: Int, widths: [CGFloat]) -> CGFloat {
+        var x: CGFloat = 0
+        for i in 0..<index {
+            x += widths[i] + 3.5
+        }
+        return x + widths[index] / 2
+    }
+
+    private func cardXOffsetForBead(at index: Int, widths: [CGFloat], totalWidth: CGFloat) -> CGFloat {
+        guard index < widths.count else { return 0 }
+        let centerX = centerXForBead(at: index, widths: widths)
+        let halfWidth: CGFloat = 97.5 + 8 // 97.5 is 195/2, 8 is safety padding from edges
+        
+        var offset: CGFloat = 0
+        if centerX < halfWidth {
+            offset = halfWidth - centerX
+        } else if centerX > totalWidth - halfWidth {
+            offset = (totalWidth - halfWidth) - centerX
+        }
+        
+        // Clamp to ensure the downward pointer remains inside the card's rounded rect bounds
+        let maxOffset: CGFloat = 97.5 - 16
+        return max(-maxOffset, min(maxOffset, offset))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             // Interactive Header
@@ -97,20 +122,46 @@ struct MiniTimelineView: View, Equatable {
                         spacing: 3.5
                     )
                     
-                    HStack(alignment: .center, spacing: 3.5) {
-                        ForEach(Array(zip(segments, widths)), id: \.0.id) { segment, width in
-                            TimelineBeadView(
-                                segment: segment,
-                                width: width,
-                                isHovered: hoveredSegmentId == segment.id,
-                                isAnyHovered: hoveredSegmentId != nil,
-                                formatDuration: formatDuration,
-                                onHover: { hovering in
-                                    withAnimation(.spring(response: 0.22, dampingFraction: 0.72)) {
-                                        hoveredSegmentId = hovering ? segment.id : nil
+                    ZStack {
+                        // Visual Layer (renders beads and tooltips, pass-through hit testing)
+                        HStack(alignment: .center, spacing: 3.5) {
+                            ForEach(0..<segments.count, id: \.self) { index in
+                                let segment = segments[index]
+                                let width = widths[index]
+                                let cardOffset = cardXOffsetForBead(at: index, widths: widths, totalWidth: geo.size.width)
+                                
+                                TimelineBeadVisualView(
+                                    segment: segment,
+                                    width: width,
+                                    isHovered: hoveredSegmentId == segment.id,
+                                    isAnyHovered: hoveredSegmentId != nil,
+                                    formatDuration: formatDuration,
+                                    cardXOffset: cardOffset
+                                )
+                                .zIndex(hoveredSegmentId == segment.id ? 2 : 1)
+                            }
+                        }
+                        .allowsHitTesting(false)
+                        
+                        // Hover Detection Layer (completely static, catches hover, transparent)
+                        HStack(alignment: .center, spacing: 3.5) {
+                            ForEach(0..<segments.count, id: \.self) { index in
+                                let segment = segments[index]
+                                let width = widths[index]
+                                
+                                Color.white.opacity(0.0001)
+                                    .frame(width: max(6.0, width), height: 40)
+                                    .contentShape(Rectangle())
+                                    .onHover { hovering in
+                                        withAnimation(.spring(response: 0.22, dampingFraction: 0.72)) {
+                                            if hovering {
+                                                hoveredSegmentId = segment.id
+                                            } else if hoveredSegmentId == segment.id {
+                                                hoveredSegmentId = nil
+                                            }
+                                        }
                                     }
-                                }
-                            )
+                            }
                         }
                     }
                     .frame(width: geo.size.width, height: 60, alignment: .center)
@@ -180,22 +231,61 @@ struct MiniTimelineView: View, Equatable {
 
 // MARK: - Timeline Bead Subview
 
-private struct TimelineBeadView: View {
+private struct TimelineBeadVisualView: View {
     let segment: TimelineSegment
     let width: CGFloat
     let isHovered: Bool
     let isAnyHovered: Bool
     let formatDuration: (TimeInterval) -> String
-    let onHover: (Bool) -> Void
+    let cardXOffset: CGFloat
+    
+    private var appCategory: String {
+        let id = segment.bundleId.lowercased()
+        let name = segment.appName.lowercased()
+        if id.contains("chrome") || id.contains("safari") || id.contains("browser") || id.contains("arc") {
+            return "Research & Documentation"
+        } else if id.contains("xcode") || id.contains("vscode") || id.contains("cursor") || name.contains("code") {
+            return "Development & Engineering"
+        } else if id.contains("terminal") || id.contains("warp") || id.contains("iterm") || name.contains("terminal") {
+            return "Command Line & Systems"
+        } else if id.contains("finder") {
+            return "File Management"
+        } else if id.contains("figma") || id.contains("photoshop") || id.contains("illustrator") || name.contains("figma") {
+            return "Design & Creative"
+        } else if id.contains("slack") || id.contains("discord") || id.contains("message") || name.contains("slack") {
+            return "Collaboration & Comms"
+        } else if id.contains("spotify") || id.contains("music") {
+            return "Media & Audio Background"
+        } else {
+            return "Utility & Active Task"
+        }
+    }
+    
+    private var focusContribution: String {
+        let duration = segment.duration
+        if duration >= 300 {
+            return "High"
+        } else if duration >= 60 {
+            return "Medium"
+        } else {
+            return "Low"
+        }
+    }
+    
+    private var focusContributionColor: Color {
+        switch focusContribution {
+        case "High": return Color(nsColor: NSColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1.0)) // vibrant green
+        case "Medium": return Color.orange
+        default: return Color.secondary
+        }
+    }
     
     var body: some View {
         let beadWidth = max(6.0, width)
         let beadHeight: CGFloat = isHovered ? 20.0 : 10.0
         let beadOpacity: Double = isHovered ? 1.0 : (isAnyHovered ? 0.45 : 0.85)
-        let shadowOpacity: Double = isHovered ? 0.6 : 0.0
         
         ZStack {
-            
             Capsule(style: .continuous)
                 .fill(
                     LinearGradient(
@@ -231,54 +321,94 @@ private struct TimelineBeadView: View {
                         }
                     }
                 )
+                .frame(width: beadWidth, height: beadHeight)
+                .shadow(color: Color.black.opacity(isHovered ? 0.22 : 0.05), radius: isHovered ? 4 : 1, y: isHovered ? 1.5 : 0.5)
         }
-        .frame(width: beadWidth, height: beadHeight)
-        .shadow(color: Color.black.opacity(isHovered ? 0.22 : 0.05), radius: isHovered ? 4 : 1, y: isHovered ? 1.5 : 0.5)
+        .frame(width: beadWidth, height: 40)
         .opacity(beadOpacity)
-        .onHover(perform: onHover)
         .overlay(
             Group {
                 if isHovered {
                     VStack(spacing: 0) {
-                        HStack(spacing: 6) {
-                            AppIconView(bundleId: segment.bundleId, size: 14)
-                                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Header
+                            HStack(spacing: 8) {
+                                AppIconView(bundleId: segment.bundleId, size: 22)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                    .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
+                                
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(segment.appName)
+                                        .font(.system(size: 11.5, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    
+                                    Text(appCategory)
+                                        .font(.system(size: 8.5, weight: .medium))
+                                        .foregroundStyle(.white.opacity(0.55))
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.top, 9)
+                            .padding(.bottom, 7)
                             
-                            Text(segment.appName)
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                            // Separator line
+                            Rectangle()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 0.5)
                             
-                            Text("•")
-                                .foregroundStyle(.white.opacity(0.3))
-                            
-                            Text(formatDuration(segment.duration))
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.8))
+                            // Details
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 0) {
+                                    Text("Time Spent: ")
+                                        .foregroundStyle(.white.opacity(0.60))
+                                    Text(formatDuration(segment.duration))
+                                        .foregroundStyle(.white)
+                                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                }
+                                .font(.system(size: 9.5))
+                                
+                                Text("Part of Workflow Context")
+                                    .font(.system(size: 9.5))
+                                    .foregroundStyle(EchoPalette.indigoSoft.opacity(0.85))
+                                
+                                HStack(spacing: 0) {
+                                    Text("Focus Contribution: ")
+                                        .foregroundStyle(.white.opacity(0.60))
+                                    Text(focusContribution)
+                                        .foregroundStyle(focusContributionColor)
+                                        .font(.system(size: 9.5, weight: .bold))
+                                }
+                                .font(.system(size: 9.5))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .frame(width: 195)
                         .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color(nsColor: NSColor(white: 0.08, alpha: 0.90)))
-                                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(.ultraThinMaterial)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
                         )
+                        .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+                        .offset(x: cardXOffset)
                         
+                        // Downward Pointer
                         Image(systemName: "arrowtriangle.down.fill")
                             .font(.system(size: 6))
-                            .foregroundStyle(Color(nsColor: NSColor(white: 0.08, alpha: 0.90)))
-                            .offset(y: -1)
+                            .foregroundStyle(Color(white: 0.1, opacity: 0.85))
+                            .offset(y: -0.5)
                     }
                     .fixedSize()
-                    .offset(y: -38)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9).combined(with: .offset(y: 4))))
+                    .offset(y: -96)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92).combined(with: .offset(y: 6))))
+                    .allowsHitTesting(false)
                 }
             },
             alignment: .top
         )
     }
 }
-

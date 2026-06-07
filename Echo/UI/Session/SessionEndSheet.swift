@@ -12,14 +12,14 @@ struct SessionEndSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("End workflow memory")
+            Text("End session")
                 .font(.system(size: 18, weight: .semibold))
 
-            Text("Name this memory, add tags, or delete it permanently.")
+            Text("Name this session, add tags, or delete it permanently.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
 
-            TextField("Session title", text: $title)
+            TextField("Session Name", text: $title)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isWorking)
 

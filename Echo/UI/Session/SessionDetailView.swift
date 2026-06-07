@@ -87,9 +87,8 @@ struct SessionDetailView: View {
                     Task {
                         await sessionDetailStore.restoreSelectedItems()
                         if let threadId = sessionDetailStore.memory?.session.workflowThreadId {
-                            await sessionControl.continueWorkflowThread(id: threadId)
+                            await sessionControl.continueWorkflowThread(id: threadId, appStore: appStore)
                             appStore.popSessionDetail()
-                            appStore.selectTab(.timeline)
                         }
                     }
                 },

@@ -62,6 +62,7 @@ nonisolated enum AppMetadataResolver {
     }
 
     static func humanizedBundleId(_ bundleId: String) -> String {
+        if let known = knownNames[bundleId] { return known }
         let segment = bundleId.split(separator: ".").last.map(String.init) ?? bundleId
         guard !segment.isEmpty else { return "App" }
         return segment.prefix(1).uppercased() + segment.dropFirst()

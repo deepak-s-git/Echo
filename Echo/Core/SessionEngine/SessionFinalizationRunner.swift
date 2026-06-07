@@ -126,6 +126,8 @@ nonisolated enum SessionFinalizationRunner {
         tabs: [BrowserTab]
     ) -> WorkflowRestorePlan {
         let defaultChromeProfile = tabs.first(where: { $0.browser == .chrome })?.profileName
+        let defaultBraveProfile = tabs.first(where: { $0.browser == .brave })?.profileName
+        let defaultEdgeProfile = tabs.first(where: { $0.browser == .edge })?.profileName
         
         // Build a URL-to-Profile map from the active tabs scraped at finalization (highly accurate window-level voting)
         var urlToProfileMap: [String: String] = [:]
@@ -161,6 +163,10 @@ nonisolated enum SessionFinalizationRunner {
 
                 if item.bundleId == "com.google.Chrome" && item.profileName == nil {
                     item.profileName = defaultChromeProfile
+                } else if item.bundleId == "com.brave.Browser" && item.profileName == nil {
+                    item.profileName = defaultBraveProfile
+                } else if item.bundleId == "com.microsoft.edgemac" && item.profileName == nil {
+                    item.profileName = defaultEdgeProfile
                 }
             }
             let key: String

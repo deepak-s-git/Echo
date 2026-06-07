@@ -35,8 +35,12 @@ struct BrowserTabScraper {
             script = """
             try {
                 var app = Application('Arc');
-                var tab = app.windows[0].activeTab();
-                JSON.stringify({url: tab.url(), title: tab.name()});
+                var tab = app.windows[0].activeTab;
+                var sName = "";
+                try { sName = app.windows[0].activeSpace.name(); } catch(e) {
+                    try { sName = app.windows[0].activeSpace.title(); } catch(e2) {}
+                }
+                JSON.stringify({url: tab.url(), title: tab.name(), profileName: sName});
             } catch(e) { JSON.stringify(null); }
             """
         default:
@@ -72,8 +76,9 @@ struct BrowserTabScraper {
             return nil
         }
         var profileName: String? = nil
-        if browser == .chrome {
-            let sessionMap = sessionURLsForProfiles()
+        let isChromium = (browser == .chrome || browser == .brave || browser == .edge)
+        if isChromium {
+            let sessionMap = sessionURLsForProfiles(for: browser)
             var allUrls = [url]
             if let windowUrlsStr = item["windowUrls"] {
                 let parsedUrls = windowUrlsStr.components(separatedBy: "|").filter { !$0.isEmpty }
@@ -81,7 +86,9 @@ struct BrowserTabScraper {
                     allUrls = parsedUrls
                 }
             }
-            profileName = chromeProfile(forURLs: allUrls, sessionMap: sessionMap)
+            profileName = resolveProfile(forURLs: allUrls, browser: browser, sessionMap: sessionMap)
+        } else if browser == .arc {
+            profileName = item["profileName"]
         }
 
         return BrowserTab(
@@ -131,33 +138,74 @@ struct BrowserTabScraper {
 
     @MainActor
     private static func runChromeStyleTabList(appName: String, browser: BrowserTab.Browser) -> [BrowserTab]? {
-        let script = """
-        try {
-            var app = Application('\(appName)');
-            var flatTabs = [];
-            for (var i = 0; i < app.windows.length; i++) {
-                var win = app.windows[i];
-                try {
-                    for (var j = 0; j < win.tabs.length; j++) {
-                        var tab = win.tabs[j];
-                        try {
-                            flatTabs.push({
-                                url: tab.url(),
-                                title: tab.name(),
-                                windowIndex: i.toString()
-                            });
-                        } catch(e) {}
-                    }
-                } catch(e) {}
-            }
-            JSON.stringify(flatTabs);
-        } catch(e) { JSON.stringify(null); }
-        """
+        let script: String
+        if browser == .arc {
+            script = """
+            try {
+                var app = Application('Arc');
+                var flatTabs = [];
+                for (var i = 0; i < app.windows.length; i++) {
+                    var win = app.windows[i];
+                    try {
+                        for (var j = 0; j < win.spaces.length; j++) {
+                            var space = win.spaces[j];
+                            try {
+                                for (var k = 0; k < space.tabs.length; k++) {
+                                    var tab = space.tabs[k];
+                                    try {
+                                        var tUrl = tab.url();
+                                        var tTitle = "";
+                                        try { tTitle = tab.title(); } catch(e) {
+                                            try { tTitle = tab.name(); } catch(e2) {}
+                                        }
+                                        var sName = "";
+                                        try { sName = space.name(); } catch(e) {}
+                                        flatTabs.push({
+                                            url: tUrl,
+                                            title: tTitle,
+                                            windowIndex: i.toString(),
+                                            profileName: sName
+                                        });
+                                    } catch(e) {}
+                                }
+                            } catch(e) {}
+                        }
+                    } catch(e) {}
+                }
+                JSON.stringify(flatTabs);
+            } catch(e) { JSON.stringify(null); }
+            """
+        } else {
+            script = """
+            try {
+                var app = Application('\(appName)');
+                var flatTabs = [];
+                for (var i = 0; i < app.windows.length; i++) {
+                    var win = app.windows[i];
+                    try {
+                        for (var j = 0; j < win.tabs.length; j++) {
+                            var tab = win.tabs[j];
+                            try {
+                                flatTabs.push({
+                                    url: tab.url(),
+                                    title: tab.name(),
+                                    windowIndex: i.toString()
+                                });
+                            } catch(e) {}
+                        }
+                    } catch(e) {}
+                }
+                JSON.stringify(flatTabs);
+            } catch(e) { JSON.stringify(null); }
+            """
+        }
         
         guard let result = runJXA(script) else { return nil }
         
+        let isChromium = (browser == .chrome || browser == .brave || browser == .edge)
+        
         // Pre-compute session-based URL map once for all windows
-        let sessionMap = (browser == .chrome) ? sessionURLsForProfiles() : [:]
+        let sessionMap = isChromium ? sessionURLsForProfiles(for: browser) : [:]
         
         // Group the scraped tabs by windowIndex to perform window-level profile resolution
         let groupedByWindow = Dictionary(grouping: result, by: { $0["windowIndex"] ?? "0" })
@@ -170,7 +218,7 @@ struct BrowserTabScraper {
                 guard isValidTab(url: url, title: title) else { continue }
                 validURLs.append(url)
             }
-            let profile = (browser == .chrome && !validURLs.isEmpty) ? chromeProfile(forURLs: validURLs, sessionMap: sessionMap) : nil
+            let profile = (isChromium && !validURLs.isEmpty) ? resolveProfile(forURLs: validURLs, browser: browser, sessionMap: sessionMap) : nil
             resolvedWindowProfiles[windowIndex] = profile
         }
 
@@ -179,7 +227,7 @@ struct BrowserTabScraper {
             guard let url = item["url"], let title = item["title"] else { continue }
             guard isValidTab(url: url, title: title) else { continue }
             let wIndex = item["windowIndex"] ?? "0"
-            let resolvedProfile = resolvedWindowProfiles[wIndex] ?? nil
+            let resolvedProfile = (browser == .arc) ? item["profileName"] : (resolvedWindowProfiles[wIndex] ?? nil)
             
             tabs.append(BrowserTab(
                 id: UUID(),
@@ -221,14 +269,27 @@ struct BrowserTabScraper {
         let lastVisitTime: Double
     }
 
-    // MARK: - Session-Based Chrome Profile Resolution
+    // MARK: - Session-Based Profile Resolution
 
-    /// Reads each Chrome profile's most recent SNSS Session file to build
+    private static func appSupportDir(for browser: BrowserTab.Browser) -> URL? {
+        let base = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        switch browser {
+        case .chrome:
+            return base.appendingPathComponent("Google/Chrome")
+        case .brave:
+            return base.appendingPathComponent("BraveSoftware/Brave-Browser")
+        case .edge:
+            return base.appendingPathComponent("Microsoft Edge")
+        default:
+            return nil
+        }
+    }
+
+    /// Reads each profile's most recent SNSS Session file to build
     /// a map of which normalized hosts are currently open in each profile.
     /// This is the ground-truth source for window-to-profile assignment.
-    private static func sessionURLsForProfiles() -> [String: Set<String>] {
-        let base = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Google/Chrome")
+    private static func sessionURLsForProfiles(for browser: BrowserTab.Browser) -> [String: Set<String>] {
+        guard let base = appSupportDir(for: browser) else { return [:] }
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: base, includingPropertiesForKeys: [.isDirectoryKey]
         ) else { return [:] }
@@ -313,9 +374,9 @@ struct BrowserTabScraper {
         return result
     }
 
-    /// Resolves the Chrome profile for a window's URLs using session file data.
+    /// Resolves the profile for a window's URLs using session file data.
     /// Profiles that exclusively own a host get strong votes; shared hosts get weaker votes.
-    private static func chromeProfileFromSessions(
+    private static func profileFromSessions(
         forWindowURLs urls: [String],
         sessionMap: [String: Set<String>]
     ) -> String? {
@@ -367,19 +428,18 @@ struct BrowserTabScraper {
         return first.key
     }
 
-    // MARK: - Chrome Profile Resolution (Session-first, History-fallback)
+    // MARK: - Profile Resolution (Session-first, History-fallback)
 
-    /// Resolves the most likely Chrome profile for a set of URLs from the same window.
+    /// Resolves the most likely profile for a set of URLs from the same window.
     /// Uses session-based resolution first, falls back to History DB queries.
-    private static func chromeProfile(forURLs urls: [String], sessionMap: [String: Set<String>] = [:]) -> String? {
+    private static func resolveProfile(forURLs urls: [String], browser: BrowserTab.Browser, sessionMap: [String: Set<String>] = [:]) -> String? {
         // 1. PRIMARY: Session-based resolution (reads current tab state per profile)
-        if let sessionResult = chromeProfileFromSessions(forWindowURLs: urls, sessionMap: sessionMap) {
+        if let sessionResult = profileFromSessions(forWindowURLs: urls, sessionMap: sessionMap) {
             return sessionResult
         }
 
         // 2. SECONDARY: Fall back to History DB voting
-        let base = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Google/Chrome")
+        guard let base = appSupportDir(for: browser) else { return nil }
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: base, includingPropertiesForKeys: [.isDirectoryKey]
         ) else { return nil }

@@ -96,12 +96,70 @@ struct BrowserPageRestorer: WorkflowRestoring {
         if let bundleId = item.bundleId,
            let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
 
-            if bundleId == "com.google.Chrome", let profileName = item.profileName, !profileName.isEmpty {
-                EchoLog.restore("[restore] Using open -na for profile=\(profileName) url=\(urlString)")
+            if bundleId == "company.thebrowser.Browser" {
+                let targetSpace = item.profileName ?? ""
+                let escapedURL = urlString.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+                let escapedSpace = targetSpace.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+                
+                let scriptSource: String
+                if !targetSpace.isEmpty {
+                    scriptSource = """
+                    tell application "Arc"
+                        activate
+                        if (count of windows) is 0 then
+                            make new window
+                        end if
+                        tell front window
+                            try
+                                tell space "\(escapedSpace)" to make new tab with properties {URL:"\(escapedURL)"}
+                            on error
+                                make new tab with properties {URL:"\(escapedURL)"}
+                            end try
+                        end tell
+                    end tell
+                    """
+                } else {
+                    scriptSource = """
+                    tell application "Arc"
+                        activate
+                        if (count of windows) is 0 then
+                            make new window
+                        end if
+                        tell front window
+                            make new tab with properties {URL:"\(escapedURL)"}
+                        end tell
+                    end tell
+                    """
+                }
+                
+                if let appleScript = NSAppleScript(source: scriptSource) {
+                    var errorInfo: NSDictionary?
+                    appleScript.executeAndReturnError(&errorInfo)
+                    if let error = errorInfo {
+                        EchoLog.restore("[restore] Arc AppleScript failed: \(error)")
+                    } else {
+                        EchoLog.restore("[restore] Arc AppleScript succeeded for \(urlString)")
+                        return
+                    }
+                }
+            }
+
+            let isChromiumProfileRestore = (bundleId == "com.google.Chrome" || bundleId == "com.brave.Browser" || bundleId == "com.microsoft.edgemac")
+            if isChromiumProfileRestore, let profileName = item.profileName, !profileName.isEmpty {
+                let appName: String
+                if bundleId == "com.google.Chrome" {
+                    appName = "Google Chrome"
+                } else if bundleId == "com.brave.Browser" {
+                    appName = "Brave Browser"
+                } else {
+                    appName = "Microsoft Edge"
+                }
+                
+                EchoLog.restore("[restore] Using open -na for \(appName) profile=\(profileName) url=\(urlString)")
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
                 process.arguments = [
-                    "-na", "Google Chrome",
+                    "-na", appName,
                     "--args",
                     "--profile-directory=\(profileName)",
                     urlString
@@ -112,7 +170,7 @@ struct BrowserPageRestorer: WorkflowRestoring {
                     EchoLog.restore("[restore] open -na exited with status=\(process.terminationStatus)")
                     return
                 } catch {
-                    EchoLog.restore("[restore] open -na failed for profile \(profileName)", error: error)
+                    EchoLog.restore("[restore] open -na failed for profile \(profileName) in \(appName)", error: error)
                     // fallback to generic open
                 }
             } else {

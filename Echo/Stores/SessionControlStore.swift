@@ -13,16 +13,19 @@ final class SessionControlStore: ObservableObject {
         isReady = true
     }
 
-    func startNewSession() async {
-        await container?.startNewSession()
+    func startNewSession(workflowName: String, appStore: AppStore) async {
+        await container?.startNewSession(workflowName: workflowName)
+        appStore.selectTab(.home)
     }
 
-    func continuePreviousSession() async {
+    func continuePreviousSession(appStore: AppStore) async {
         await container?.continuePreviousSession()
+        appStore.selectTab(.home)
     }
 
-    func continueWorkflowThread(id: UUID) async {
+    func continueWorkflowThread(id: UUID, appStore: AppStore) async {
         await container?.continueWorkflowThread(id: id)
+        appStore.selectTab(.home)
     }
 
     func pauseSession() async {
@@ -35,19 +38,20 @@ final class SessionControlStore: ObservableObject {
 
     func requestEndSession(
         appStore: AppStore,
-        activityStore: ActivityStore
+        activityStore: ActivityStore,
+        sessionStore: SessionStore
     ) {
         if activityStore.currentSession == nil, activityStore.isRecording {
             Task { await container?.cancelRecording() }
             return
         }
         guard let session = activityStore.currentSession else { return }
-        let suggested = activityStore.workflowIdentity
+        
+        let suggested = SessionTitleGenerator.generate(from: activityStore.recentEvents, startedAt: session.startedAt)
+        
         appStore.presentEndSession(SessionEndRequest(
             sessionId: session.id,
-            suggestedTitle: suggested == "Your workflow"
-                ? (session.title ?? "Untitled memory")
-                : suggested
+            suggestedTitle: suggested
         ))
     }
 

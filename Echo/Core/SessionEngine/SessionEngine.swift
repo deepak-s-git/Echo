@@ -70,16 +70,17 @@ actor SessionEngine {
         guard !isRecordingEnabled else { return }
         isRecordingEnabled = true
         await idleMonitor.setMonitoringEnabled(true)
-        await activityTracker?.setCapturePaused(false)
 
         if let thread = await findContinueThread() {
             await armRecording(on: thread)
             if restoreContext, let lastSegment = try? await repository.fetchLastEndedSegment(threadId: thread.id) {
                 await restoreContextFromLastSegment(lastSegment)
             }
+            await activityTracker?.setCapturePaused(false)
             EchoLog.lifecycle("Continued workflow \(thread.id.uuidString) — awaiting first activity")
             return
         }
+        await activityTracker?.setCapturePaused(false)
         await beginNewWorkflow()
         EchoLog.lifecycle("Continue fell back to new workflow")
     }

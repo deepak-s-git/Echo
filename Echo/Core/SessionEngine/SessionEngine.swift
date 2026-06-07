@@ -57,13 +57,13 @@ actor SessionEngine {
         await prepareOnLaunch()
     }
 
-    func startNewSession() async {
+    func startNewSession(workflowName: String) async {
         guard !isRecordingEnabled else { return }
         isRecordingEnabled = true
         await idleMonitor.setMonitoringEnabled(true)
         await activityTracker?.setCapturePaused(false)
-        await beginNewWorkflow()
-        EchoLog.lifecycle("User started new workflow")
+        await beginNewWorkflow(title: workflowName)
+        EchoLog.lifecycle("User started new workflow: \(workflowName)")
     }
 
     func continuePreviousSession(restoreContext: Bool = true) async {
@@ -306,17 +306,8 @@ actor SessionEngine {
                 )
                 if var thread = try? await repo.fetchThread(id: capturedThreadId) {
                     thread.statusRaw = WorkflowThreadStatus.idle.rawValue
-                    if let capturedTitle, !capturedTitle.isEmpty { thread.title = capturedTitle }
                     thread.lastActiveAt = endedAt
                     try? await repo.saveThread(thread)
-                    let savedThread = thread
-                    await MainActor.run { [weak self] in
-                        self?.sessionStore.saveContinuationCandidate(
-                            threadId: savedThread.id,
-                            title: savedThread.title ?? "Untitled workflow",
-                            endTime: endedAt
-                        )
-                    }
                 }
             }
             await SessionFinalizationRunner.finalize(
@@ -540,7 +531,7 @@ actor SessionEngine {
         }
     }
 
-    private func beginNewWorkflow() async {
+    private func beginNewWorkflow(title: String? = nil) async {
         if currentSession != nil || recordingThread != nil { return }
 
         do {
@@ -551,11 +542,16 @@ actor SessionEngine {
         }
 
         let startedAt = Date()
-        let title = await MainActor.run {
-            SessionTitleGenerator.generate(from: [], startedAt: startedAt)
+        let resolvedTitle: String
+        if let title = title {
+            resolvedTitle = title
+        } else {
+            resolvedTitle = await MainActor.run {
+                SessionTitleGenerator.generate(from: [], startedAt: startedAt)
+            }
         }
         let thread = WorkflowThread(
-            title: title,
+            title: resolvedTitle,
             statusRaw: WorkflowThreadStatus.active.rawValue
         )
 
@@ -567,7 +563,7 @@ actor SessionEngine {
             eventsSinceTitlePersist = 0
             isRecoveredSession = false
             isSessionPaused = false
-            await activityStore.beginRecording(threadTitle: title, threadAccumulated: 0)
+            await activityStore.beginRecording(threadTitle: resolvedTitle, threadAccumulated: 0)
             await sessionStore.workflowThreadDidUpdate(thread)
             await MainActor.run { sessionStore.setContinueWorkflowThread(nil) }
             EchoLog.lifecycle("Armed new workflow \(thread.id.uuidString) — awaiting first activity")

@@ -32,13 +32,13 @@ struct ContinuityPanel: View {
                 }
             }
 
-            if let thread = sessionStore.continueWorkflowThread {
+            if let thread = sessionStore.continueWorkflowThread, let session = sessionStore.continueSession {
                 continuityButton(
                     title: "Continue Previous Workflow",
-                    subtitle: "\(thread.title ?? "Untitled workflow") · Ended \(relativeTimeString(for: thread.lastActiveAt))",
+                    subtitle: "Workflow: \(thread.title ?? "Untitled") · Latest Session: \(session.title ?? "Untitled") · Ended \(relativeTimeString(for: session.endedAt ?? thread.lastActiveAt))",
                     icon: "clock.arrow.circlepath"
                 ) {
-                    Task { await sessionControl.continuePreviousSession() }
+                    Task { await sessionControl.continuePreviousSession(appStore: appStore) }
                 }
             } else if let previous = continuityStore.previousSession {
                 continuityButton(

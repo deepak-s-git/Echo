@@ -340,19 +340,7 @@ struct SessionDetailView: View {
 
     private func continuityMeter(score: Double, label: String) -> some View {
         VStack(spacing: 6) {
-            ZStack {
-                Circle().stroke(Color.primary.opacity(0.06), lineWidth: 6)
-                Circle()
-                    .trim(from: 0, to: score)
-                    .stroke(
-                        EchoPalette.premiumGradient,
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                Text("\(Int(score * 100))")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-            }
-            .frame(width: 64, height: 64)
+            FocusIndicatorView(score: score, label: "", size: 64)
             Text(label)
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -360,6 +348,7 @@ struct SessionDetailView: View {
                 .frame(width: 72)
         }
     }
+
 
     // MARK: - Rhythm
 

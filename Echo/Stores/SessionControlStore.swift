@@ -74,6 +74,14 @@ final class SessionControlStore: ObservableObject {
         appStore.popSessionDetail()
     }
 
+    func deleteSessions(ids: Set<UUID>, appStore: AppStore) async {
+        for id in ids {
+            await container?.deleteSession(id: id)
+        }
+        appStore.dismissEndSession()
+        appStore.popSessionDetail()
+    }
+
     func renameSession(id: UUID, title: String, tags: [String]) async {
         await container?.renameSession(id: id, title: title, tags: tags)
     }

@@ -15,6 +15,8 @@ struct TimelineView: View {
         case deleteSingle(WorkflowThreadSummary)
         case eraseAll
         case bulkDelete(count: Int)
+        case deleteSession(Session, index: Int)
+        case bulkDeleteSessions(count: Int)
         
         var id: String {
             switch self {
@@ -24,15 +26,24 @@ struct TimelineView: View {
                 return "erase-all"
             case .bulkDelete(let count):
                 return "bulk-delete-\(count)"
+            case .deleteSession(let segment, let index):
+                return "delete-session-\(segment.id.uuidString)-\(index)"
+            case .bulkDeleteSessions(let count):
+                return "bulk-delete-sessions-\(count)"
             }
         }
     }
     
     @State private var activeAlert: ActiveAlert? = nil
     
-    // Multi-select Select Mode
+    // Multi-select Select Mode (Workflows)
     @State private var isSelectMode = false
     @State private var selectedThreadIds = Set<UUID>()
+    
+    // Multi-select Session Select Mode
+    @State private var isSessionSelectMode = false
+    @State private var sessionSelectThreadId: UUID? = nil
+    @State private var selectedSessionIds = Set<UUID>()
 
     var body: some View {
         Group {
@@ -83,6 +94,33 @@ struct TimelineView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Color.red)
                         .disabled(selectedThreadIds.isEmpty)
+                        .echoPointingCursor()
+                    } else if isSessionSelectMode {
+                        Text("Delete Sessions")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                        
+                        Button("Cancel") {
+                            withAnimation(EchoDesign.subtle) {
+                                isSessionSelectMode = false
+                                sessionSelectThreadId = nil
+                                selectedSessionIds.removeAll()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .echoPointingCursor()
+                        
+                        Button(action: {
+                            activeAlert = .bulkDeleteSessions(count: selectedSessionIds.count)
+                        }) {
+                            Text("Delete Selected (\(selectedSessionIds.count))")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.red)
+                        .disabled(selectedSessionIds.isEmpty)
                         .echoPointingCursor()
                     } else {
                         Text("Timeline")
@@ -157,7 +195,10 @@ struct TimelineView: View {
 
                                     WorkflowThreadCard(
                                         summary: summary,
-                                        logsExpanded: expandedLogsThreadIds.contains(summary.id),
+                                        logsExpanded: expandedLogsThreadIds.contains(summary.id) || (isSessionSelectMode && sessionSelectThreadId == summary.id),
+                                        isSessionSelectMode: isSessionSelectMode,
+                                        sessionSelectThreadId: sessionSelectThreadId,
+                                        selectedSessionIds: selectedSessionIds,
                                         onToggleLogs: {
                                             if expandedLogsThreadIds.contains(summary.id) {
                                                 expandedLogsThreadIds.remove(summary.id)
@@ -165,11 +206,32 @@ struct TimelineView: View {
                                                 expandedLogsThreadIds.insert(summary.id)
                                             }
                                         },
-                                        onSelectSegment: { appStore.openSessionDetail($0) }
+                                        onSelectSegment: { appStore.openSessionDetail($0) },
+                                        onDeleteWorkflow: {
+                                            activeAlert = .deleteSingle(summary)
+                                        },
+                                        onDeleteSession: { segment, index in
+                                            activeAlert = .deleteSession(segment, index: index)
+                                        },
+                                        onStartSessionSelect: {
+                                            withAnimation(EchoDesign.subtle) {
+                                                isSessionSelectMode = true
+                                                sessionSelectThreadId = summary.id
+                                                selectedSessionIds.removeAll()
+                                            }
+                                        },
+                                        onToggleSessionSelect: { id in
+                                            if selectedSessionIds.contains(id) {
+                                                selectedSessionIds.remove(id)
+                                            } else {
+                                                selectedSessionIds.insert(id)
+                                            }
+                                        }
                                     )
-                                    .disabled(isSelectMode)
+                                    .disabled(isSelectMode || (isSessionSelectMode && sessionSelectThreadId != summary.id))
+                                    .opacity((isSessionSelectMode && sessionSelectThreadId != summary.id) ? 0.4 : 1.0)
                                     .contextMenu {
-                                        if !isSelectMode {
+                                        if !isSelectMode && !isSessionSelectMode {
                                             Button("Rename workflow…") {
                                                 appStore.renameThreadDraft = WorkflowThreadRenameDraft(
                                                     threadId: summary.id,
@@ -206,6 +268,20 @@ struct TimelineView: View {
         }
         .alert(item: $activeAlert) { alertType in
             switch alertType {
+            case .deleteSession(let segment, let index):
+                return Alert(
+                    title: Text("Delete Session \(index)"),
+                    message: Text("Are you sure you want to permanently delete Session \(index)? This will erase all its recorded activities and cannot be undone."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        Task {
+                            await sessionControl.deleteSession(
+                                id: segment.id,
+                                appStore: appStore
+                            )
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
             case .deleteSingle(let summary):
                 return Alert(
                     title: Text("Delete Workflow"),
@@ -248,6 +324,23 @@ struct TimelineView: View {
                                     appStore: appStore
                                 )
                             }
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .bulkDeleteSessions(let count):
+                return Alert(
+                    title: Text("Delete Selected Sessions"),
+                    message: Text("Are you sure you want to permanently delete the \(count) selected sessions? This will erase all their recorded activities and cannot be undone."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        let ids = selectedSessionIds
+                        withAnimation(EchoDesign.subtle) {
+                            isSessionSelectMode = false
+                            sessionSelectThreadId = nil
+                            selectedSessionIds.removeAll()
+                        }
+                        Task {
+                            await sessionControl.deleteSessions(ids: ids, appStore: appStore)
                         }
                     },
                     secondaryButton: .cancel()
@@ -323,8 +416,18 @@ struct TimelineView: View {
 private struct WorkflowThreadCard: View {
     let summary: WorkflowThreadSummary
     let logsExpanded: Bool
+    let isSessionSelectMode: Bool
+    let sessionSelectThreadId: UUID?
+    let selectedSessionIds: Set<UUID>
     let onToggleLogs: () -> Void
     let onSelectSegment: (UUID) -> Void
+    let onDeleteWorkflow: () -> Void
+    let onDeleteSession: (Session, Int) -> Void
+    let onStartSessionSelect: () -> Void
+    let onToggleSessionSelect: (UUID) -> Void
+
+    @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject var sessionControl: SessionControlStore
 
     @State private var hovering = false
 
@@ -381,6 +484,25 @@ private struct WorkflowThreadCard: View {
 
                 Spacer(minLength: 8)
 
+                // 3-dot Menu Button (discoverable card actions)
+                Menu {
+                    Button("Delete Sessions…") {
+                        onStartSessionSelect()
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary.opacity(0.7))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .disabled(isSessionSelectMode)
+                .echoPointingCursor()
+                .padding(.top, 6)
+                .onTapGesture {} // Prevent card toggle on menu click
+
                 // Rotating Chevron
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .bold))
@@ -416,7 +538,16 @@ private struct WorkflowThreadCard: View {
                         SessionHistoryRow(
                             index: index + 1,
                             segment: segment,
-                            onTap: { onSelectSegment(segment.id) }
+                            showCheckbox: isSessionSelectMode && sessionSelectThreadId == summary.id,
+                            isSelected: selectedSessionIds.contains(segment.id),
+                            onTap: {
+                                if isSessionSelectMode && sessionSelectThreadId == summary.id {
+                                    onToggleSessionSelect(segment.id)
+                                } else {
+                                    onSelectSegment(segment.id)
+                                }
+                            },
+                            onDelete: { onDeleteSession(segment, index + 1) }
                         )
                         
                         if segment.id != chronologicalSegments.last?.id {
@@ -451,16 +582,26 @@ private struct WorkflowThreadCard: View {
 private struct SessionHistoryRow: View {
     let index: Int
     let segment: Session
+    let showCheckbox: Bool
+    let isSelected: Bool
     let onTap: () -> Void
+    let onDelete: () -> Void
     
     @State private var hovering = false
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                Image(systemName: segment.isActive ? "play.circle.fill" : "circle.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(segment.isActive ? EchoPalette.live : Color.secondary.opacity(0.6))
+                if showCheckbox {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(isSelected ? Color.red : Color.primary.opacity(0.35))
+                        .frame(width: 20, height: 20)
+                } else {
+                    Image(systemName: segment.isActive ? "play.circle.fill" : "circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(segment.isActive ? EchoPalette.live : Color.secondary.opacity(0.6))
+                }
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Session \(index)")
@@ -489,6 +630,13 @@ private struct SessionHistoryRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .echoPointingCursor()
+        .contextMenu {
+            if !showCheckbox {
+                Button("Delete Session…", role: .destructive) {
+                    onDelete()
+                }
+            }
+        }
     }
     
     private func formatSessionTimeRange(_ segment: Session) -> String {

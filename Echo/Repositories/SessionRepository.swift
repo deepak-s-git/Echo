@@ -354,6 +354,18 @@ final class SessionRepository: Sendable {
         }
     }
 
+    func fetchLatestEligibleSession() async throws -> Session? {
+        let cutoff = Date().addingTimeInterval(-3600) // 60 minutes
+        return try await database.readAsync { db in
+            try Session.fetchOne(db, sql: """
+                SELECT s.* FROM sessions s
+                JOIN workflow_threads w ON s.workflowThreadId = w.id
+                WHERE s.endedAt IS NOT NULL AND s.endedAt >= ? AND w.statusRaw != 'archived'
+                ORDER BY s.endedAt DESC LIMIT 1
+                """, arguments: [cutoff])
+        }
+    }
+
     func deleteWorkflowThread(id: UUID) async throws {
         let key = id.uuidString
         try await database.writeAsync { db in

@@ -256,7 +256,20 @@ struct RestoreSelectionSheet: View {
                 let profileId = profileName ?? "no-profile"
                 let profileNameLabel: String?
                 if let pName = profileName {
-                    profileNameLabel = showProfileHeaders ? "Profile: \(pName)" : nil
+                    if bundleId == "company.thebrowser.Browser" {
+                        if pName.lowercased().hasPrefix("space") {
+                            profileNameLabel = showProfileHeaders ? pName : nil
+                        } else {
+                            profileNameLabel = showProfileHeaders ? "Space: \(pName)" : nil
+                        }
+                    } else {
+                        let humanName = humanizedProfileName(bundleId: bundleId, directoryName: pName)
+                        if humanName.lowercased().hasPrefix("profile") {
+                            profileNameLabel = showProfileHeaders ? humanName : nil
+                        } else {
+                            profileNameLabel = showProfileHeaders ? "Profile: \(humanName)" : nil
+                        }
+                    }
                 } else {
                     profileNameLabel = showProfileHeaders ? "Other Tabs" : nil
                 }
@@ -407,9 +420,37 @@ struct RestoreSelectionSheet: View {
     private func appIconName(for bundleId: String) -> String {
         if bundleId.contains("Chrome") { return "globe" }
         if bundleId.contains("Safari") { return "safari" }
+        if bundleId.contains("Arc") { return "globe" }
+        if bundleId.contains("Brave") { return "globe" }
+        if bundleId.contains("Edge") { return "globe" }
         if bundleId.contains("Finder") { return "folder.fill" }
         if bundleId.contains("Preview") { return "doc.text.fill" }
         return "app.fill"
+    }
+
+    private func humanizedProfileName(bundleId: String, directoryName: String) -> String {
+        let base: URL
+        if bundleId.contains("Chrome") {
+            base = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/Google/Chrome")
+        } else if bundleId.contains("Brave") {
+            base = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/BraveSoftware/Brave-Browser")
+        } else if bundleId.contains("Edge") {
+            base = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/Microsoft Edge")
+        } else {
+            return directoryName
+        }
+        
+        let prefsURL = base.appendingPathComponent(directoryName).appendingPathComponent("Preferences")
+        guard let data = try? Data(contentsOf: prefsURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let profile = json["profile"] as? [String: Any],
+              let name = profile["name"] as? String else {
+            return directoryName
+        }
+        return name
     }
 
     // MARK: - Selection Bindings

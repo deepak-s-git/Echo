@@ -347,7 +347,7 @@ final class ActivityStore: ObservableObject {
     }
 
     private func publishTimelineNow() {
-        timelineSegments = SessionTimelineBuilder.segments(from: eventBuffer)
+        timelineSegments = SessionTimelineBuilder.segments(from: eventBuffer, session: currentSession)
         focusIntensity = SessionTimelineBuilder.focusIntensity(from: eventBuffer)
     }
 

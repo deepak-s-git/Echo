@@ -87,8 +87,8 @@ final class ServiceContainer {
         await sessionEngine.cancelRecording()
     }
 
-    func startNewSession() async {
-        await sessionEngine.startNewSession()
+    func startNewSession(workflowName: String) async {
+        await sessionEngine.startNewSession(workflowName: workflowName)
         await sessionStore.loadRecent()
         await continuityStore.refresh(
             activeSession: sessionStore.activeSession,
@@ -203,9 +203,6 @@ final class ServiceContainer {
         try? await sessionRepository.clearAll()
         // Reset UI stores
         activityStore.enterIdleMode()
-        await MainActor.run {
-            sessionStore.clearContinuationCandidate()
-        }
         await sessionStore.loadRecent()
         await continuityStore.refresh(activeSession: nil, recent: [])
     }

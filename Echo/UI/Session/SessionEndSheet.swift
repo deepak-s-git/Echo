@@ -51,7 +51,7 @@ struct SessionEndSheet: View {
         }
         .padding(24)
         .frame(width: 440)
-        .onAppear { title = request.suggestedTitle }
+        .onAppear { title = "" }
         .confirmationDialog(
             "Delete this memory permanently?",
             isPresented: $showDeleteConfirm,
@@ -74,7 +74,7 @@ struct SessionEndSheet: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         sessionControl.confirmEndSession(
-            title: title.isEmpty ? request.suggestedTitle : title,
+            title: title.isEmpty ? "Untitled session" : title,
             tags: tags,
             appStore: appStore
         )

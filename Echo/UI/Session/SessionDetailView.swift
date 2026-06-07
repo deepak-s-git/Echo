@@ -6,6 +6,7 @@ struct SessionDetailView: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionDetailStore: SessionDetailStore
     @EnvironmentObject var sessionControl: SessionControlStore
+    @EnvironmentObject var sessionStore: SessionStore
     @State private var showDiagnostics = false
 
     var body: some View {
@@ -28,6 +29,7 @@ struct SessionDetailView: View {
                         header(memory)
                         continuitySection(memory)
                         rhythmSection(memory)
+                        workflowIntelligenceSection(memory)
                         if !memory.phases.isEmpty {
                             phasesSection(memory)
                         } else {
@@ -572,6 +574,159 @@ struct SessionDetailView: View {
                 .tracking(0.4)
         }
     }
+
+    // MARK: - Workflow Intelligence
+
+    private func workflowIntelligenceSection(_ memory: WorkflowMemory) -> some View {
+        let analyzer = WorkflowIntelligenceAnalyzer(
+            session: memory.session,
+            events: memory.events,
+            recentSessions: sessionStore.recentSessions,
+            workflowThreads: sessionStore.workflowThreads
+        )
+        
+        let integrity = analyzer.contextIntegrity
+        let purity = analyzer.workflowPurity
+        let recovery = analyzer.flowRecovery
+        let momentum = analyzer.workflowMomentum
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Workflow Intelligence", icon: "brain")
+            
+            VStack(alignment: .leading, spacing: 16) {
+                // Header: Momentum level
+                HStack(alignment: .center, spacing: 10) {
+                    Text(momentum.level)
+                        .font(.system(size: 15, weight: .bold))
+                    
+                    Text("Session Insights")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .textCase(.uppercase)
+                    
+                    Spacer()
+                    
+                    Text(momentum.level)
+                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(momentum.badgeColor))
+                }
+                
+                Text(momentum.description)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(.secondary)
+                
+                Divider()
+                    .opacity(0.3)
+                
+                // Integrity & Purity side by side
+                HStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Context Integrity")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        
+                        HStack(spacing: 12) {
+                            Text("\(integrity.score)%")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundStyle(integrityColor(score: integrity.score))
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(integrity.narrative)
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(.primary.opacity(0.85))
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Divider()
+                        .frame(height: 50)
+                        .opacity(0.3)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Workflow Purity")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        
+                        HStack(spacing: 12) {
+                            Text("\(purity)%")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundStyle(purityColor(score: purity))
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Time spent on context tools vs background noise.")
+                                    .font(.system(size: 11, weight: .regular))
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                
+                Divider()
+                    .opacity(0.3)
+                
+                // Flow Recovery
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Flow Recovery")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    
+                    if recovery.hasDrifts {
+                        HStack(spacing: 0) {
+                            recoveryStatBlock(label: "Average Recovery", value: recovery.averageLabel)
+                            Spacer()
+                            recoveryStatBlock(label: "Best Recovery", value: recovery.bestLabel)
+                            Spacer()
+                            recoveryStatBlock(label: "Longest Recovery", value: recovery.longestLabel)
+                        }
+                        .padding(.top, 4)
+                    } else {
+                        Text("No context drifts recorded. You remained fully focused on the primary workflow.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                            .padding(.vertical, 2)
+                    }
+                }
+            }
+            .padding(EchoDesign.cardPadding)
+            .echoCard()
+        }
+    }
+    
+    private func recoveryStatBlock(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.9))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private func integrityColor(score: Int) -> Color {
+        if score >= 85 { return Color(nsColor: NSColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1.0)) }
+        if score >= 70 { return Color.orange }
+        return Color.secondary
+    }
+    
+    private func purityColor(score: Int) -> Color {
+        if score >= 85 { return EchoPalette.indigoSoft }
+        if score >= 70 { return Color.orange }
+        return Color.secondary
+    }
 }
 
 private struct AppTransitionRow: View {
@@ -653,5 +808,288 @@ private struct FlowLayout: Layout {
         }
 
         return (CGSize(width: maxWidth, height: y + rowHeight), frames)
+    }
+}
+
+// MARK: - Workflow Intelligence Analyzer
+
+struct WorkflowIntelligenceAnalyzer {
+    let session: Session
+    let events: [ActivityEvent]
+    let recentSessions: [Session]
+    let workflowThreads: [WorkflowThreadSummary]
+    
+    private struct AppFocusSegment {
+        let appBundleId: String
+        let appName: String
+        let timestamp: Date
+        var duration: TimeInterval
+    }
+    
+    private var focusSegments: [AppFocusSegment] {
+        let focusEvents = events
+            .filter { $0.type == .appFocus || $0.type == .appSwitch }
+            .sorted { $0.timestamp < $1.timestamp }
+        
+        guard !focusEvents.isEmpty else { return [] }
+        
+        let sessionStart = session.startedAt
+        let sessionEnd = session.endedAt ?? session.pausedAt ?? focusEvents.map { $0.timestamp + $0.duration }.max() ?? Date()
+        
+        var segments: [AppFocusSegment] = []
+        
+        for i in 0..<focusEvents.count {
+            let event = focusEvents[i]
+            let start = max(event.timestamp, sessionStart)
+            let end: Date
+            if i < focusEvents.count - 1 {
+                end = min(focusEvents[i + 1].timestamp, sessionEnd)
+            } else {
+                end = sessionEnd
+            }
+            let duration = max(0, end.timeIntervalSince(start))
+            
+            segments.append(AppFocusSegment(
+                appBundleId: event.appBundleId,
+                appName: event.appName,
+                timestamp: start,
+                duration: duration
+            ))
+        }
+        
+        return segments
+    }
+    
+    var contextBundleIds: Set<String> {
+        let segments = focusSegments
+        guard !segments.isEmpty else { return [] }
+        
+        var durations: [String: TimeInterval] = [:]
+        for segment in segments {
+            durations[segment.appBundleId, default: 0] += segment.duration
+        }
+        
+        let totalDuration = durations.values.reduce(0, +)
+        guard totalDuration > 0 else { return [] }
+        
+        let sortedApps = durations.sorted { $0.value > $1.value }
+        var selected: Set<String> = []
+        
+        if let first = sortedApps.first {
+            selected.insert(first.key)
+        }
+        
+        for (bundleId, duration) in sortedApps.dropFirst() {
+            let fraction = duration / totalDuration
+            if fraction >= 0.15 && duration >= 60 {
+                selected.insert(bundleId)
+            }
+        }
+        
+        return selected
+    }
+    
+    struct ContextIntegrityResult {
+        let score: Int
+        let narrative: String
+    }
+    
+    var contextIntegrity: ContextIntegrityResult {
+        let segments = focusSegments
+        let context = contextBundleIds
+        
+        guard !segments.isEmpty else {
+            return ContextIntegrityResult(score: 100, narrative: "No activity recorded.")
+        }
+        
+        var totalSwitches = 0
+        var nonContextSwitches = 0
+        
+        for i in 1..<segments.count {
+            let prev = segments[i - 1]
+            let curr = segments[i]
+            if prev.appBundleId != curr.appBundleId {
+                totalSwitches += 1
+                if !context.contains(curr.appBundleId) {
+                    nonContextSwitches += 1
+                }
+            }
+        }
+        
+        let score: Int
+        if totalSwitches == 0 {
+            score = 100
+        } else {
+            let fraction = 1.0 - (Double(nonContextSwitches) / Double(totalSwitches))
+            score = Int(max(0, min(1.0, fraction)) * 100)
+        }
+        
+        let narrative: String
+        if score >= 85 {
+            narrative = "Most activity remained inside the workflow context."
+        } else if score >= 70 {
+            narrative = "Steady attention with minor excursions."
+        } else if score >= 50 {
+            narrative = "Frequent transitions outside the workflow context."
+        } else {
+            narrative = "Highly fragmented attention across multiple contexts."
+        }
+        
+        return ContextIntegrityResult(score: score, narrative: narrative)
+    }
+    
+    var workflowPurity: Int {
+        let segments = focusSegments
+        let context = contextBundleIds
+        guard !segments.isEmpty else { return 100 }
+        
+        let contextDuration = segments.filter { context.contains($0.appBundleId) }.reduce(0) { $0 + $1.duration }
+        let totalDuration = segments.reduce(0) { $0 + $1.duration }
+        
+        guard totalDuration > 0 else { return 100 }
+        return Int((contextDuration / totalDuration) * 100)
+    }
+    
+    struct FlowRecoveryResult {
+        let hasDrifts: Bool
+        let averageLabel: String
+        let bestLabel: String
+        let longestLabel: String
+    }
+    
+    var flowRecovery: FlowRecoveryResult {
+        let segments = focusSegments
+        let context = contextBundleIds
+        
+        struct Drift {
+            let start: Date
+            let end: Date
+            var duration: TimeInterval { end.timeIntervalSince(start) }
+        }
+        
+        var drifts: [Drift] = []
+        var currentDriftStart: Date? = nil
+        
+        for i in 0..<segments.count {
+            let segment = segments[i]
+            let isContext = context.contains(segment.appBundleId)
+            
+            if isContext {
+                if let start = currentDriftStart {
+                    drifts.append(Drift(start: start, end: segment.timestamp))
+                    currentDriftStart = nil
+                }
+            } else {
+                if currentDriftStart == nil {
+                    currentDriftStart = segment.timestamp
+                }
+            }
+        }
+        
+        guard !drifts.isEmpty else {
+            return FlowRecoveryResult(
+                hasDrifts: false,
+                averageLabel: "--",
+                bestLabel: "--",
+                longestLabel: "--"
+            )
+        }
+        
+        let durations = drifts.map(\.duration)
+        let sum = durations.reduce(0, +)
+        let avg = sum / Double(durations.count)
+        let best = durations.min() ?? 0
+        let longest = durations.max() ?? 0
+        
+        return FlowRecoveryResult(
+            hasDrifts: true,
+            averageLabel: formatTimeShort(avg),
+            bestLabel: formatTimeShort(best),
+            longestLabel: formatTimeShort(longest)
+        )
+    }
+    
+    struct WorkflowMomentumResult {
+        let level: String
+        let description: String
+        let badgeColor: Color
+    }
+    
+    var workflowMomentum: WorkflowMomentumResult {
+        if let threadId = session.workflowThreadId {
+            let threadSummary = workflowThreads.first { $0.thread.id == threadId }
+            let segmentsCount = threadSummary?.segments.count ?? 1
+            let totalTime = threadSummary?.totalDuration ?? session.duration
+            
+            if segmentsCount >= 3 {
+                return WorkflowMomentumResult(
+                    level: "Deep Continuity",
+                    description: "Sustained engagement with \(segmentsCount) workflow segments (\(formatHours(totalTime))).",
+                    badgeColor: Color(nsColor: NSColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1.0))
+                )
+            } else if segmentsCount == 2 {
+                return WorkflowMomentumResult(
+                    level: "Strong Momentum",
+                    description: "Active continuation. Focus is deepening across sessions.",
+                    badgeColor: Color.orange
+                )
+            } else {
+                if session.focusScore >= 0.75 {
+                    return WorkflowMomentumResult(
+                        level: "Building Momentum",
+                        description: "A focused start to a new workflow thread.",
+                        badgeColor: EchoPalette.indigoSoft
+                    )
+                } else {
+                    return WorkflowMomentumResult(
+                        level: "Initial Phase",
+                        description: "Setting up workspace and establishing context.",
+                        badgeColor: Color.secondary
+                    )
+                }
+            }
+        }
+        
+        let recentIn24h = recentSessions.filter {
+            $0.startedAt > Date().addingTimeInterval(-86400) && $0.id != session.id
+        }
+        
+        if recentIn24h.count >= 2 {
+            return WorkflowMomentumResult(
+                level: "Active Rhythm",
+                description: "Frequent workflow session completions in the last 24 hours.",
+                badgeColor: Color.orange
+            )
+        } else if recentIn24h.count == 1 {
+            return WorkflowMomentumResult(
+                level: "Building Momentum",
+                description: "Sequential session completions today.",
+                badgeColor: EchoPalette.indigoSoft
+            )
+        } else {
+            return WorkflowMomentumResult(
+                level: "Initial Phase",
+                description: "Establishing a new workspace flow state.",
+                badgeColor: Color.secondary
+            )
+        }
+    }
+    
+    private func formatTimeShort(_ duration: TimeInterval) -> String {
+        if duration < 60 {
+            return "\(Int(duration))s"
+        }
+        let mins = Int(duration / 60)
+        let secs = Int(duration.truncatingRemainder(dividingBy: 60))
+        return secs > 0 ? "\(mins)m \(secs)s" : "\(mins)m"
+    }
+    
+    private func formatHours(_ duration: TimeInterval) -> String {
+        let hours = Int(duration / 3600)
+        let mins = Int((duration.truncatingRemainder(dividingBy: 3600)) / 60)
+        if hours > 0 {
+            return mins > 0 ? "\(hours)h \(mins)m" : "\(hours)h"
+        }
+        return "\(mins)m"
     }
 }

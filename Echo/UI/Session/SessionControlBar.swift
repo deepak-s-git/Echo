@@ -5,6 +5,7 @@ struct SessionControlBar: View {
     @EnvironmentObject var sessionControl: SessionControlStore
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var activityStore: ActivityStore
+    @EnvironmentObject var sessionStore: SessionStore
 
     private var hasSession: Bool {
         activityStore.isRecording && activityStore.currentSession != nil
@@ -24,7 +25,11 @@ struct SessionControlBar: View {
                 }
 
                 controlButton("End", icon: "stop.fill", role: .destructive) {
-                    sessionControl.requestEndSession(appStore: appStore, activityStore: activityStore)
+                    sessionControl.requestEndSession(
+                        appStore: appStore,
+                        activityStore: activityStore,
+                        sessionStore: sessionStore
+                    )
                 }
             }
         }

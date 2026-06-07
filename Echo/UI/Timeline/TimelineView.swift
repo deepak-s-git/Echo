@@ -269,9 +269,10 @@ struct TimelineView: View {
         .alert(item: $activeAlert) { alertType in
             switch alertType {
             case .deleteSession(let segment, let index):
+                let displayName = segment.title?.isEmpty == false ? segment.title! : "Session \(index)"
                 return Alert(
-                    title: Text("Delete Session \(index)"),
-                    message: Text("Are you sure you want to permanently delete Session \(index)? This will erase all its recorded activities and cannot be undone."),
+                    title: Text("Delete \(displayName)"),
+                    message: Text("Are you sure you want to permanently delete \"\(displayName)\"? This will erase all its recorded activities and cannot be undone."),
                     primaryButton: .destructive(Text("Delete")) {
                         Task {
                             await sessionControl.deleteSession(
@@ -604,7 +605,8 @@ private struct SessionHistoryRow: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Session \(index)")
+                    let displayName = segment.title?.isEmpty == false ? segment.title! : "Session \(index)"
+                    Text(displayName)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(segment.isActive ? EchoPalette.live : .primary)
                     

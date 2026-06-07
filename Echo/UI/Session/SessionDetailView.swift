@@ -361,7 +361,7 @@ struct SessionDetailView: View {
                     .foregroundStyle(.tertiary)
             } else {
                 MiniTimelineView(
-                    segments: SessionTimelineBuilder.segments(from: memory.events),
+                    segments: SessionTimelineBuilder.segments(from: memory.events, session: memory.session),
                     focusIntensity: SessionTimelineBuilder.focusIntensity(from: memory.events)
                 )
             }

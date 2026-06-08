@@ -554,4 +554,34 @@ final class SessionRepository: Sendable {
         }
         ActivityPersistenceLogger.log("Reset active thread statuses on launch")
     }
+
+    // MARK: - Embeddings
+
+    func saveEmbeddings(_ embeddings: [SessionEmbedding]) async throws {
+        guard !embeddings.isEmpty else { return }
+        try await database.writeAsync { db in
+            for embedding in embeddings {
+                try embedding.insert(db, onConflict: .replace)
+            }
+        }
+        ActivityPersistenceLogger.log("Saved \(embeddings.count) embeddings to database")
+    }
+
+    func fetchAllEmbeddings() async throws -> [SessionEmbedding] {
+        try await database.readAsync { db in
+            try SessionEmbedding.fetchAll(db)
+        }
+    }
+
+    func fetchUnindexedSessionIds() async throws -> [UUID] {
+        try await database.readAsync { db in
+            let sql = """
+            SELECT id FROM sessions
+            WHERE id NOT IN (SELECT DISTINCT sessionId FROM session_embeddings)
+            AND endedAt IS NOT NULL
+            """
+            let strings = try String.fetchAll(db, sql: sql)
+            return strings.compactMap { UUID(uuidString: $0) }
+        }
+    }
 }

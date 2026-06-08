@@ -2,19 +2,27 @@ import SwiftUI
 
 // MARK: - SearchView
 
+struct SemanticSearchResult: Identifiable, Equatable {
+    var id: UUID { session.id }
+    let session: Session
+    let score: Float?
+    let matchedDocument: String?
+    let matchedKind: String?
+    
+    static func == (lhs: SemanticSearchResult, rhs: SemanticSearchResult) -> Bool {
+        lhs.session.id == rhs.session.id
+    }
+}
+
 struct SearchView: View {
     @EnvironmentObject var sessionStore: SessionStore
     @EnvironmentObject var appStore: AppStore
     @State private var query = ""
     @FocusState private var isFocused: Bool
-
-    private var results: [Session] {
-        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return sessionStore.recentSessions }
-        return sessionStore.recentSessions.filter {
-            ($0.title ?? "").lowercased().contains(q)
-        }
-    }
+    
+    @State private var searchResults: [SemanticSearchResult] = []
+    @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -23,13 +31,20 @@ struct SearchView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Premium glassmorphic search bar
                 HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(isFocused ? EchoPalette.glowBlue : .secondary)
-                        .scaleEffect(isFocused ? 1.1 : 1.0)
-                        .animation(EchoDesign.subtle, value: isFocused)
+                    if isSearching {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.7)
+                            .frame(width: 14, height: 14)
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(isFocused ? EchoPalette.glowBlue : .secondary)
+                            .scaleEffect(isFocused ? 1.1 : 1.0)
+                            .animation(EchoDesign.subtle, value: isFocused)
+                    }
 
-                    TextField("Search sessions…", text: $query)
+                    TextField("Search your workflows…", text: $query)
                         .textFieldStyle(.plain)
                         .font(.system(size: 14, weight: .medium))
                         .focused($isFocused)
@@ -61,8 +76,17 @@ struct SearchView: View {
                 )
                 .shadow(color: isFocused ? EchoPalette.glowBlue.opacity(0.08) : .clear, radius: 8, y: 2)
                 .animation(EchoDesign.subtle, value: isFocused)
+                .onChange(of: query) { oldValue, newValue in
+                    runSearch(for: newValue)
+                }
+                .onAppear {
+                    runSearch(for: query)
+                }
+                .onChange(of: sessionStore.recentSessions) { oldValue, newValue in
+                    runSearch(for: query)
+                }
 
-                if results.isEmpty {
+                if searchResults.isEmpty {
                     Spacer()
                     VStack(spacing: 12) {
                         Image(systemName: "sparkle.magnifyingglass")
@@ -80,9 +104,9 @@ struct SearchView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
-                            ForEach(results) { session in
-                                SearchResultCard(session: session) {
-                                    appStore.openSessionDetail(session.id)
+                            ForEach(searchResults) { result in
+                                SearchResultCard(result: result) {
+                                    appStore.openSessionDetail(result.session.id)
                                 }
                             }
                         }
@@ -92,10 +116,63 @@ struct SearchView: View {
             .padding(28)
         }
     }
+    
+    private func runSearch(for q: String) {
+        searchTask?.cancel()
+        
+        let trimmed = q.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            self.searchResults = sessionStore.recentSessions.map {
+                SemanticSearchResult(session: $0, score: nil, matchedDocument: nil, matchedKind: nil)
+            }
+            self.isSearching = false
+            return
+        }
+        
+        self.isSearching = true
+        searchTask = Task {
+            let rawResults = await sessionStore.performSemanticSearch(query: trimmed)
+            
+            var mapped: [SemanticSearchResult] = []
+            for res in rawResults {
+                if let session = sessionStore.recentSessions.first(where: { $0.id == res.sessionId }) {
+                    mapped.append(SemanticSearchResult(
+                        session: session,
+                        score: res.score,
+                        matchedDocument: res.matchedDocument,
+                        matchedKind: res.matchedKind
+                    ))
+                }
+            }
+            
+            let lowerQ = trimmed.lowercased()
+            for sess in sessionStore.recentSessions {
+                if (sess.title ?? "").lowercased().contains(lowerQ) {
+                    if !mapped.contains(where: { $0.session.id == sess.id }) {
+                        mapped.append(SemanticSearchResult(
+                            session: sess,
+                            score: 0.5,
+                            matchedDocument: nil,
+                            matchedKind: "summary"
+                        ))
+                    }
+                }
+            }
+            
+            mapped.sort { ($0.score ?? 0) > ($1.score ?? 0) }
+            
+            guard !Task.isCancelled else { return }
+            
+            await MainActor.run {
+                self.searchResults = mapped
+                self.isSearching = false
+            }
+        }
+    }
 }
 
 private struct SearchResultCard: View {
-    let session: Session
+    let result: SemanticSearchResult
     let action: () -> Void
     @State private var hovering = false
 
@@ -104,39 +181,63 @@ private struct SearchResultCard: View {
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(EchoPalette.indigo.opacity(0.12))
+                        .fill(badgeColor.opacity(0.12))
                         .frame(width: 36, height: 36)
-                    Image(systemName: "folder.fill")
+                    Image(systemName: iconName)
                         .font(.system(size: 15))
-                        .foregroundStyle(EchoPalette.indigoSoft)
+                        .foregroundStyle(badgeColor)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(session.title ?? "Untitled segment")
+                    Text(result.session.title ?? "Untitled segment")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     
-                    HStack(spacing: 6) {
-                        Text(session.startedAt.formatted(date: .abbreviated, time: .shortened))
-                            .foregroundStyle(.secondary.opacity(0.85))
-                        if session.appCount > 0 {
-                            Text("·")
-                                .foregroundStyle(.tertiary)
-                            Text("\(session.appCount) apps")
-                                .foregroundStyle(.secondary.opacity(0.85))
+                    if let doc = result.matchedDocument, let kind = result.matchedKind {
+                        HStack(spacing: 4) {
+                            Image(systemName: snippetIcon(kind: kind))
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                            Text(formatMatchedSnippet(document: doc, kind: kind))
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
+                    } else {
+                        HStack(spacing: 6) {
+                            Text(result.session.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                .foregroundStyle(.secondary.opacity(0.85))
+                            if result.session.appCount > 0 {
+                                Text("·")
+                                    .foregroundStyle(.tertiary)
+                                Text("\(result.session.appCount) apps")
+                                    .foregroundStyle(.secondary.opacity(0.85))
+                            }
+                        }
+                        .font(.system(size: 11))
                     }
-                    .font(.system(size: 11))
                 }
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(hovering ? .secondary : .quaternary)
-                    .offset(x: hovering ? 2 : 0)
-                    .animation(EchoDesign.subtle, value: hovering)
+                if let score = result.score {
+                    Text("\(Int(score * 100))% Match")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background {
+                            Capsule()
+                                .fill(badgeColor.opacity(0.12))
+                        }
+                        .foregroundStyle(badgeColor)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(hovering ? .secondary : .quaternary)
+                        .offset(x: hovering ? 2 : 0)
+                        .animation(EchoDesign.subtle, value: hovering)
+                }
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 14)
@@ -154,6 +255,56 @@ private struct SearchResultCard: View {
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
+    }
+
+    private var iconName: String {
+        guard let kind = result.matchedKind else { return "folder.fill" }
+        switch kind {
+        case "browser": return "globe"
+        case "terminal": return "terminal.fill"
+        case "file": return "doc.text.fill"
+        case "summary": return "sparkles"
+        default: return "folder.fill"
+        }
+    }
+
+    private var badgeColor: Color {
+        guard let score = result.score else { return EchoPalette.indigoSoft }
+        if score >= 0.70 {
+            return EchoPalette.glowBlue
+        } else if score >= 0.45 {
+            return EchoPalette.indigoSoft
+        } else {
+            return .secondary
+        }
+    }
+
+    private func snippetIcon(kind: String) -> String {
+        switch kind {
+        case "browser": return "safari"
+        case "terminal": return "terminal"
+        case "file": return "doc.text"
+        case "summary": return "sparkles"
+        default: return "info.circle"
+        }
+    }
+
+    private func formatMatchedSnippet(document: String, kind: String) -> String {
+        let lines = document.components(separatedBy: "\n")
+        if kind == "browser" {
+            if let titleLine = lines.first(where: { $0.hasPrefix("Webpage: ") }) {
+                return "Webpage: " + titleLine.replacingOccurrences(of: "Webpage: ", with: "")
+            }
+        } else if kind == "file" {
+            if let fileLine = lines.first(where: { $0.hasPrefix("File: ") }) {
+                return "File: " + fileLine.replacingOccurrences(of: "File: ", with: "")
+            }
+        } else if kind == "terminal" {
+            return "Terminal command: " + document.replacingOccurrences(of: "Terminal command: ", with: "")
+        } else if kind == "summary" {
+            return "Summary: " + document.replacingOccurrences(of: "Session Title: ", with: "")
+        }
+        return lines.first ?? document
     }
 }
 

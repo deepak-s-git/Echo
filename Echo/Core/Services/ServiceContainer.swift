@@ -187,6 +187,12 @@ final class ServiceContainer {
             activeSession: sessionStore.activeSession,
             recent: sessionStore.recentSessions
         )
+        
+        let repo = self.sessionRepository
+        Task(priority: .utility) {
+            await SemanticSearchEngine.shared.indexPendingSessions(repository: repo)
+        }
+        
         appStore.setReady()
     }
 

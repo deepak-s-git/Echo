@@ -227,10 +227,12 @@ struct WorkspaceRestorer: WorkflowRestoring {
         }
         if let bundleId = item.bundleId,
            let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
             _ = try await NSWorkspace.shared.open(
                 [url],
                 withApplicationAt: appURL,
-                configuration: NSWorkspace.OpenConfiguration()
+                configuration: config
             )
             return
         }
@@ -251,7 +253,13 @@ struct ApplicationRestorer: WorkflowRestoring {
             $0.bundleIdentifier == bundleId && !$0.isTerminated
         }
         guard let running else { return nil }
-        running.activate()
+        
+        if #available(macOS 14.0, *) {
+            NSApplication.shared.yieldActivation(toApplicationWithBundleIdentifier: bundleId)
+            running.activate()
+        } else {
+            running.activate(options: .activateIgnoringOtherApps)
+        }
         return "already running"
     }
 
@@ -261,6 +269,7 @@ struct ApplicationRestorer: WorkflowRestoring {
         else { throw RestoreError.targetUnavailable }
 
         let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
         _ = try await NSWorkspace.shared.openApplication(at: url, configuration: config)
     }
 }
@@ -292,7 +301,13 @@ struct FolderRestorer: WorkflowRestoring {
         guard let finder = NSWorkspace.shared.runningApplications.first(where: {
             $0.bundleIdentifier == "com.apple.finder"
         }) else { return nil }
-        finder.activate()
+        
+        if #available(macOS 14.0, *) {
+            NSApplication.shared.yieldActivation(toApplicationWithBundleIdentifier: "com.apple.finder")
+            finder.activate()
+        } else {
+            finder.activate(options: .activateIgnoringOtherApps)
+        }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
         return "finder focused"
     }

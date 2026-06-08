@@ -663,3 +663,4 @@ nonisolated enum ActivityPersistenceLogger {
         print("[ActivityPersistence] \(message): \(error.localizedDescription)")
     }
 }
+

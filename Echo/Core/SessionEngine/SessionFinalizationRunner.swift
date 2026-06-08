@@ -43,6 +43,10 @@ nonisolated enum SessionFinalizationRunner {
             EchoLog.persistence(
                 "Finalize complete — \(finalized.id.uuidString), restore=\(finalized.restorePlan?.items.count ?? 0)"
             )
+            // Compute vector embedding chunks in the background
+            Task {
+                await SemanticSearchEngine.shared.indexSession(finalized, activities: events, repository: repository)
+            }
         } catch {
             EchoLog.persistence("Finalize save failed", error: error)
         }

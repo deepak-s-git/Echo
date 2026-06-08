@@ -3,7 +3,7 @@ import GRDB
 
 // MARK: - Session
 
-nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord, Sendable {
+nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableRecord, Sendable, Equatable {
     var id: UUID
     var title: String?
     var startedAt: Date
@@ -661,6 +661,35 @@ nonisolated enum ActivityPersistenceLogger {
 
     static func log(_ message: String, error: Error) {
         print("[ActivityPersistence] \(message): \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Session Embedding Chunk
+
+nonisolated struct SessionEmbedding: Identifiable, Codable, FetchableRecord, PersistableRecord, Sendable {
+    var id: String
+    var sessionId: String
+    var chunkKind: String
+    var vector: Data
+    var document: String
+
+    static let databaseTableName = "session_embeddings"
+
+    init(id: String = UUID().uuidString, sessionId: String, chunkKind: String, vector: [Float], document: String) {
+        self.id = id
+        self.sessionId = sessionId
+        self.chunkKind = chunkKind
+        self.vector = vector.withUnsafeBufferPointer { Data(buffer: $0) }
+        self.document = document
+    }
+
+    func floatVector() -> [Float] {
+        let floatCount = vector.count / MemoryLayout<Float>.size
+        guard floatCount > 0 else { return [] }
+        return vector.withUnsafeBytes { buffer in
+            let floatBuffer = buffer.bindMemory(to: Float.self)
+            return Array(floatBuffer)
+        }
     }
 }
 

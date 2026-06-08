@@ -39,26 +39,78 @@ actor SemanticSearchEngine {
         }
 
         // 3. Terminal Command Chunks
-        var seenCommands = Set<String>()
+        var seenTerminalKeys = Set<String>()
         for event in activities {
             guard event.type == .terminalCommand || isTerminal(event.appBundleId) else { continue }
-            guard let cmd = event.windowTitle, !cmd.isEmpty else { continue }
-            guard seenCommands.insert(cmd).inserted else { continue }
             
-            let text = "Terminal command: \(cmd)"
-            chunks.append((kind: "terminal", document: text))
+            var path = ""
+            if let url = event.url, url.hasPrefix("file://") {
+                path = URL(string: url)?.path ?? ""
+            }
+            
+            let title = event.windowTitle ?? ""
+            let key = "\(path):\(title)"
+            guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            guard seenTerminalKeys.insert(key).inserted else { continue }
+            
+            var docParts: [String] = []
+            if !title.isEmpty {
+                let cleanTitle = title
+                    .replacingOccurrences(of: " — -zsh — 120×30", with: "")
+                    .replacingOccurrences(of: " — login — 120×30", with: "")
+                    .replacingOccurrences(of: " -zsh", with: "")
+                    .replacingOccurrences(of: " -login", with: "")
+                docParts.append("Terminal: \(cleanTitle)")
+            }
+            
+            if !path.isEmpty {
+                let dirName = (path as NSString).lastPathComponent
+                docParts.append("Directory: \(dirName)")
+                docParts.append("Path: \(path)")
+                
+                let gitPath = (path as NSString).appendingPathComponent(".git")
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: gitPath, isDirectory: &isDir), isDir.boolValue {
+                    docParts.append("Version Control: Git repository")
+                }
+            }
+            
+            if !docParts.isEmpty {
+                let text = docParts.joined(separator: "\n")
+                chunks.append((kind: "terminal", document: text))
+            }
         }
 
         // 4. File Chunks
         var seenFiles = Set<String>()
         for event in activities {
-            guard event.type == .fileAccess || event.appBundleId == "com.apple.Preview" else { continue }
-            guard let path = event.url ?? event.windowTitle, !path.isEmpty else { continue }
-            let lowerPath = path.lowercased()
+            let isFile = event.type == .fileAccess ||
+                         event.appBundleId == "com.apple.Preview" ||
+                         (event.url?.hasPrefix("file://") == true) ||
+                         isCodeEditorOrDocApp(event.appBundleId, windowTitle: event.windowTitle)
+            
+            guard isFile else { continue }
+            
+            let path = event.url ?? event.windowTitle
+            guard let p = path, !p.isEmpty else { continue }
+            
+            let cleanPath: String
+            if p.hasPrefix("file://"), let url = URL(string: p) {
+                cleanPath = url.path
+            } else {
+                cleanPath = p
+            }
+            
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: cleanPath, isDirectory: &isDir), isDir.boolValue {
+                continue
+            }
+            
+            let lowerPath = cleanPath.lowercased()
             guard seenFiles.insert(lowerPath).inserted else { continue }
             
-            let filename = (path as NSString).lastPathComponent
-            let text = "File: \(filename)\nPath: \(path)"
+            let filename = (cleanPath as NSString).lastPathComponent
+            let text = "File: \(filename)\nPath: \(cleanPath)"
             chunks.append((kind: "file", document: text))
         }
 
@@ -159,15 +211,17 @@ actor SemanticSearchEngine {
             for emb in allEmbeddings {
                 guard let sessionId = UUID(uuidString: emb.sessionId) else { continue }
                 let vector = emb.floatVector()
-                let score = cosineSimilarity(a: queryVector, b: vector)
+                let vectorScore = cosineSimilarity(a: queryVector, b: vector)
                 
-                if score > 0.28 { // relevance threshold
+                let finalScore = calculateHybridScore(query: query, document: emb.document, vectorScore: vectorScore)
+                
+                if finalScore > 0.28 { // relevance threshold
                     if let existing = sessionBestMatch[sessionId] {
-                        if score > existing.score {
-                            sessionBestMatch[sessionId] = (score: score, document: emb.document, kind: emb.chunkKind)
+                        if finalScore > existing.score {
+                            sessionBestMatch[sessionId] = (score: finalScore, document: emb.document, kind: emb.chunkKind)
                         }
                     } else {
-                        sessionBestMatch[sessionId] = (score: score, document: emb.document, kind: emb.chunkKind)
+                        sessionBestMatch[sessionId] = (score: finalScore, document: emb.document, kind: emb.chunkKind)
                     }
                 }
             }
@@ -186,6 +240,47 @@ actor SemanticSearchEngine {
         }
     }
 
+    private func calculateHybridScore(query: String, document: String, vectorScore: Float) -> Float {
+        let cleanQuery = query.lowercased()
+        let cleanDoc = document.lowercased()
+        
+        let delimiters = CharacterSet.alphanumerics.inverted
+        let queryWords = cleanQuery
+            .components(separatedBy: delimiters)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.count >= 2 }
+        
+        let stopwords: Set<String> = [
+            "a", "an", "the", "in", "on", "at", "for", "with",
+            "where", "what", "was", "i", "did", "to", "under",
+            "above", "of", "and", "or", "but", "how", "why", "who",
+            "were", "is", "are", "am", "be", "been", "have", "has", "had"
+        ]
+        
+        let searchTerms = queryWords.filter { !stopwords.contains($0) }
+        guard !searchTerms.isEmpty else {
+            return vectorScore
+        }
+        
+        var matchCount = 0
+        for term in searchTerms {
+            if cleanDoc.contains(term) {
+                matchCount += 1
+            }
+        }
+        
+        let keywordCoverage = Float(matchCount) / Float(searchTerms.count)
+        
+        let normalizedVector = max(0, vectorScore)
+        var blended = (normalizedVector * 0.60) + (keywordCoverage * 0.40)
+        
+        if keywordCoverage == 1.0 {
+            blended = max(blended, 0.90)
+        }
+        
+        return min(max(blended, 0), 1.0)
+    }
+
     private func isTerminal(_ bundleId: String) -> Bool {
         [
             "com.apple.Terminal",
@@ -193,5 +288,32 @@ actor SemanticSearchEngine {
             "dev.warp.Warp-Stable",
             "co.zeit.hyper"
         ].contains(bundleId)
+    }
+
+    private func isCodeEditorOrDocApp(_ bundleId: String, windowTitle: String?) -> Bool {
+        let editors = [
+            "com.microsoft.VSCode",
+            "com.todesktop.230313mzl4w4u92", // Cursor
+            "com.apple.dt.Xcode",
+            "com.sublimetext.4",
+            "com.apple.TextEdit",
+            "com.jetbrains.",
+            "org.vim.",
+            "com.macromates.TextMate"
+        ]
+        let isEditor = editors.contains { bundleId.hasPrefix($0) }
+        guard isEditor else { return false }
+        
+        guard let title = windowTitle else { return false }
+        let ext = (title as NSString).pathExtension
+        if !ext.isEmpty { return true }
+        
+        let parts = title.components(separatedBy: " — ")
+        if let first = parts.first {
+            let firstExt = (first as NSString).pathExtension
+            if !firstExt.isEmpty { return true }
+        }
+        
+        return false
     }
 }

@@ -224,17 +224,103 @@ nonisolated enum WorkflowContextCapture {
     guard let path = pathOpt,
           FileManager.default.fileExists(atPath: path)
     else { return [] }
-    let key = "ws:\(path)"
+    
+    let resolvedPath: String
+    if event.appBundleId == "com.microsoft.VSCode" || event.appBundleId == "com.todesktop.230313mzl4w4u92" {
+      resolvedPath = resolveProjectRoot(filePath: path, windowTitle: event.windowTitle, bundleId: event.appBundleId)
+    } else {
+      resolvedPath = path
+    }
+    
+    let key = "ws:\(resolvedPath)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
       kind: .workspace,
-      label: (path as NSString).lastPathComponent,
+      label: (resolvedPath as NSString).lastPathComponent,
       bundleId: event.appBundleId,
       url: nil,
-      path: path,
+      path: resolvedPath,
       workingDirectory: nil
     )]
+  }
+
+  private static func resolveProjectRoot(filePath: String, windowTitle: String?, bundleId: String) -> String {
+    guard let title = windowTitle else { return filePath }
+    let separators = [" — ", " – ", " - "]
+    
+    var projectName: String? = nil
+    
+    if title.contains(".xcodeproj") || title.contains(".xcworkspace") {
+      let parts = title.components(separatedBy: " — ")
+      if let last = parts.last {
+        projectName = last
+          .replacingOccurrences(of: ".xcodeproj", with: "")
+          .replacingOccurrences(of: ".xcworkspace", with: "")
+          .trimmingCharacters(in: .whitespaces)
+      }
+    }
+    
+    let fileURL = URL(fileURLWithPath: filePath)
+    var isDir: ObjCBool = false
+    let fileExists = FileManager.default.fileExists(atPath: filePath, isDirectory: &isDir)
+    
+    var startURL = fileURL
+    if fileExists {
+      if !isDir.boolValue {
+        startURL = fileURL.deletingLastPathComponent()
+      }
+    } else {
+      if !fileURL.pathExtension.isEmpty {
+        startURL = fileURL.deletingLastPathComponent()
+      }
+    }
+    
+    var candidates: [String] = [title.trimmingCharacters(in: .whitespaces)]
+    for sep in separators {
+      if title.contains(sep) {
+        let parts = title.components(separatedBy: sep)
+        for part in parts {
+          let trimmed = part.trimmingCharacters(in: .whitespaces)
+          if !trimmed.isEmpty {
+            candidates.append(trimmed)
+          }
+        }
+      }
+    }
+    
+    if projectName == nil {
+      for candidate in candidates {
+        if candidate == "VS Code" || candidate == "Visual Studio Code" || candidate == "Cursor" {
+          continue
+        }
+        
+        var current = startURL
+        while current.path != "/" {
+          if current.lastPathComponent == candidate {
+            return current.path
+          }
+          current = current.deletingLastPathComponent()
+        }
+      }
+    }
+    
+    if let projName = projectName, !projName.isEmpty {
+      var current = startURL
+      while current.path != "/" {
+        if current.lastPathComponent == projName {
+          return current.path
+        }
+        current = current.deletingLastPathComponent()
+      }
+    }
+    
+    let parent = fileURL.deletingLastPathComponent().path
+    if parent != "/" && parent != "/Users" {
+      return parent
+    }
+    
+    return filePath
   }
 
   // MARK: - Browser

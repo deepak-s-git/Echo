@@ -142,6 +142,11 @@ final class SessionStore: ObservableObject {
     func select(_ session: Session) { selectedSession = session }
     func deselect() { selectedSession = nil }
 
+    func performSemanticSearch(query: String) async -> [SemanticSearchEngine.SearchResult] {
+        guard let repository else { return [] }
+        return await SemanticSearchEngine.shared.search(query: query, repository: repository)
+    }
+
     func sessionDidStart(_ session: Session) {
         recentSessions.removeAll { $0.id == session.id }
         recentSessions.insert(session, at: 0)

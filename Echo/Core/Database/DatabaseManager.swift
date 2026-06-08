@@ -159,6 +159,19 @@ nonisolated final class DatabaseManager: Sendable {
             }
         }
 
+        migrator.registerMigration("v6_session_embeddings") { db in
+            try db.execute(sql: """
+                CREATE TABLE session_embeddings (
+                    id TEXT PRIMARY KEY,
+                    sessionId TEXT NOT NULL,
+                    chunkKind TEXT NOT NULL,
+                    vector BLOB NOT NULL,
+                    document TEXT NOT NULL,
+                    FOREIGN KEY (sessionId) REFERENCES sessions (id) ON DELETE CASCADE
+                )
+            """)
+        }
+
         try migrator.migrate(pool)
     }
 

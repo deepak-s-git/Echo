@@ -6,6 +6,7 @@ struct WorkflowIdleDashboard: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionControl: SessionControlStore
     @State private var showCreateSheet = false
+    @State private var showSelectWorkflowSheet = false
     var body: some View {
         VStack(alignment: .leading, spacing: EchoDesign.sectionSpacing) {
             VStack(alignment: .leading, spacing: 6) {
@@ -45,6 +46,16 @@ struct WorkflowIdleDashboard: View {
                 }
 
                 DashboardActionButton(
+                    title: "Start a New Session",
+                    subtitle: "Record under an existing workflow context",
+                    icon: "plus.circle",
+                    prominent: false,
+                    gradientColor: false
+                ) {
+                    showSelectWorkflowSheet = true
+                }
+
+                DashboardActionButton(
                     title: "Browse Memories",
                     subtitle: "Open timeline without recording",
                     icon: "timeline.selection",
@@ -61,6 +72,12 @@ struct WorkflowIdleDashboard: View {
             WorkflowCreateSheet(isPresented: $showCreateSheet)
                 .environmentObject(appStore)
                 .environmentObject(sessionControl)
+        }
+        .sheet(isPresented: $showSelectWorkflowSheet) {
+            SelectWorkflowSheet(isPresented: $showSelectWorkflowSheet)
+                .environmentObject(appStore)
+                .environmentObject(sessionControl)
+                .environmentObject(sessionStore)
         }
         .onAppear {
             Task {
@@ -204,5 +221,188 @@ private struct DashboardActionButton: View {
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - SelectWorkflowSheet
+
+struct SelectWorkflowSheet: View {
+    @EnvironmentObject var sessionStore: SessionStore
+    @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject var sessionControl: SessionControlStore
+    @Binding var isPresented: Bool
+    
+    @State private var searchText = ""
+    @State private var isWorking = false
+    @State private var isLoadingThreads = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Record under Existing Workflow")
+                .font(.system(size: 16, weight: .bold))
+            
+            Text("Choose an active workflow thread to start a new session segment under.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            
+            // Search Bar
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                TextField("Search workflows…", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+            
+            // Workflow List
+            VStack {
+                if isLoadingThreads {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.small)
+                    Spacer()
+                } else {
+                    let filtered = filteredThreads
+                    if filtered.isEmpty {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            Image(systemName: "folder.badge.questionmark")
+                                .font(.system(size: 28, weight: .thin))
+                                .foregroundStyle(.secondary.opacity(0.6))
+                            Text(searchText.isEmpty ? "No workflows available" : "No matching workflows")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 8) {
+                                ForEach(filtered) { summary in
+                                    WorkflowSelectionCard(summary: summary) {
+                                        selectWorkflow(summary.id)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 240)
+            
+            HStack {
+                Button("Cancel") {
+                    isPresented = false
+                }
+                .keyboardShortcut(.cancelAction)
+                .disabled(isWorking)
+                
+                Spacer()
+            }
+        }
+        .padding(24)
+        .frame(width: 440)
+        .onAppear {
+            isLoadingThreads = true
+            Task {
+                await sessionStore.loadWorkflowThreads()
+                isLoadingThreads = false
+            }
+        }
+    }
+    
+    private var filteredThreads: [WorkflowThreadSummary] {
+        let active = sessionStore.workflowThreads.filter { $0.thread.statusRaw != "archived" }
+        if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            return active
+        }
+        return active.filter { summary in
+            summary.displayTitle.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    private func selectWorkflow(_ id: UUID) {
+        isWorking = true
+        Task {
+            await sessionControl.continueWorkflowThread(id: id, appStore: appStore)
+            isPresented = false
+        }
+    }
+}
+
+// MARK: - WorkflowSelectionCard
+
+struct WorkflowSelectionCard: View {
+    let summary: WorkflowThreadSummary
+    let action: () -> Void
+    
+    @State private var hovering = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(hovering ? EchoPalette.indigo.opacity(0.12) : Color.primary.opacity(0.04))
+                        .frame(width: 34, height: 34)
+                    
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(hovering ? EchoPalette.indigoSoft : .secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(summary.displayTitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 6) {
+                        let count = summary.segments.count
+                        Text("\(count) \(count == 1 ? "session" : "sessions")")
+                        Text("·")
+                        Text("Active \(relativeTimeString(for: summary.thread.lastActiveAt))")
+                    }
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(hovering ? .secondary : .quaternary)
+                    .offset(x: hovering ? 1 : 0)
+                    .animation(EchoDesign.subtle, value: hovering)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(hovering ? Color.primary.opacity(0.015) : Color.clear)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(hovering ? EchoPalette.stroke : Color.clear, lineWidth: 0.5)
+            )
+            .scaleEffect(hovering ? 1.005 : 1.0)
+            .animation(EchoDesign.subtle, value: hovering)
+            .echoPointingCursor()
+            .onHover { hovering = $0 }
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func relativeTimeString(for date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }

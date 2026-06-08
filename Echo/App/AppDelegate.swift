@@ -51,15 +51,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
-        // Use a semaphore to block termination until teardown completes.
-        // This guarantees the final session is written before the process exits.
-        let semaphore = DispatchSemaphore(value: 0)
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
             await container?.teardown()
-            semaphore.signal()
+            sender.reply(toApplicationShouldTerminate: true)
         }
-        semaphore.wait()
+        return .terminateLater
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

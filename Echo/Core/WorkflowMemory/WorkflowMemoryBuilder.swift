@@ -372,7 +372,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
             ))
         }
 
-        if let folder = extractProjectPath(from: events), seen.insert("folder:\(folder)").inserted {
+        if let folder = extractProjectPath(from: events),
+           !seen.contains("ws:\(folder)"),
+           seen.insert("folder:\(folder)").inserted {
             items.append(RestoreItem(
                 id: UUID(),
                 kind: .folder,
@@ -488,7 +490,18 @@ nonisolated enum WorkflowRestorePlanBuilder {
                 if let range = title.range(of: "/Users/") ?? title.range(of: "/Volumes/") {
                     let path = String(title[range.lowerBound...])
                     let trimmed = path.components(separatedBy: " — ").first ?? path
-                    if FileManager.default.fileExists(atPath: trimmed) { return trimmed }
+                    
+                    var isDir: ObjCBool = false
+                    if FileManager.default.fileExists(atPath: trimmed, isDirectory: &isDir) {
+                        if isDir.boolValue {
+                            return trimmed
+                        } else {
+                            let parent = URL(fileURLWithPath: trimmed).deletingLastPathComponent().path
+                            if parent != "/" && parent != "/Users" {
+                                return parent
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -16,6 +16,9 @@ actor SemanticSearchEngine {
 
         // 1. Session Summary Chunk
         var summaryText = "Session Title: \(session.title ?? "Untitled Session")"
+        if let summary = session.summary {
+            summaryText += "\nSummary: \(summary)"
+        }
         if let cluster = session.workflowCluster {
             summaryText += "\nCluster: \(cluster)"
         }

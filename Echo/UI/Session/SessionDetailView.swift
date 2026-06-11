@@ -296,6 +296,14 @@ struct SessionDetailView: View {
                 .font(.system(size: 28, weight: .semibold))
                 .lineLimit(3)
 
+            if let summary = memory.session.summary, !summary.isEmpty {
+                Text(summary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .padding(.top, 2)
+            }
+
             HStack(spacing: 16) {
                 Label(memory.session.startedAt.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
                 Label(memory.session.duration.shortLabel, systemImage: "clock")
@@ -829,6 +837,7 @@ struct WorkflowIntelligenceAnalyzer {
     private var focusSegments: [AppFocusSegment] {
         let focusEvents = events
             .filter { $0.type == .appFocus || $0.type == .appSwitch }
+            .filter { !$0.appBundleId.lowercased().contains("echo") && !$0.appName.lowercased().contains("echo") }
             .sorted { $0.timestamp < $1.timestamp }
         
         guard !focusEvents.isEmpty else { return [] }
@@ -879,9 +888,10 @@ struct WorkflowIntelligenceAnalyzer {
             selected.insert(first.key)
         }
         
+        let minDuration = min(15.0, totalDuration * 0.05)
         for (bundleId, duration) in sortedApps.dropFirst() {
             let fraction = duration / totalDuration
-            if fraction >= 0.15 && duration >= 60 {
+            if fraction >= 0.15 && duration >= minDuration {
                 selected.insert(bundleId)
             }
         }
@@ -983,6 +993,13 @@ struct WorkflowIntelligenceAnalyzer {
                 if currentDriftStart == nil {
                     currentDriftStart = segment.timestamp
                 }
+            }
+        }
+        
+        if let start = currentDriftStart, let lastSegment = segments.last {
+            let driftEnd = lastSegment.timestamp.addingTimeInterval(lastSegment.duration)
+            if driftEnd > start {
+                drifts.append(Drift(start: start, end: driftEnd))
             }
         }
         

@@ -21,19 +21,24 @@ nonisolated enum SessionFinalizationRunner {
 
         let events = (try? await repository.fetchActivities(sessionId: session.id)) ?? []
         let startedAt = session.startedAt
-        let generatedTitle: String?
+        
+        // Always generate the AI summary for the session card
+        let compiledContext = SessionSummaryCompiler.compile(events: events)
+        let aiSummary = await LocalSummarizerService.shared.summarize(activityText: compiledContext)
+        
+        // Generate a relatable workflow title only if no title is specified
+        var generatedTitle: String? = nil
         if (userTitle == nil || userTitle?.isEmpty == true),
            session.title == nil || session.title?.isEmpty == true {
             generatedTitle = await MainActor.run {
                 SessionTitleGenerator.generate(from: events, startedAt: startedAt)
             }
-        } else {
-            generatedTitle = nil
         }
 
         var finalized = session
         finalized.appCount = Set(events.map(\.appBundleId)).count
         finalized.focusScore = Self.focusScore(from: events)
+        finalized.summary = aiSummary
         if let generatedTitle { finalized.title = generatedTitle }
 
         await Self.finalizeMemory(&finalized, events: events, repository: repository)

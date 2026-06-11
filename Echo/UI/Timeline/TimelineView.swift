@@ -610,9 +610,18 @@ private struct SessionHistoryRow: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(segment.isActive ? EchoPalette.live : .primary)
                     
+                    if let summary = segment.summary, !summary.isEmpty {
+                        Text(summary)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .padding(.vertical, 1)
+                            .multilineTextAlignment(.leading)
+                    }
+                    
                     Text(formatSessionTimeRange(segment))
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.secondary.opacity(0.85))
                 }
                 
                 Spacer()

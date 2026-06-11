@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8415A6D02FB7411D0070B100 /* Hub in Frameworks */ = {isa = PBXBuildFile; productRef = 8415A6CF2FB7411D0070B100 /* Hub */; };
 		8415A6D02FB7411D0070B811 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 8415A6CF2FB7411D0070B811 /* GRDB */; };
+		8415A6D02FB7411D0070B999 /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 8415A6CF2FB7411D0070B999 /* Transformers */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +30,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				8415A6D02FB7411D0070B811 /* GRDB in Frameworks */,
+				8415A6D02FB7411D0070B999 /* Transformers in Frameworks */,
+				8415A6D02FB7411D0070B100 /* Hub in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +83,8 @@
 			name = Echo;
 			packageProductDependencies = (
 				8415A6CF2FB7411D0070B811 /* GRDB */,
+				8415A6CF2FB7411D0070B999 /* Transformers */,
+				8415A6CF2FB7411D0070B100 /* Hub */,
 			);
 			productName = Echo;
 			productReference = 8415A6822FB738950070B811 /* Echo.app */;
@@ -110,6 +116,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				8415A6C92FB73FE80070B811 /* XCRemoteSwiftPackageReference "GRDB" */,
+				8415A6C92FB73FE80070B999 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8415A6832FB738950070B811 /* Products */;
@@ -360,13 +367,31 @@
 				kind = branch;
 			};
 		};
+		8415A6C92FB73FE80070B999 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-transformers";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		8415A6CF2FB7411D0070B100 /* Hub */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8415A6C92FB73FE80070B999 /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Hub;
+		};
 		8415A6CF2FB7411D0070B811 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8415A6C92FB73FE80070B811 /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
+		};
+		8415A6CF2FB7411D0070B999 /* Transformers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8415A6C92FB73FE80070B999 /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Transformers;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

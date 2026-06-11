@@ -123,9 +123,10 @@ final class ServiceContainer {
     }
 
     func endCurrentSession(title: String, tags: [String]) async {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         await sessionEngine.endCurrentSession(
             reason: .userInitiated,
-            title: title,
+            title: trimmedTitle.isEmpty ? nil : trimmedTitle,
             tags: tags
         )
         await sessionStore.loadRecent()

@@ -8,7 +8,7 @@ struct WorkflowIdleDashboard: View {
     @State private var showCreateSheet = false
     @State private var showSelectWorkflowSheet = false
     var body: some View {
-        VStack(alignment: .leading, spacing: EchoDesign.sectionSpacing) {
+        VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Workflow Memory")
                     .font(.system(size: 11, weight: .bold))
@@ -20,47 +20,58 @@ struct WorkflowIdleDashboard: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.primary)
             }
-            .padding(.bottom, 4)
+            .padding(.bottom, 2)
 
-            VStack(spacing: 12) {
-                if let thread = sessionStore.continueWorkflowThread, let session = sessionStore.continueSession {
-                    DashboardActionButton(
-                        title: "Continue Previous Workflow",
-                        subtitle: continueSubtitle(for: thread, session: session),
-                        icon: "arrow.uturn.backward",
-                        prominent: true,
-                        gradientColor: true
+            // 1. Resume Workflow (Hero Action)
+            if let thread = sessionStore.continueWorkflowThread, let session = sessionStore.continueSession {
+                HeroActionButton(
+                    title: "Continue Previous Workflow",
+                    subtitle: continueSubtitle(for: thread, session: session),
+                    icon: "arrow.uturn.backward"
+                ) {
+                    Task { await sessionControl.continuePreviousSession(appStore: appStore) }
+                }
+            }
+
+            // 2. Record Section (Grid of 2 options)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Record Activity")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
+                    .textCase(.uppercase)
+                
+                HStack(spacing: 12) {
+                    GridActionButton(
+                        title: "Start New Workflow",
+                        subtitle: "Begin a fresh topic context from scratch",
+                        icon: "sparkles"
                     ) {
-                        Task { await sessionControl.continuePreviousSession(appStore: appStore) }
+                        showCreateSheet = true
+                    }
+                    
+                    GridActionButton(
+                        title: "Record in Existing",
+                        subtitle: "Start a session under an active project",
+                        icon: "folder.badge.plus"
+                    ) {
+                        showSelectWorkflowSheet = true
                     }
                 }
+            }
 
-                DashboardActionButton(
-                    title: "Start New Workflow",
-                    subtitle: "Begin a fresh workflow memory segment",
-                    icon: "record.circle",
-                    prominent: sessionStore.continueWorkflowThread == nil,
-                    gradientColor: false
-                ) {
-                    showCreateSheet = true
-                }
-
-                DashboardActionButton(
-                    title: "Start a New Session",
-                    subtitle: "Record under an existing workflow context",
-                    icon: "plus.circle",
-                    prominent: false,
-                    gradientColor: false
-                ) {
-                    showSelectWorkflowSheet = true
-                }
-
-                DashboardActionButton(
+            // 3. History Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("History")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
+                    .textCase(.uppercase)
+                
+                SubtleActionButton(
                     title: "Browse Memories",
                     subtitle: "Open timeline without recording",
-                    icon: "timeline.selection",
-                    prominent: false,
-                    gradientColor: false
+                    icon: "timeline.selection"
                 ) {
                     appStore.selectTab(.timeline)
                 }
@@ -155,12 +166,10 @@ struct WorkflowCreateSheet: View {
     }
 }
 
-private struct DashboardActionButton: View {
+private struct HeroActionButton: View {
     let title: String
     let subtitle: String
     let icon: String
-    let prominent: Bool
-    let gradientColor: Bool
     let action: () -> Void
     
     @State private var hovering = false
@@ -170,23 +179,147 @@ private struct DashboardActionButton: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(prominent ? EchoPalette.indigo.opacity(0.12) : Color.primary.opacity(0.04))
-                        .frame(width: 40, height: 40)
-                    
-                    if gradientColor {
-                        Image(systemName: icon)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(EchoPalette.premiumGradient)
-                    } else {
-                        Image(systemName: icon)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(prominent ? EchoPalette.indigoSoft : .secondary)
-                    }
+                        .fill(Color.primary.opacity(hovering ? 0.08 : 0.04))
+                        .frame(width: 44, height: 44)
+                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
                 }
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+                        
+                        Text("RESUME LATEST")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.primary.opacity(0.06))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                            )
+                    }
+                    
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary.opacity(0.85))
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary.opacity(0.6))
+                    .offset(x: hovering ? 2 : 0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
+            }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 20)
+            .background {
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.02 : 0.005))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
+            )
+            .scaleEffect(hovering ? 1.005 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
+            .echoPointingCursor()
+            .onHover { hovering = $0 }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct GridActionButton: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let action: () -> Void
+    
+    @State private var hovering = false
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.primary.opacity(hovering ? 0.08 : 0.04))
+                        .frame(width: 44, height: 44)
+                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(hovering ? .primary : .secondary)
+                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary.opacity(0.85))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                Spacer(minLength: 0)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, minHeight: 136)
+            .background {
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.015 : 0.005))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
+            )
+            .scaleEffect(hovering ? 1.008 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
+            .echoPointingCursor()
+            .onHover { hovering = $0 }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SubtleActionButton: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let action: () -> Void
+    
+    @State private var hovering = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(hovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.04))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(hovering ? .primary : .secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(subtitle)
                         .font(.system(size: 11))
@@ -197,27 +330,24 @@ private struct DashboardActionButton: View {
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(hovering ? .secondary : .quaternary)
-                    .offset(x: hovering ? 2 : 0)
-                    .animation(EchoDesign.subtle, value: hovering)
+                    .offset(x: hovering ? 1 : 0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
             }
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .padding(.horizontal, 16)
             .background {
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .fill(prominent ? EchoPalette.indigo.opacity(0.06) : Color.primary.opacity(0.02))
+                    .fill(Color.primary.opacity(hovering ? 0.015 : 0.005))
             }
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .strokeBorder(
-                        prominent ? EchoPalette.indigo.opacity(0.15) : EchoPalette.stroke,
-                        lineWidth: 0.5
-                    )
+                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
             )
-            .scaleEffect(hovering ? 1.008 : 1.0)
-            .animation(EchoDesign.subtle, value: hovering)
-            .echoHoverHighlight()
+            .scaleEffect(hovering ? 1.005 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
+            .echoPointingCursor()
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)

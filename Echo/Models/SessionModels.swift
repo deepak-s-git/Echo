@@ -22,6 +22,7 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
     var tagsJSON: String?
     /// Parent workflow memory; each session row is one continuation segment.
     var workflowThreadId: UUID?
+    var summary: String?
 
     static let databaseTableName = "sessions"
 
@@ -42,7 +43,8 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         pausedAt: Date? = nil,
         pausedDuration: TimeInterval = 0,
         tagsJSON: String? = nil,
-        workflowThreadId: UUID? = nil
+        workflowThreadId: UUID? = nil,
+        summary: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -61,6 +63,7 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         self.pausedDuration = pausedDuration
         self.tagsJSON = tagsJSON
         self.workflowThreadId = workflowThreadId
+        self.summary = summary
     }
 
     var cluster: WorkflowCluster {
@@ -112,6 +115,7 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         container["pausedDuration"] = pausedDuration
         container["tagsJSON"] = tagsJSON
         container["workflowThreadId"] = workflowThreadId?.uuidString
+        container["summary"] = summary
     }
 
     init(row: Row) throws {
@@ -136,6 +140,7 @@ nonisolated struct Session: Identifiable, Codable, FetchableRecord, PersistableR
         } else {
             workflowThreadId = nil
         }
+        summary = row["summary"]
     }
 }
 

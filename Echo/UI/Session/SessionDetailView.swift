@@ -296,14 +296,6 @@ struct SessionDetailView: View {
                 .font(.system(size: 28, weight: .semibold))
                 .lineLimit(3)
 
-            if let summary = memory.session.summary, !summary.isEmpty {
-                Text(summary)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .padding(.top, 2)
-            }
-
             HStack(spacing: 16) {
                 Label(memory.session.startedAt.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
                 Label(memory.session.duration.shortLabel, systemImage: "clock")

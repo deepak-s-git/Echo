@@ -172,12 +172,6 @@ nonisolated final class DatabaseManager: Sendable {
             """)
         }
 
-        migrator.registerMigration("v7_session_summary") { db in
-            try db.alter(table: Session.databaseTableName) { t in
-                t.add(column: "summary", .text)
-            }
-        }
-
         try migrator.migrate(pool)
     }
 

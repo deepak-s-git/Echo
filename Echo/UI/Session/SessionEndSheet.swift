@@ -74,7 +74,7 @@ struct SessionEndSheet: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         sessionControl.confirmEndSession(
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: title.isEmpty ? "Untitled session" : title,
             tags: tags,
             appStore: appStore
         )

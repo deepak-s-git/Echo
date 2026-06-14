@@ -366,7 +366,37 @@ struct SelectWorkflowSheet: View {
     @State private var isWorking = false
     @State private var isLoadingThreads = false
     
+    @State private var selectedWorkflowThread: WorkflowThreadSummary? = nil
+    @State private var selectedSession: Session? = nil
+    @State private var selectableRestoreItems: [RestoreWeighting.SelectableItem] = []
+    @State private var isLoadingActivities = false
+    
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let thread = selectedWorkflowThread {
+                if let session = selectedSession {
+                    restoreChecklistStage(thread: thread, session: session)
+                } else {
+                    sessionListStage(thread: thread)
+                }
+            } else {
+                workflowListStage()
+            }
+        }
+        .padding(24)
+        .frame(width: 440, height: 440)
+        .onAppear {
+            isLoadingThreads = true
+            Task {
+                await sessionStore.loadWorkflowThreads()
+                isLoadingThreads = false
+            }
+        }
+    }
+    
+    // MARK: - Stages
+    
+    private func workflowListStage() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Record under Existing Workflow")
                 .font(.system(size: 16, weight: .bold))
@@ -415,7 +445,9 @@ struct SelectWorkflowSheet: View {
                             LazyVStack(spacing: 8) {
                                 ForEach(filtered) { summary in
                                     WorkflowSelectionCard(summary: summary) {
-                                        selectWorkflow(summary.id)
+                                        withAnimation(EchoDesign.subtle) {
+                                            selectedWorkflowThread = summary
+                                        }
                                     }
                                 }
                             }
@@ -425,7 +457,7 @@ struct SelectWorkflowSheet: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 240)
+            .frame(maxHeight: .infinity)
             
             HStack {
                 Button("Cancel") {
@@ -436,17 +468,311 @@ struct SelectWorkflowSheet: View {
                 
                 Spacer()
             }
-        }
-        .padding(24)
-        .frame(width: 440)
-        .onAppear {
-            isLoadingThreads = true
-            Task {
-                await sessionStore.loadWorkflowThreads()
-                isLoadingThreads = false
-            }
+            .padding(.top, 4)
         }
     }
+    
+    private func sessionListStage(thread: WorkflowThreadSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with back button
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(EchoDesign.subtle) {
+                        selectedWorkflowThread = nil
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Workflows")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(EchoPalette.indigoSoft)
+                }
+                .buttonStyle(.plain)
+                .echoPointingCursor()
+                
+                Spacer()
+            }
+            .padding(.bottom, 4)
+            
+            Text(thread.displayTitle)
+                .font(.system(size: 16, weight: .bold))
+                .lineLimit(1)
+            
+            Text("Select a previous session to restore, or start a new segment.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            
+            // Start New Session Card
+            Button {
+                isWorking = true
+                Task {
+                    await sessionControl.continueWorkflowThread(id: thread.id, appStore: appStore)
+                    isPresented = false
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(EchoPalette.indigo.opacity(0.12))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(EchoPalette.indigoSoft)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Start New Session under this Workflow")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text("Begin recording a fresh segment from scratch")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+            .echoPointingCursor()
+            .padding(.vertical, 4)
+            
+            Text("PAST SESSIONS")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.secondary)
+                .tracking(0.5)
+                .padding(.top, 4)
+            
+            // List of Sessions
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(thread.segments) { session in
+                        Button {
+                            isLoadingActivities = true
+                            selectedSession = session
+                            Task {
+                                let events = await sessionStore.fetchActivities(sessionId: session.id)
+                                let plan = session.restorePlan ?? WorkflowRestorePlan.empty
+                                withAnimation(EchoDesign.subtle) {
+                                    self.selectableRestoreItems = RestoreWeighting.buildSelectableItems(from: events, plan: plan)
+                                    isLoadingActivities = false
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(Color.primary.opacity(0.04))
+                                        .frame(width: 28, height: 28)
+                                    Image(systemName: "clock.arrow.circlepath")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(session.title ?? "Untitled Session")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    
+                                    HStack(spacing: 6) {
+                                        Text(session.duration.sessionDurationFormatted)
+                                        Text("·")
+                                        Text("\(session.appCount) apps")
+                                        if let ended = session.endedAt {
+                                            Text("·")
+                                            Text(relativeTimeString(for: ended))
+                                        }
+                                    }
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.quaternary)
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(Color.primary.opacity(0.01), in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
+                        }
+                        .buttonStyle(.plain)
+                        .echoPointingCursor()
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .frame(maxHeight: 180)
+            
+            Spacer(minLength: 0)
+        }
+    }
+    
+    private func restoreChecklistStage(thread: WorkflowThreadSummary, session: Session) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with back button
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(EchoDesign.subtle) {
+                        selectedSession = nil
+                        selectableRestoreItems = []
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Sessions")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(EchoPalette.indigoSoft)
+                }
+                .buttonStyle(.plain)
+                .echoPointingCursor()
+                
+                Spacer()
+            }
+            .padding(.bottom, 4)
+            
+            Text("Restore: \(session.title ?? "Untitled Session")")
+                .font(.system(size: 16, weight: .bold))
+                .lineLimit(1)
+            
+            Text("Choose which apps and tabs to restore and continue.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            
+            VStack {
+                if isLoadingActivities {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.small)
+                    Spacer()
+                } else if selectableRestoreItems.isEmpty {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "doc.badge.gearshape")
+                            .font(.system(size: 24, weight: .thin))
+                            .foregroundStyle(.secondary.opacity(0.6))
+                        Text("No restorable items found for this session.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 6) {
+                            ForEach(0..<selectableRestoreItems.count, id: \.self) { idx in
+                                let item = selectableRestoreItems[idx]
+                                Button {
+                                    selectableRestoreItems[idx].isSelected.toggle()
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: item.isSelected ? "checkmark.square.fill" : "square")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(item.isSelected ? EchoPalette.indigoSoft : .secondary)
+                                        
+                                        if let bundleId = item.item.bundleId {
+                                            AppIconView(bundleId: bundleId, size: 20)
+                                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                        } else {
+                                            Image(systemName: systemImage(for: item.item.kind))
+                                                .font(.system(size: 11))
+                                                .frame(width: 20, height: 20)
+                                                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 4))
+                                        }
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.item.label)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.primary)
+                                                .lineLimit(1)
+                                            
+                                            let subText = item.item.url ?? item.item.path ?? item.item.workingDirectory ?? ""
+                                            if !subText.isEmpty {
+                                                Text(subText)
+                                                    .font(.system(size: 9))
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 10)
+                                    .background(Color.primary.opacity(0.01), in: RoundedRectangle(cornerRadius: 6))
+                                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
+                                }
+                                .buttonStyle(.plain)
+                                .echoPointingCursor()
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(maxHeight: 200)
+            
+            Divider().opacity(0.3)
+            
+            HStack {
+                Button("Cancel") {
+                    isPresented = false
+                }
+                .keyboardShortcut(.cancelAction)
+                .disabled(isWorking)
+                
+                Spacer()
+                
+                let selected = selectableRestoreItems.filter(\.isSelected)
+                
+                Button {
+                    isWorking = true
+                    Task {
+                        var plan = RestoreWeighting.filteredPlan(from: selectableRestoreItems)
+                        if plan.items.isEmpty {
+                            plan = RestoreWeighting.fallbackPlan(from: [], plan: session.restorePlan ?? WorkflowRestorePlan.empty)
+                        }
+                        await sessionControl.restoreAndContinueWorkflowThread(
+                            id: thread.id,
+                            plan: plan,
+                            appStore: appStore
+                        )
+                        isPresented = false
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .font(.system(size: 12))
+                        Text("Restore & Continue")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(EchoPalette.indigo.opacity(selected.isEmpty ? 0.08 : 0.16))
+                    .foregroundStyle(selected.isEmpty ? .secondary : EchoPalette.indigoSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(EchoPalette.indigo.opacity(selected.isEmpty ? 0.1 : 0.3), lineWidth: 0.5)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isWorking)
+                .echoPointingCursor()
+            }
+            .padding(.top, 4)
+        }
+    }
+    
+    // MARK: - Helpers
     
     private var filteredThreads: [WorkflowThreadSummary] {
         let active = sessionStore.workflowThreads.filter { $0.thread.statusRaw != "archived" }
@@ -458,11 +784,14 @@ struct SelectWorkflowSheet: View {
         }
     }
     
-    private func selectWorkflow(_ id: UUID) {
-        isWorking = true
-        Task {
-            await sessionControl.continueWorkflowThread(id: id, appStore: appStore)
-            isPresented = false
+    private func systemImage(for kind: RestoreItem.RestoreKind) -> String {
+        switch kind {
+        case .application: return "app.fill"
+        case .url, .browserPage: return "globe"
+        case .folder: return "folder"
+        case .document: return "doc.text"
+        case .terminalDirectory: return "terminal"
+        case .workspace: return "macwindow"
         }
     }
 }
@@ -529,10 +858,12 @@ struct WorkflowSelectionCard: View {
         }
         .buttonStyle(.plain)
     }
-    
-    private func relativeTimeString(for date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
+}
+
+// MARK: - Fileprivate Helpers
+
+fileprivate func relativeTimeString(for date: Date) -> String {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .abbreviated
+    return formatter.localizedString(for: date, relativeTo: Date())
 }

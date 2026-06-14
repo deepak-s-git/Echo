@@ -157,6 +157,11 @@ actor ActivityTracker {
         let ignoredIds = await MainActor.run { EchoSettings.shared.ignoredBundleIds }
         guard !ignoredIds.contains(snapshot.bundleId) else { return }
 
+        // Never record Echo itself — the recorder recording itself is noise.
+        if snapshot.bundleId == (Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2") {
+            return
+        }
+
         if snapshot.bundleId == currentBundleId {
             await handleSameAppWindowChange(snapshot)
             return

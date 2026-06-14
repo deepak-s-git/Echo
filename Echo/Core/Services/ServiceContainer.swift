@@ -114,6 +114,15 @@ final class ServiceContainer {
         )
     }
 
+    func restoreAndContinue(id: UUID, plan: WorkflowRestorePlan) async {
+        await sessionEngine.restoreAndContinueWorkflowThread(id: id, plan: plan)
+        await sessionStore.loadRecent()
+        await continuityStore.refresh(
+            activeSession: sessionStore.activeSession,
+            recent: sessionStore.recentSessions
+        )
+    }
+
     func pauseCurrentSession() async {
         await sessionEngine.pauseSession()
     }

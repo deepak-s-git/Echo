@@ -2,12 +2,19 @@ import SwiftUI
 
 // MARK: - SearchView
 
+struct MatchedChunk: Equatable {
+    let document: String
+    let kind: String
+    let score: Float
+}
+
 struct SemanticSearchResult: Identifiable, Equatable {
     var id: UUID { session.id }
     let session: Session
     let score: Float?
     let matchedDocument: String?
     let matchedKind: String?
+    let matchedChunks: [MatchedChunk]
     
     static func == (lhs: SemanticSearchResult, rhs: SemanticSearchResult) -> Bool {
         lhs.session.id == rhs.session.id
@@ -31,18 +38,20 @@ struct SearchView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Premium glassmorphic search bar
                 HStack(spacing: 12) {
-                    if isSearching {
-                        ProgressView()
-                            .controlSize(.small)
-                            .scaleEffect(0.7)
-                            .frame(width: 14, height: 14)
-                    } else {
+                    ZStack {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(isFocused ? EchoPalette.glowBlue : .secondary)
                             .scaleEffect(isFocused ? 1.1 : 1.0)
-                            .animation(EchoDesign.subtle, value: isFocused)
+                            .opacity(isSearching ? 0 : 1)
+
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.7)
+                            .opacity(isSearching ? 1 : 0)
                     }
+                    .frame(width: 14, height: 14)
+                    .animation(EchoDesign.subtle, value: isFocused)
 
                     TextField("Search your workflows…", text: $query)
                         .textFieldStyle(.plain)
@@ -73,9 +82,9 @@ struct SearchView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                         .strokeBorder(isFocused ? EchoPalette.glowBlue.opacity(0.4) : EchoPalette.stroke, lineWidth: 1.0)
+                        .animation(EchoDesign.subtle, value: isFocused)
                 )
                 .shadow(color: isFocused ? EchoPalette.glowBlue.opacity(0.08) : .clear, radius: 8, y: 2)
-                .animation(EchoDesign.subtle, value: isFocused)
                 .onChange(of: query) { oldValue, newValue in
                     runSearch(for: newValue)
                 }
@@ -123,7 +132,7 @@ struct SearchView: View {
         let trimmed = q.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else {
             self.searchResults = sessionStore.recentSessions.map {
-                SemanticSearchResult(session: $0, score: nil, matchedDocument: nil, matchedKind: nil)
+                SemanticSearchResult(session: $0, score: nil, matchedDocument: nil, matchedKind: nil, matchedChunks: [])
             }
             self.isSearching = false
             return
@@ -136,11 +145,15 @@ struct SearchView: View {
             var mapped: [SemanticSearchResult] = []
             for res in rawResults {
                 if let session = sessionStore.recentSessions.first(where: { $0.id == res.sessionId }) {
+                    let chunks = res.matchedChunks.map { chunk in
+                        MatchedChunk(document: chunk.document, kind: chunk.kind, score: chunk.score)
+                    }
                     mapped.append(SemanticSearchResult(
                         session: session,
                         score: res.score,
                         matchedDocument: res.matchedDocument,
-                        matchedKind: res.matchedKind
+                        matchedKind: res.matchedKind,
+                        matchedChunks: chunks
                     ))
                 }
             }
@@ -153,7 +166,8 @@ struct SearchView: View {
                             session: sess,
                             score: 0.5,
                             matchedDocument: nil,
-                            matchedKind: "summary"
+                            matchedKind: "summary",
+                            matchedChunks: []
                         ))
                     }
                 }
@@ -194,7 +208,23 @@ private struct SearchResultCard: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     
-                    if let doc = result.matchedDocument, let kind = result.matchedKind {
+                    if !result.matchedChunks.isEmpty {
+                        // Show up to 2 distinct chunk type snippets
+                        let displayChunks = deduplicatedChunks(result.matchedChunks, maxCount: 2)
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(Array(displayChunks.enumerated()), id: \.offset) { _, chunk in
+                                HStack(spacing: 4) {
+                                    Image(systemName: snippetIcon(kind: chunk.kind))
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(.secondary)
+                                    Text(formatMatchedSnippet(document: chunk.document, kind: chunk.kind))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                    } else if let doc = result.matchedDocument, let kind = result.matchedKind {
                         HStack(spacing: 4) {
                             Image(systemName: snippetIcon(kind: kind))
                                 .font(.system(size: 9))
@@ -293,18 +323,43 @@ private struct SearchResultCard: View {
         let lines = document.components(separatedBy: "\n")
         if kind == "browser" {
             if let titleLine = lines.first(where: { $0.hasPrefix("Webpage: ") }) {
-                return "Webpage: " + titleLine.replacingOccurrences(of: "Webpage: ", with: "")
+                return titleLine
+            }
+            if let urlLine = lines.first(where: { $0.hasPrefix("URL: ") }) {
+                return urlLine
             }
         } else if kind == "file" {
-            if let fileLine = lines.first(where: { $0.hasPrefix("File: ") }) {
-                return "File: " + fileLine.replacingOccurrences(of: "File: ", with: "")
+            let filePart = lines.first(where: { $0.hasPrefix("File: ") }) ?? ""
+            let editorPart = lines.first(where: { $0.hasPrefix("Editor: ") }) ?? ""
+            if !filePart.isEmpty && !editorPart.isEmpty {
+                return "\(filePart) — \(editorPart.replacingOccurrences(of: "Editor: ", with: ""))"
             }
+            return filePart.isEmpty ? (lines.first ?? document) : filePart
         } else if kind == "terminal" {
-            return "Terminal command: " + document.replacingOccurrences(of: "Terminal command: ", with: "")
+            let termLine = lines.first(where: { $0.hasPrefix("Terminal: ") }) ?? ""
+            let dirLine = lines.first(where: { $0.hasPrefix("Directory: ") }) ?? ""
+            if !termLine.isEmpty && !dirLine.isEmpty {
+                return "\(termLine) — \(dirLine.replacingOccurrences(of: "Directory: ", with: ""))"
+            }
+            return termLine.isEmpty ? (lines.first ?? document) : termLine
         } else if kind == "summary" {
-            return "Summary: " + document.replacingOccurrences(of: "Session Title: ", with: "")
+            let titleLine = lines.first(where: { $0.hasPrefix("Session Title: ") }) ?? ""
+            return titleLine.isEmpty ? (lines.first ?? document) : titleLine.replacingOccurrences(of: "Session Title: ", with: "Summary: ")
         }
         return lines.first ?? document
+    }
+
+    /// Deduplicate chunks by kind, keeping the highest-scoring one per kind.
+    private func deduplicatedChunks(_ chunks: [MatchedChunk], maxCount: Int) -> [MatchedChunk] {
+        var seen = Set<String>()
+        var result: [MatchedChunk] = []
+        for chunk in chunks {
+            if seen.insert(chunk.kind).inserted {
+                result.append(chunk)
+                if result.count >= maxCount { break }
+            }
+        }
+        return result
     }
 }
 

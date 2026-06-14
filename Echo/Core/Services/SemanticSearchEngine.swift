@@ -14,6 +14,10 @@ actor SemanticSearchEngine {
     // MARK: - Chunk Generation
 
     func generateChunks(session: Session, activities: [ActivityEvent]) -> [(kind: String, document: String)] {
+        // Exclude Echo itself from indexing
+        let selfBundleId = "com.deepaks.EchoTest2"
+        let activities = activities.filter { $0.appBundleId != selfBundleId }
+
         var chunks: [(kind: String, document: String)] = []
 
         // 1. Session Summary Chunk

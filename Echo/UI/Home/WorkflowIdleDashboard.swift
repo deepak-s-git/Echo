@@ -8,32 +8,42 @@ struct WorkflowIdleDashboard: View {
     @State private var showCreateSheet = false
     @State private var showSelectWorkflowSheet = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 22) {
+            // Header with Ambient Glow & Modern Typography
             VStack(alignment: .leading, spacing: 6) {
-                Text("Workflow Memory")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(EchoPalette.indigoSoft)
-                    .textCase(.uppercase)
-                    .tracking(1.0)
+                HStack(spacing: 6) {
+                    Image(systemName: "circle.grid.2x1.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(EchoPalette.indigoSoft)
+                    Text("Workflow Memory")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(EchoPalette.indigoSoft)
+                        .tracking(1.5)
+                        .textCase(.uppercase)
+                }
                 
                 Text("Recall and continue your working context instantly.")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.primary)
             }
             .padding(.bottom, 2)
 
-            // 1. Resume Workflow (Hero Action)
+            // 1. Resume Workflow (Hero Action with App Icon Stack)
             if let thread = sessionStore.continueWorkflowThread, let session = sessionStore.continueSession {
+                let appItems = session.restorePlan?.items.filter { $0.kind == .application } ?? []
+                let bundleIds = appItems.compactMap { $0.bundleId }
+                
                 HeroActionButton(
                     title: "Continue Previous Workflow",
                     subtitle: continueSubtitle(for: thread, session: session),
-                    icon: "arrow.uturn.backward"
+                    icon: "arrow.uturn.backward",
+                    bundleIds: bundleIds
                 ) {
                     Task { await sessionControl.continuePreviousSession(appStore: appStore) }
                 }
             }
 
-            // 2. Record Section (Grid of 2 options)
+            // 2. Record Section (Grid of 2 upgraded gradient cards)
             VStack(alignment: .leading, spacing: 8) {
                 Text("Record Activity")
                     .font(.system(size: 9, weight: .bold))
@@ -45,7 +55,8 @@ struct WorkflowIdleDashboard: View {
                     GridActionButton(
                         title: "Start New Workflow",
                         subtitle: "Begin a fresh topic context from scratch",
-                        icon: "sparkles"
+                        icon: "sparkles",
+                        gradientColors: [Color.orange, Color.pink]
                     ) {
                         showCreateSheet = true
                     }
@@ -53,7 +64,8 @@ struct WorkflowIdleDashboard: View {
                     GridActionButton(
                         title: "Record in Existing",
                         subtitle: "Start a session under an active project",
-                        icon: "folder.badge.plus"
+                        icon: "folder.badge.plus",
+                        gradientColors: [Color(red: 0.18, green: 0.72, blue: 0.72), EchoPalette.indigoSoft]
                     ) {
                         showSelectWorkflowSheet = true
                     }
@@ -76,9 +88,39 @@ struct WorkflowIdleDashboard: View {
                     appStore.selectTab(.timeline)
                 }
             }
+
+            // 4. Quick Stats Footer
+            if !sessionStore.workflowThreads.isEmpty {
+                HStack(spacing: 16) {
+                    let activeCount = sessionStore.workflowThreads.filter { $0.thread.statusRaw != "archived" }.count
+                    HStack(spacing: 4) {
+                        Image(systemName: "circle.grid.2x1")
+                            .font(.system(size: 9))
+                        Text("\(activeCount) active \(activeCount == 1 ? "workflow" : "workflows")")
+                    }
+                    
+                    let totalDuration = sessionStore.workflowThreads.map { $0.thread.totalAccumulatedDuration }.reduce(0, +)
+                    if totalDuration > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 9))
+                            Text("Total tracked: \(totalDuration.sessionDurationFormatted)")
+                        }
+                    }
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 4)
+                .padding(.top, 4)
+            }
         }
         .padding(24)
-        .echoCard(material: .thinMaterial)
+        .echoCard(material: .ultraThinMaterial)
+        .background {
+            AmbientGlowView()
+                .offset(y: -20)
+                .allowsHitTesting(false)
+        }
         .sheet(isPresented: $showCreateSheet) {
             WorkflowCreateSheet(isPresented: $showCreateSheet)
                 .environmentObject(appStore)
@@ -170,6 +212,7 @@ private struct HeroActionButton: View {
     let title: String
     let subtitle: String
     let icon: String
+    let bundleIds: [String]
     let action: () -> Void
     
     @State private var hovering = false
@@ -179,12 +222,15 @@ private struct HeroActionButton: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(Color.primary.opacity(hovering ? 0.08 : 0.04))
+                        .fill(LinearGradient(
+                            colors: [EchoPalette.indigo.opacity(hovering ? 0.25 : 0.15), EchoPalette.indigo.opacity(hovering ? 0.08 : 0.04)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
                         .frame(width: 44, height: 44)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
                     Image(systemName: icon)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(EchoPalette.indigoSoft)
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -195,16 +241,16 @@ private struct HeroActionButton: View {
                         
                         Text("RESUME LATEST")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(EchoPalette.indigoSoft)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(Color.primary.opacity(0.06))
+                                    .fill(EchoPalette.indigo.opacity(0.12))
                             )
                             .overlay(
                                 Capsule()
-                                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                                    .stroke(EchoPalette.indigoSoft.opacity(0.3), lineWidth: 0.5)
                             )
                     }
                     
@@ -212,6 +258,31 @@ private struct HeroActionButton: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary.opacity(0.85))
                         .lineLimit(1)
+                    
+                    if !bundleIds.isEmpty {
+                        HStack(spacing: -6) {
+                            ForEach(Array(bundleIds.prefix(8).enumerated()), id: \.element) { index, bundleId in
+                                AppIconView(bundleId: bundleId, size: 20)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                            .stroke(Color.black.opacity(0.2), lineWidth: 0.5)
+                                    )
+                                    .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
+                                    .zIndex(Double(bundleIds.count - index))
+                            }
+                            if bundleIds.count > 8 {
+                                Text("+\(bundleIds.count - 8)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.primary.opacity(0.06), in: Capsule())
+                                    .padding(.leading, 4)
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
                 }
                 
                 Spacer()
@@ -219,19 +290,37 @@ private struct HeroActionButton: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary.opacity(0.6))
-                    .offset(x: hovering ? 2 : 0)
+                    .offset(x: hovering ? 3 : 0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
             }
             .padding(.vertical, 16)
             .padding(.horizontal, 20)
             .background {
-                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .fill(Color.primary.opacity(hovering ? 0.02 : 0.005))
+                ZStack {
+                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                        .fill(Color.primary.opacity(hovering ? 0.025 : 0.005))
+                    
+                    if hovering {
+                        RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [EchoPalette.indigo.opacity(0.06), Color.purple.opacity(0.02)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                }
             }
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
+                    .strokeBorder(
+                        hovering ? LinearGradient(colors: [EchoPalette.indigoSoft.opacity(0.5), Color.purple.opacity(0.25)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                        LinearGradient(colors: [EchoPalette.stroke, EchoPalette.stroke.opacity(0.5)], startPoint: .top, endPoint: .bottom),
+                        lineWidth: 0.5
+                    )
             )
+            .shadow(color: hovering ? EchoPalette.indigoSoft.opacity(0.05) : Color.clear, radius: 10, y: 3)
             .scaleEffect(hovering ? 1.005 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
             .echoPointingCursor()
@@ -245,6 +334,7 @@ private struct GridActionButton: View {
     let title: String
     let subtitle: String
     let icon: String
+    let gradientColors: [Color]
     let action: () -> Void
     
     @State private var hovering = false
@@ -254,14 +344,20 @@ private struct GridActionButton: View {
             VStack(alignment: .leading, spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(Color.primary.opacity(hovering ? 0.08 : 0.04))
+                        .fill(LinearGradient(
+                            colors: [gradientColors[0].opacity(hovering ? 0.2 : 0.1), gradientColors[1].opacity(hovering ? 0.08 : 0.04)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
                         .frame(width: 44, height: 44)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
                     
                     Image(systemName: icon)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(hovering ? .primary : .secondary)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
+                        .foregroundStyle(LinearGradient(
+                            colors: [gradientColors[0], gradientColors[1]],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -281,13 +377,20 @@ private struct GridActionButton: View {
             .padding(18)
             .frame(maxWidth: .infinity, minHeight: 136)
             .background {
-                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .fill(Color.primary.opacity(hovering ? 0.015 : 0.005))
+                ZStack {
+                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                        .fill(Color.primary.opacity(hovering ? 0.02 : 0.005))
+                }
             }
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
+                    .strokeBorder(
+                        hovering ? LinearGradient(colors: [gradientColors[0].opacity(0.5), gradientColors[1].opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                        LinearGradient(colors: [EchoPalette.stroke, EchoPalette.stroke.opacity(0.5)], startPoint: .top, endPoint: .bottom),
+                        lineWidth: 0.5
+                    )
             )
+            .shadow(color: hovering ? gradientColors[0].opacity(0.04) : Color.clear, radius: 8, y: 3)
             .scaleEffect(hovering ? 1.008 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
             .echoPointingCursor()
@@ -307,14 +410,15 @@ private struct SubtleActionButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(hovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.04))
+                        .fill(hovering ? EchoPalette.indigo.opacity(0.12) : Color.primary.opacity(0.04))
                         .frame(width: 36, height: 36)
+                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
                     Image(systemName: icon)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(hovering ? .primary : .secondary)
+                        .foregroundStyle(hovering ? EchoPalette.indigoSoft : .secondary)
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -331,8 +435,8 @@ private struct SubtleActionButton: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(hovering ? .secondary : .quaternary)
-                    .offset(x: hovering ? 1 : 0)
+                    .foregroundStyle(hovering ? EchoPalette.indigoSoft : Color.secondary.opacity(0.3))
+                    .offset(x: hovering ? 2 : 0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
             }
             .padding(.vertical, 10)
@@ -343,9 +447,9 @@ private struct SubtleActionButton: View {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
+                    .strokeBorder(hovering ? EchoPalette.indigoSoft.opacity(0.3) : EchoPalette.stroke, lineWidth: 0.5)
             )
-            .scaleEffect(hovering ? 1.005 : 1.0)
+            .scaleEffect(hovering ? 1.003 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
             .echoPointingCursor()
             .onHover { hovering = $0 }
@@ -857,6 +961,54 @@ struct WorkflowSelectionCard: View {
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Ambient Glow
+
+struct AmbientGlowView: View {
+    @State private var rotation: Double = 0.0
+    
+    var body: some View {
+        ZStack {
+            // First glowing blob (Vibrant Indigo/Blue Gradient)
+            Circle()
+                .fill(LinearGradient(
+                    colors: [
+                        Color(red: 0.25, green: 0.35, blue: 0.95),
+                        Color(red: 0.15, green: 0.55, blue: 0.90)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .frame(width: 340, height: 340)
+                .blur(radius: 55)
+                .opacity(0.24)
+                .offset(x: -70, y: -50)
+            
+            // Second glowing blob (Vibrant Purple/Pink Gradient)
+            Circle()
+                .fill(LinearGradient(
+                    colors: [
+                        Color(red: 0.60, green: 0.25, blue: 0.85),
+                        Color(red: 0.90, green: 0.20, blue: 0.65)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .frame(width: 300, height: 300)
+                .blur(radius: 50)
+                .opacity(0.18)
+                .offset(x: 70, y: 50)
+        }
+        .rotationEffect(.degrees(rotation))
+        .onAppear {
+            DispatchQueue.main.async {
+                withAnimation(.linear(duration: 30.0).repeatForever(autoreverses: false)) {
+                    rotation = 360.0
+                }
+            }
+        }
     }
 }
 

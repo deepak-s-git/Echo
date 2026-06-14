@@ -119,20 +119,32 @@ enum EchoDesign {
 // MARK: - Card
 
 struct EchoCard: ViewModifier {
+    var material: Material? = nil
+    
     func body(content: Content) -> some View {
-        content
-            .background(EchoPalette.graphiteElevated, in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+        if let material = material {
+            content
+                .background(material, in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                        .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+        } else {
+            content
+                .background(EchoPalette.graphiteElevated, in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                        .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+        }
     }
 }
 
 extension View {
-    func echoCard(material: Material = .ultraThinMaterial) -> some View {
-        modifier(EchoCard())
+    func echoCard(material: Material? = nil) -> some View {
+        modifier(EchoCard(material: material))
     }
 
     func echoAmbientBackground() -> some View {

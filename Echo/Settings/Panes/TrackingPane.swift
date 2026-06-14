@@ -40,6 +40,18 @@ struct TrackingPane: View {
                 )
 
                 SettingsSliderRow(
+                    icon: "hourglass.badge.plus",
+                    iconColor: rose,
+                    label: "App stay duration threshold",
+                    description: "Minimum time focused in an app before logging it.",
+                    value: $settings.appFocusEligibilitySeconds,
+                    range: 1.0...60.0,
+                    step: 1.0,
+                    valueFormatter: { String(format: "%.0fs", $0) },
+                    showDivider: true
+                )
+
+                SettingsSliderRow(
                     icon: "clock.badge.checkmark",
                     iconColor: rose,
                     label: "Browser tab capture delay",

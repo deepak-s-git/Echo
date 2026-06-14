@@ -53,6 +53,11 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    func fetchActivities(sessionId: UUID) async -> [ActivityEvent] {
+        guard let repository else { return [] }
+        return (try? await repository.fetchActivities(sessionId: sessionId)) ?? []
+    }
+
     init() {
         startContinuationTimer()
     }

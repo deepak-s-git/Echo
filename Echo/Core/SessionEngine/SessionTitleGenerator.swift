@@ -5,22 +5,26 @@ enum SessionTitleGenerator {
 
     @MainActor
     static func generate(from events: [ActivityEvent], startedAt: Date) -> String {
-        guard !events.isEmpty else {
+        // Exclude Echo itself from title generation
+        let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2"
+        let filtered = events.filter { $0.appBundleId != selfBundleId }
+
+        guard !filtered.isEmpty else {
             return timeOfDayPrefix(for: startedAt) + "Session"
         }
 
-        let weights = appDurationWeights(from: events)
+        let weights = appDurationWeights(from: filtered)
         let ranked = weights.sorted { $0.value > $1.value }
 
-        if let repoTitle = repoTitle(from: events) {
+        if let repoTitle = repoTitle(from: filtered) {
             return repoTitle
         }
 
-        if let browserTitle = browserTitle(from: events) {
+        if let browserTitle = browserTitle(from: filtered) {
             return browserTitle
         }
 
-        if let terminalTitle = terminalTitle(from: events) {
+        if let terminalTitle = terminalTitle(from: filtered) {
             return terminalTitle
         }
 

@@ -23,6 +23,9 @@ actor ActivityTracker {
     private var lastTransitionTime: Date = .distantPast
     private var lastWindowRecheckTime: Date = .distantPast
 
+    private var pendingFocusEvent: RawActivityEvent?
+    private var pendingFocusEmitTask: Task<Void, Never>?
+
     private var observerTokens: [NSObjectProtocol] = []
     private var verifyPollTask: Task<Void, Never>?
     private var enrichTask: Task<Void, Never>?
@@ -51,6 +54,9 @@ actor ActivityTracker {
         verifyPollTask = nil
         enrichTask?.cancel()
         enrichTask = nil
+        pendingFocusEmitTask?.cancel()
+        pendingFocusEmitTask = nil
+        pendingFocusEvent = nil
         eventContinuation?.finish()
         eventContinuation = nil
         eventStream = nil
@@ -155,10 +161,9 @@ actor ActivityTracker {
 
         // Skip ignored apps
         let ignoredIds = await MainActor.run { EchoSettings.shared.ignoredBundleIds }
-        guard !ignoredIds.contains(snapshot.bundleId) else { return }
-
-        // Never record Echo itself — the recorder recording itself is noise.
-        if snapshot.bundleId == (Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2") {
+        let isEcho = snapshot.bundleId == (Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2")
+        if ignoredIds.contains(snapshot.bundleId) || isEcho {
+            closeCurrentAppFocus(at: Date())
             return
         }
 
@@ -186,6 +191,23 @@ actor ActivityTracker {
         guard now.timeIntervalSince(lastWindowRecheckTime) >= EchoConfig.trackerMinTransitionInterval
         else { return }
         lastWindowRecheckTime = now
+        
+        if let pending = pendingFocusEvent {
+            pendingFocusEvent = RawActivityEvent(
+                id: pending.id,
+                timestamp: pending.timestamp,
+                type: pending.type,
+                appBundleId: pending.appBundleId,
+                appName: pending.appName,
+                windowTitle: snapshot.windowTitle,
+                url: snapshot.documentURL,
+                profileName: pending.profileName,
+                duration: pending.duration
+            )
+            lastEmittedWindowFingerprint = fingerprint
+            return
+        }
+        
         lastEmittedWindowFingerprint = fingerprint
 
         guard let bundleId = currentBundleId, let name = currentAppName else { return }
@@ -250,7 +272,7 @@ actor ActivityTracker {
         appFocusStart = now
         lastEmittedWindowFingerprint = initialDocumentURL ?? initialWindowTitle ?? ""
 
-        emit(RawActivityEvent(
+        let focusEvent = RawActivityEvent(
             id: UUID(),
             timestamp: now,
             type: .appFocus,
@@ -260,10 +282,37 @@ actor ActivityTracker {
             url: initialDocumentURL,
             profileName: nil,
             duration: 0
-        ))
+        )
 
-        // Always enrich: get browser URL via AppleScript, or document URL + clean title via AX.
-        scheduleWindowEnrichment(bundleId: bundleId, name: name, timestamp: now)
+        pendingFocusEvent = focusEvent
+        pendingFocusEmitTask?.cancel()
+
+        let delaySeconds = await MainActor.run {
+            let isBrowser = BrowserContextService.isBrowser(bundleId)
+            if isBrowser {
+                return EchoSettings.shared.browserCaptureDelaySeconds + EchoSettings.shared.tabEligibilitySeconds
+            } else {
+                return EchoSettings.shared.appFocusEligibilitySeconds
+            }
+        }
+
+        pendingFocusEmitTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delaySeconds))
+            guard !Task.isCancelled else { return }
+            await self?.emitPendingFocusEvent(matching: bundleId)
+        }
+    }
+
+    private func emitPendingFocusEvent(matching bundleId: String) {
+        guard let event = pendingFocusEvent, event.appBundleId == bundleId else { return }
+        pendingFocusEvent = nil
+        emit(event)
+
+        scheduleWindowEnrichment(
+            bundleId: event.appBundleId,
+            name: event.appName,
+            timestamp: event.timestamp
+        )
     }
 
     /// Enriches a focus event with URL context after a short delay.
@@ -338,6 +387,17 @@ actor ActivityTracker {
 
     private func closeCurrentAppFocus(at endTime: Date) {
         guard let bundleId = currentBundleId else { return }
+
+        pendingFocusEmitTask?.cancel()
+        pendingFocusEmitTask = nil
+
+        if pendingFocusEvent != nil {
+            pendingFocusEvent = nil
+            currentBundleId = nil
+            currentAppName = nil
+            return
+        }
+
         let duration = endTime.timeIntervalSince(appFocusStart)
         guard duration > 0.5 else { return }
 

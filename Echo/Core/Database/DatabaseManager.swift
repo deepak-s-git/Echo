@@ -172,6 +172,11 @@ nonisolated final class DatabaseManager: Sendable {
             """)
         }
 
+        // v7: Clear embeddings to force re-index with richer chunk documents
+        migrator.registerMigration("v7_reindex_embeddings") { db in
+            try db.execute(sql: "DELETE FROM session_embeddings")
+        }
+
         try migrator.migrate(pool)
     }
 

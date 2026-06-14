@@ -12,6 +12,12 @@ struct SessionDetailView: View {
     var body: some View {
         ZStack {
             EchoDesign.ambientBackground.ignoresSafeArea()
+            
+            // Ambient rotating glow backdrop
+            AmbientGlowView()
+                .opacity(0.5)
+                .offset(y: -100)
+                .allowsHitTesting(false)
 
             VStack(spacing: 0) {
                 detailHeader
@@ -267,7 +273,7 @@ struct SessionDetailView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     // MARK: - Header
@@ -310,24 +316,30 @@ struct SessionDetailView: View {
     // MARK: - Continuity
 
     private func continuitySection(_ memory: WorkflowMemory) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             sectionTitle("Continuity", icon: "point.topleft.down.to.point.bottomright.curvepath")
 
-            HStack(spacing: 20) {
-                continuityMeter(score: memory.continuityScore, label: "Flow preserved")
+            HStack(alignment: .center, spacing: 24) {
+                FocusIndicatorView(score: memory.continuityScore, label: "", size: 72)
+                    .shadow(color: EchoPalette.indigo.opacity(0.1), radius: 6)
+                
                 VStack(alignment: .leading, spacing: 8) {
                     Text(continuityNarrative(memory))
-                        .font(.system(size: 14))
-                        .foregroundStyle(.primary.opacity(0.85))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.95))
+                        .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("\(Int(memory.session.focusScore * 100))% focus · \(memory.interruptions.count) pauses")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
+                    
+                    HStack(spacing: 8) {
+                        DetailBadge(label: "\(Int(memory.session.focusScore * 100))% focus", icon: "target", tintColor: EchoPalette.indigoSoft)
+                        DetailBadge(label: "\(memory.interruptions.count) \(memory.interruptions.count == 1 ? "pause" : "pauses")", icon: "pause.circle", tintColor: .orange)
+                        DetailBadge(label: "Flow preserved", icon: "checkmark.shield", tintColor: EchoPalette.live)
+                    }
                 }
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     private func continuityNarrative(_ memory: WorkflowMemory) -> String {
@@ -338,17 +350,6 @@ struct SessionDetailView: View {
             return "Your attention fragmented across several pauses — a scattered but honest record."
         }
         return "A working memory with natural shifts between contexts."
-    }
-
-    private func continuityMeter(score: Double, label: String) -> some View {
-        VStack(spacing: 6) {
-            FocusIndicatorView(score: score, label: "", size: 64)
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(width: 72)
-        }
     }
 
 
@@ -369,7 +370,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     // MARK: - Phases
@@ -420,7 +421,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     // MARK: - Transitions
@@ -434,7 +435,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     // MARK: - Browser
@@ -453,7 +454,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     // MARK: - Interruptions
@@ -473,7 +474,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     // MARK: - Restore
@@ -523,21 +524,35 @@ struct SessionDetailView: View {
                 Button {
                     sessionDetailStore.prepareRestoreSelection()
                 } label: {
-                    HStack {
+                    HStack(spacing: 6) {
                         if sessionDetailStore.isRestoring {
-                            ProgressView().scaleEffect(0.7)
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise.circle.fill")
+                                .font(.system(size: 13, weight: .semibold))
                         }
                         Text("Resume Workflow")
+                            .font(.system(size: 12, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        EchoPalette.indigo.opacity(0.12)
+                    )
+                    .foregroundStyle(EchoPalette.indigoSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(EchoPalette.indigo.opacity(0.25), lineWidth: 0.5)
+                    )
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(.plain)
                 .disabled(sessionDetailStore.isRestoring)
+                .echoPointingCursor()
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard()
+        .echoCard(material: .ultraThinMaterial)
     }
 
     private func restoreGroupTitle(_ kind: RestoreItem.RestoreKind) -> String {
@@ -574,7 +589,6 @@ struct SessionDetailView: View {
                 .tracking(0.4)
         }
     }
-
     // MARK: - Workflow Intelligence
 
     private func workflowIntelligenceSection(_ memory: WorkflowMemory) -> some View {
@@ -598,77 +612,75 @@ struct SessionDetailView: View {
                 HStack(alignment: .center, spacing: 10) {
                     Text(momentum.level)
                         .font(.system(size: 15, weight: .bold))
-                    
-                    Text("Session Insights")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .textCase(.uppercase)
+                        .foregroundStyle(.primary)
                     
                     Spacer()
                     
-                    Text(momentum.level)
-                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                    Text("MOMENTUM")
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.vertical, 3.5)
                         .background(Capsule().fill(momentum.badgeColor))
                 }
                 
                 Text(momentum.description)
-                    .font(.system(size: 12.5))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 
                 Divider()
                     .opacity(0.3)
                 
-                // Integrity & Purity side by side
-                HStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
+                // Integrity & Purity structured side by side
+                HStack(spacing: 16) {
+                    // Context Integrity Block
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("Context Integrity")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
+                            .tracking(0.5)
                         
-                        HStack(spacing: 12) {
+                        HStack(alignment: .center, spacing: 12) {
                             Text("\(integrity.score)%")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
                                 .foregroundStyle(integrityColor(score: integrity.score))
                             
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(integrity.narrative)
-                                    .font(.system(size: 11.5, weight: .medium))
-                                    .foregroundStyle(.primary.opacity(0.85))
-                                    .lineLimit(2)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
+                            Text(integrity.narrative)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .padding(12)
+                    .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    Divider()
-                        .frame(height: 50)
-                        .opacity(0.3)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
+                    // Workflow Purity Block
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("Workflow Purity")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
+                            .tracking(0.5)
                         
-                        HStack(spacing: 12) {
+                        HStack(alignment: .center, spacing: 12) {
                             Text("\(purity)%")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
                                 .foregroundStyle(purityColor(score: purity))
                             
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Time spent on context tools vs background noise.")
-                                    .font(.system(size: 11, weight: .regular))
-                                    .foregroundStyle(.tertiary)
-                                    .lineLimit(2)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
+                            Text("Ratio of context tools vs background noise.")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .padding(12)
+                    .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 
@@ -678,42 +690,45 @@ struct SessionDetailView: View {
                 // Flow Recovery
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Flow Recovery")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
+                        .tracking(0.5)
                     
                     if recovery.hasDrifts {
-                        HStack(spacing: 0) {
+                        HStack(spacing: 10) {
                             recoveryStatBlock(label: "Average Recovery", value: recovery.averageLabel)
-                            Spacer()
                             recoveryStatBlock(label: "Best Recovery", value: recovery.bestLabel)
-                            Spacer()
                             recoveryStatBlock(label: "Longest Recovery", value: recovery.longestLabel)
                         }
                         .padding(.top, 4)
                     } else {
                         Text("No context drifts recorded. You remained fully focused on the primary workflow.")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, 4)
                     }
                 }
             }
             .padding(EchoDesign.cardPadding)
-            .echoCard()
+            .echoCard(material: .ultraThinMaterial)
         }
     }
     
     private func recoveryStatBlock(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.tertiary)
+                .textCase(.uppercase)
             Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.9))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(EchoPalette.indigoSoft)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
     }
     
     private func integrityColor(score: Int) -> Color {
@@ -1100,5 +1115,31 @@ struct WorkflowIntelligenceAnalyzer {
             return mins > 0 ? "\(hours)h \(mins)m" : "\(hours)h"
         }
         return "\(mins)m"
+    }
+}
+
+fileprivate struct DetailBadge: View {
+    let label: String
+    let icon: String
+    var tintColor: Color = .secondary
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+        }
+        .foregroundStyle(tintColor)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(tintColor.opacity(0.06))
+        )
+        .overlay(
+            Capsule()
+                .stroke(tintColor.opacity(0.12), lineWidth: 0.5)
+        )
     }
 }

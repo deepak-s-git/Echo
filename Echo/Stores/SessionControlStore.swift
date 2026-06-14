@@ -28,6 +28,11 @@ final class SessionControlStore: ObservableObject {
         appStore.selectTab(.home)
     }
 
+    func restoreAndContinueWorkflowThread(id: UUID, plan: WorkflowRestorePlan, appStore: AppStore) async {
+        await container?.restoreAndContinue(id: id, plan: plan)
+        appStore.selectTab(.home)
+    }
+
     func pauseSession() async {
         await container?.pauseCurrentSession()
     }

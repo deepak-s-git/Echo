@@ -142,6 +142,10 @@ nonisolated enum WorkflowContextCapture {
   }
 
   static func itemsForEvent(_ event: ActivityEvent, duration: TimeInterval, urlDurations: [String: TimeInterval] = [:], tabEligibility: Double? = nil, seen: inout Set<String>) -> [RestoreItem] {
+    // Never include Echo itself in restore plans
+    let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2"
+    guard event.appBundleId != selfBundleId else { return [] }
+
     let threshold = tabEligibility ?? {
         let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
         let hold = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")

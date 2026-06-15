@@ -220,12 +220,17 @@ struct EchoLiveDot: View {
 // MARK: - App icon cache
 
 enum AppIconCache {
-    private static let cache = NSCache<NSString, NSImage>()
+    private static let cache = NSCache<NSString, AnyObject>()
+    private static let failureSentinel = NSObject()
 
     static func icon(for bundleId: String) -> NSImage? {
         let key = bundleId as NSString
-        if let cached = cache.object(forKey: key) { return cached }
+        if let cached = cache.object(forKey: key) {
+            if cached === failureSentinel { return nil }
+            return cached as? NSImage
+        }
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+            cache.setObject(failureSentinel, forKey: key)
             return nil
         }
         let image = NSWorkspace.shared.icon(forFile: url.path)

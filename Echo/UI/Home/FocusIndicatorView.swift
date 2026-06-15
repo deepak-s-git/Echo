@@ -4,6 +4,7 @@ struct FocusIndicatorView: View {
     let score: Double
     let label: String
     var size: CGFloat = 80
+    var animate: Bool = true
 
     @State private var clockwiseRotation: Double = 0
     @State private var counterRotation: Double = 0
@@ -162,24 +163,46 @@ struct FocusIndicatorView: View {
         }
         .frame(width: size, height: size)
         .onAppear {
-            let clockwiseDuration = score > 0.4 ? (6.0 - 3.5 * score) : 8.0
-            withAnimation(.linear(duration: clockwiseDuration).repeatForever(autoreverses: false)) {
-                clockwiseRotation = 360
+            if animate {
+                startAnimations()
             }
+        }
+        .onChange(of: animate) { newValue in
+            if newValue {
+                startAnimations()
+            } else {
+                stopAnimations()
+            }
+        }
+    }
 
-            let counterDuration = score > 0.4 ? (8.0 - 4.5 * score) : 11.0
-            withAnimation(.linear(duration: counterDuration).repeatForever(autoreverses: false)) {
-                counterRotation = -360
-            }
+    private func startAnimations() {
+        let clockwiseDuration = score > 0.4 ? (6.0 - 3.5 * score) : 8.0
+        withAnimation(.linear(duration: clockwiseDuration).repeatForever(autoreverses: false)) {
+            clockwiseRotation = 360
+        }
 
-            withAnimation(.linear(duration: 3.0).repeatForever(autoreverses: false)) {
-                ripplePhase = 1.0
-            }
+        let counterDuration = score > 0.4 ? (8.0 - 4.5 * score) : 11.0
+        withAnimation(.linear(duration: counterDuration).repeatForever(autoreverses: false)) {
+            counterRotation = -360
+        }
 
-            let pulseDuration = score > 0.5 ? 2.5 : 1.2
-            withAnimation(.easeInOut(duration: pulseDuration).repeatForever(autoreverses: true)) {
-                pulseOpacity = 0.50
-            }
+        withAnimation(.linear(duration: 3.0).repeatForever(autoreverses: false)) {
+            ripplePhase = 1.0
+        }
+
+        let pulseDuration = score > 0.5 ? 2.5 : 1.2
+        withAnimation(.easeInOut(duration: pulseDuration).repeatForever(autoreverses: true)) {
+            pulseOpacity = 0.50
+        }
+    }
+
+    private func stopAnimations() {
+        withAnimation(nil) {
+            clockwiseRotation = 0
+            counterRotation = 0
+            ripplePhase = 0
+            pulseOpacity = 0.25
         }
     }
 }

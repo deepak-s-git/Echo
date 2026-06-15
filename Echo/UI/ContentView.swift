@@ -21,7 +21,7 @@ struct ContentView: View {
                 ErrorView(error: error)
             }
         }
-        .frame(minWidth: 900, minHeight: 620)
+        .frame(minWidth: 900, maxWidth: 900, minHeight: 620, maxHeight: 620)
         .background(.clear)
         .onReceive(NotificationCenter.default.publisher(for: .echoOpenSearch)) { _ in
             appStore.selectedTab = .search

@@ -15,38 +15,43 @@ struct NotificationsPane: View {
 
             let orange = EchoPalette.indigo
 
-            // MARK: Session Events
-            SettingsGroup(label: "Session Events") {
-                SettingsToggleRow(
-                    icon: "checkmark.seal",
-                    iconColor: orange,
-                    label: "Session saved",
-                    description: "Notify when a session finishes saving to disk",
-                    isOn: $settings.notifyOnSessionSaved,
-                    showDivider: true
-                )
+            // Blacked out/disabled preview of setting rows
+            VStack(spacing: 0) {
+                // MARK: Session Events
+                SettingsGroup(label: "Session Events") {
+                    SettingsToggleRow(
+                        icon: "checkmark.seal",
+                        iconColor: orange,
+                        label: "Session saved",
+                        description: "Notify when a session finishes saving to disk",
+                        isOn: $settings.notifyOnSessionSaved,
+                        showDivider: true
+                    )
 
-                SettingsToggleRow(
-                    icon: "moon.zzz",
-                    iconColor: orange,
-                    label: "Idle timeout warning",
-                    description: "Notify 1 minute before a session ends due to inactivity",
-                    isOn: $settings.notifyOnIdleWarning,
-                    showDivider: false
-                )
-            }
+                    SettingsToggleRow(
+                        icon: "moon.zzz",
+                        iconColor: orange,
+                        label: "Idle timeout warning",
+                        description: "Notify 1 minute before a session ends due to inactivity",
+                        isOn: $settings.notifyOnIdleWarning,
+                        showDivider: false
+                    )
+                }
 
-            // MARK: Daily
-            SettingsGroup(label: "Daily") {
-                SettingsToggleRow(
-                    icon: "chart.bar.doc.horizontal",
-                    iconColor: orange,
-                    label: "Daily summary",
-                    description: "End-of-day digest with focus time and top apps",
-                    isOn: $settings.notifyDailySummary,
-                    showDivider: false
-                )
+                // MARK: Daily
+                SettingsGroup(label: "Daily") {
+                    SettingsToggleRow(
+                        icon: "chart.bar.doc.horizontal",
+                        iconColor: orange,
+                        label: "Daily summary",
+                        description: "End-of-day digest with focus time and top apps",
+                        isOn: $settings.notifyDailySummary,
+                        showDivider: false
+                    )
+                }
             }
+            .disabled(true)
+            .opacity(0.45)
 
             // MARK: Coming Soon Banner
             ComingSoonBanner(color: orange)

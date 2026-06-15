@@ -51,7 +51,8 @@ struct HomeView: View {
 
                         MiniTimelineView(
                             segments: activityStore.timelineSegments,
-                            focusIntensity: activityStore.focusIntensity
+                            focusIntensity: activityStore.focusIntensity,
+                            isLive: true
                         )
                         .equatable()
 
@@ -133,7 +134,7 @@ private struct HomeHeroSection: View {
 
             Spacer(minLength: 0)
 
-            FocusIndicatorView(score: focusScore, label: focusLabel)
+            FocusIndicatorView(score: focusScore, label: focusLabel, animate: isActive && !isPaused)
         }
         .padding(24)
         .background {

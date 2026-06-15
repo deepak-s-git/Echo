@@ -252,3 +252,23 @@ struct AppIconView: View {
         .frame(width: size, height: size)
     }
 }
+
+extension WorkflowCluster {
+    var colors: [Color] {
+        switch self {
+        case .coding:
+            return [Color(red: 0.25, green: 0.35, blue: 0.95), Color(red: 0.15, green: 0.55, blue: 0.90)]
+        case .research:
+            return [Color(red: 0.12, green: 0.63, blue: 0.63), Color(red: 0.08, green: 0.55, blue: 0.40)]
+        case .writing:
+            return [Color(red: 0.95, green: 0.60, blue: 0.10), Color(red: 0.90, green: 0.45, blue: 0.08)]
+        case .design:
+            return [Color(red: 0.95, green: 0.25, blue: 0.55), Color(red: 0.90, green: 0.20, blue: 0.35)]
+        case .communication:
+            return [Color(red: 0.60, green: 0.30, blue: 0.95), Color(red: 0.45, green: 0.20, blue: 0.85)]
+        case .mixed:
+            return [Color(red: 0.45, green: 0.50, blue: 0.60), Color(red: 0.30, green: 0.35, blue: 0.45)]
+        }
+    }
+}
+

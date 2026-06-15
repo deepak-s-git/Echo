@@ -320,7 +320,7 @@ struct SessionDetailView: View {
             sectionTitle("Continuity", icon: "point.topleft.down.to.point.bottomright.curvepath")
 
             HStack(alignment: .center, spacing: 24) {
-                FocusIndicatorView(score: memory.continuityScore, label: "", size: 72)
+                FocusIndicatorView(score: memory.continuityScore, label: "", size: 72, animate: false)
                     .shadow(color: EchoPalette.indigo.opacity(0.1), radius: 6)
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -365,7 +365,8 @@ struct SessionDetailView: View {
             } else {
                 MiniTimelineView(
                     segments: SessionTimelineBuilder.segments(from: memory.events, session: memory.session),
-                    focusIntensity: SessionTimelineBuilder.focusIntensity(from: memory.events)
+                    focusIntensity: SessionTimelineBuilder.focusIntensity(from: memory.events),
+                    isLive: false
                 )
             }
         }

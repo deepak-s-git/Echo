@@ -495,7 +495,7 @@ private struct WorkflowThreadCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(summary.displayTitle)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(.primary)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
@@ -513,7 +513,7 @@ private struct WorkflowThreadCard: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Last Active: \(summary.latestActiveLabel)")
-                            .font(.system(size: 11))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                         
                         HStack(spacing: 8) {
@@ -521,8 +521,8 @@ private struct WorkflowThreadCard: View {
                             Text("·")
                             Text("\(summary.segments.count) \(summary.segments.count == 1 ? "Session" : "Sessions")")
                         }
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary.opacity(0.85))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
                         
                         // App Icon Overlapping Stack
                         let bundleIds = summary.bundleIds
@@ -707,7 +707,7 @@ private struct SessionHistoryRow: View {
                     }
                     
                     Text(formatSessionTimeRange(segment))
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
                 
@@ -728,7 +728,7 @@ private struct SessionHistoryRow: View {
                 
                 Text("Duration: \(segment.duration.shortLabel)")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary.opacity(0.8))
+                    .foregroundStyle(.secondary)
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 12)

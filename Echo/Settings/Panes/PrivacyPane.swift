@@ -17,13 +17,14 @@ struct PrivacyPane: View {
     }
 
     var body: some View {
+        let greenTheme = EchoPalette.indigo
         VStack(alignment: .leading, spacing: 0) {
 
             SettingsPaneHeader(
                 icon: "lock.shield.fill",
                 title: "Privacy",
                 subtitle: "Permissions, data storage & retention",
-                color: Color(red: 0.45, green: 0.72, blue: 0.55)
+                color: greenTheme
             )
 
             // MARK: Permissions
@@ -31,7 +32,7 @@ struct PrivacyPane: View {
                 // Accessibility row
                 SettingsRow(
                     icon: "accessibility",
-                    iconColor: Color(red: 0.45, green: 0.72, blue: 0.55),
+                    iconColor: greenTheme,
                     label: "Accessibility Access",
                     description: "Required to detect which apps you use",
                     showDivider: false
@@ -95,7 +96,7 @@ struct PrivacyPane: View {
             SettingsGroup(label: "Storage") {
                 SettingsRow(
                     icon: "internaldrive",
-                    iconColor: Color(red: 0.45, green: 0.72, blue: 0.55),
+                    iconColor: greenTheme,
                     label: "Data location",
                     description: "~/Library/Application Support/Echo/echo.sqlite",
                     showDivider: true
@@ -117,7 +118,7 @@ struct PrivacyPane: View {
 
                 SettingsRow(
                     icon: "calendar.badge.clock",
-                    iconColor: Color(red: 0.45, green: 0.72, blue: 0.55),
+                    iconColor: greenTheme,
                     label: "Keep data for",
                     showDivider: false
                 ) {

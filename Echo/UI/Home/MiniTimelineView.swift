@@ -340,11 +340,11 @@ private struct TimelineBeadVisualView: View {
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(segment.appName)
                                         .font(.system(size: 11.5, weight: .bold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.primary)
                                     
                                     Text(appCategory)
                                         .font(.system(size: 8.5, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.55))
+                                        .foregroundStyle(.secondary)
                                 }
                                 Spacer()
                             }
@@ -354,27 +354,27 @@ private struct TimelineBeadVisualView: View {
                             
                             // Separator line
                             Rectangle()
-                                .fill(Color.white.opacity(0.08))
+                                .fill(Color.primary.opacity(0.08))
                                 .frame(height: 0.5)
                             
                             // Details
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 0) {
                                     Text("Time Spent: ")
-                                        .foregroundStyle(.white.opacity(0.60))
+                                        .foregroundStyle(.secondary)
                                     Text(formatDuration(segment.duration))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.primary)
                                         .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                                 }
                                 .font(.system(size: 9.5))
                                 
                                 Text("Part of Workflow Context")
                                     .font(.system(size: 9.5))
-                                    .foregroundStyle(EchoPalette.indigoSoft.opacity(0.85))
+                                    .foregroundStyle(EchoPalette.indigoSoft)
                                 
                                 HStack(spacing: 0) {
                                     Text("Focus Contribution: ")
-                                        .foregroundStyle(.white.opacity(0.60))
+                                        .foregroundStyle(.secondary)
                                     Text(focusContribution)
                                         .foregroundStyle(focusContributionColor)
                                         .font(.system(size: 9.5, weight: .bold))
@@ -391,15 +391,15 @@ private struct TimelineBeadVisualView: View {
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
                         )
-                        .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+                        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                         .offset(x: cardXOffset)
                         
                         // Downward Pointer
                         Image(systemName: "arrowtriangle.down.fill")
                             .font(.system(size: 6))
-                            .foregroundStyle(Color(white: 0.1, opacity: 0.85))
+                            .foregroundStyle(Color(NSColor.windowBackgroundColor))
                             .offset(y: -0.5)
                     }
                     .fixedSize()

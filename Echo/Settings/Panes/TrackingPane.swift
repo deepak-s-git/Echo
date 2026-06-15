@@ -14,10 +14,10 @@ struct TrackingPane: View {
                 icon: "waveform.circle.fill",
                 title: "Tracking",
                 subtitle: "What Echo watches and what it ignores",
-                color: Color(red: 0.88, green: 0.38, blue: 0.48)
+                color: EchoPalette.indigo
             )
 
-            let rose = Color(red: 0.88, green: 0.38, blue: 0.48)
+            let rose = EchoPalette.indigo
 
             // MARK: Activity Capture
             SettingsGroup(label: "Activity Capture") {

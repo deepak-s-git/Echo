@@ -74,11 +74,17 @@ struct SidebarView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
             } else {
-                Text("Not recording")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.primary.opacity(0.35))
+                        .frame(width: 5, height: 5)
+                    Text("Ready")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .background(EchoPalette.sidebar)
@@ -93,6 +99,8 @@ struct SidebarItem: View {
     let icon: String
     let label: String
 
+    @State private var isHovered = false
+
     private var isSelected: Bool { appStore.selectedTab == tab }
 
     var body: some View {
@@ -101,22 +109,52 @@ struct SidebarItem: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
                     .frame(width: 18)
+                    .foregroundStyle(isSelected ? Color.primary : (isHovered ? Color.primary : Color.primary.opacity(0.65)))
+                    .scaleEffect(isHovered ? 1.06 : 1.0)
+                    .offset(x: isHovered && !isSelected ? 1.5 : 0)
+                
                 Text(label)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                    .foregroundStyle(isSelected ? Color.primary : (isHovered ? Color.primary : Color.primary.opacity(0.75)))
+                
                 Spacer()
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .fill(isSelected ? EchoPalette.indigo.opacity(0.12) : .clear)
+                ZStack {
+                    RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                        .fill(isSelected ? EchoPalette.indigo.opacity(0.12) : .clear)
+                    
+                    RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                        .fill(isHovered && !isSelected ? Color.primary.opacity(0.04) : .clear)
+                }
             )
-            .foregroundStyle(isSelected ? EchoPalette.indigoSoft : Color.primary.opacity(0.7))
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? EchoPalette.strokeBright.opacity(0.5) : (isHovered ? EchoPalette.stroke.opacity(0.3) : .clear),
+                        lineWidth: 0.5
+                    )
+            )
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(EchoPalette.accent)
+                    .frame(width: 3, height: isSelected ? 16 : 0)
+                    .offset(x: 4)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isSelected)
+            }
+            .shadow(color: isSelected ? EchoPalette.indigo.opacity(0.08) : .clear, radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                isHovered = hovering
+            }
+        }
         .echoPointingCursor()
     }
 }
@@ -124,23 +162,57 @@ struct SidebarItem: View {
 // MARK: - Echo Wordmark
 
 struct EchoWordmark: View {
+    @State private var isAnimating = false
+
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             ZStack {
+                // Outer ambient pulse glow
                 Circle()
-                    .fill(EchoPalette.indigo.opacity(0.12))
+                    .fill(EchoPalette.indigo.opacity(isAnimating ? 0.22 : 0.08))
                     .frame(width: 28, height: 28)
+                    .blur(radius: isAnimating ? 2 : 0)
+                    .scaleEffect(isAnimating ? 1.15 : 0.95)
+
+                // Inner ring border
                 Circle()
-                    .fill(EchoPalette.indigo.opacity(0.55))
+                    .strokeBorder(EchoPalette.indigo.opacity(0.25), lineWidth: 1)
+                    .frame(width: 20, height: 20)
+
+                // Core dot
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [EchoPalette.indigo, EchoPalette.indigoSoft.opacity(0.8)],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 5
+                        )
+                    )
                     .frame(width: 8, height: 8)
+                    .shadow(color: EchoPalette.indigo.opacity(isAnimating ? 0.6 : 0.2), radius: isAnimating ? 4 : 1)
             }
+            .frame(width: 28, height: 28)
+            
             Text("Echo")
-                .font(.system(size: 17, weight: .semibold, design: .default))
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .tracking(0.5)
                 .foregroundStyle(.primary)
+            
             Spacer()
+        }
+        .onAppear {
+            withAnimation(
+                .easeInOut(duration: 2.2)
+                .repeatForever(autoreverses: true)
+            ) {
+                isAnimating = true
+            }
         }
     }
 }
+
+
 
 // MARK: - Live Session Pill
 
@@ -178,8 +250,8 @@ struct LiveSessionPill: View {
             }
 
             Text(activityStore.focusHeadline)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.85))
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
             Text(activityStore.workflowIdentity)
                 .font(.system(size: 10, weight: .semibold))

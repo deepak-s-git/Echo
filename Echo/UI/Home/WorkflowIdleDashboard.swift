@@ -46,7 +46,7 @@ struct WorkflowIdleDashboard: View {
             // 2. Record Section (Grid of 2 upgraded gradient cards)
             VStack(alignment: .leading, spacing: 8) {
                 Text("Record Activity")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
                     .tracking(0.5)
                     .textCase(.uppercase)
@@ -75,7 +75,7 @@ struct WorkflowIdleDashboard: View {
             // 3. History Section
             VStack(alignment: .leading, spacing: 8) {
                 Text("History")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
                     .tracking(0.5)
                     .textCase(.uppercase)
@@ -86,6 +86,26 @@ struct WorkflowIdleDashboard: View {
                     icon: "timeline.selection"
                 ) {
                     appStore.selectTab(.timeline)
+                }
+            }
+
+            // Recent Sessions Section
+            let recent = Array(sessionStore.recentSessions.prefix(3))
+            if !recent.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recent Workflows")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .tracking(0.5)
+                        .textCase(.uppercase)
+                    
+                    VStack(spacing: 8) {
+                        ForEach(recent) { session in
+                            RecentSessionRow(session: session) {
+                                appStore.openSessionDetail(session.id)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -108,8 +128,8 @@ struct WorkflowIdleDashboard: View {
                         }
                     }
                 }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
                 .padding(.top, 4)
             }
@@ -365,8 +385,8 @@ private struct GridActionButton: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.primary)
                     Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary.opacity(0.85))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -426,8 +446,8 @@ private struct SubtleActionButton: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary.opacity(0.85))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 
@@ -1009,6 +1029,85 @@ struct AmbientGlowView: View {
                 }
             }
         }
+    }
+}
+
+struct RecentSessionRow: View {
+    let session: Session
+    let action: () -> Void
+    
+    @State private var hovering = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                // Gradient category icon circle
+                let colors = session.cluster.colors
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .shadow(color: colors[0].opacity(0.25), radius: 3, y: 1.5)
+                    
+                    Image(systemName: session.cluster.icon)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 24, height: 24)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.title ?? "Untitled segment")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    
+                    Text("\(session.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(session.duration.shortLabel)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                // Show app icons used
+                let appItems = session.restorePlan?.items.filter { $0.kind == .application } ?? []
+                let bundleIds = Array(Set(appItems.compactMap { $0.bundleId }))
+                if !bundleIds.isEmpty {
+                    HStack(spacing: -5) {
+                        ForEach(Array(bundleIds.prefix(4).enumerated()), id: \.element) { index, bundleId in
+                            AppIconView(bundleId: bundleId, size: 16)
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .stroke(Color.black.opacity(0.15), lineWidth: 0.5)
+                                )
+                                .shadow(color: .black.opacity(0.08), radius: 0.5, y: 0.5)
+                                .zIndex(Double(bundleIds.count - index))
+                        }
+                    }
+                    .padding(.trailing, 2)
+                }
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(hovering ? .secondary : .quaternary)
+                    .offset(x: hovering ? 2 : 0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.5), value: hovering)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.03 : 0.01))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
+            }
+            .scaleEffect(hovering ? 1.005 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: hovering)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .echoPointingCursor()
     }
 }
 

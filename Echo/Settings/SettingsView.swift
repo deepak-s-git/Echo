@@ -26,14 +26,7 @@ struct SettingsView: View {
         }
 
         var accentColor: Color {
-            switch self {
-            case .general: return Color(red: 0.28, green: 0.58, blue: 0.88)
-            case .tracking: return Color(red: 0.88, green: 0.38, blue: 0.48)
-            case .privacy: return Color(red: 0.45, green: 0.72, blue: 0.55)
-            case .appearance: return Color(red: 0.72, green: 0.48, blue: 0.88)
-            case .notifications: return Color(red: 0.95, green: 0.65, blue: 0.30)
-            case .about: return EchoPalette.indigo
-            }
+            return EchoPalette.indigo
         }
     }
 
@@ -72,13 +65,14 @@ private struct SettingsSidebar: View {
                 ZStack {
                     Circle()
                         .fill(EchoPalette.indigo.opacity(0.14))
-                        .frame(width: 26, height: 26)
+                        .frame(width: 24, height: 24)
                     Circle()
                         .fill(EchoPalette.indigo.opacity(0.65))
-                        .frame(width: 8, height: 8)
+                        .frame(width: 6, height: 6)
                 }
                 Text("Settings")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .tracking(0.3)
                     .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -122,47 +116,68 @@ private struct SettingsSidebarRow: View {
     let isSelected: Bool
     let action: () -> Void
 
-    @State private var hovering = false
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 9) {
+            HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(isSelected
-                              ? pane.accentColor.opacity(0.18)
-                              : Color.primary.opacity(0.06))
-                        .frame(width: 26, height: 26)
+                              ? EchoPalette.indigo.opacity(0.16)
+                              : Color.primary.opacity(0.04))
+                        .frame(width: 24, height: 24)
                     Image(systemName: pane.icon)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(isSelected
-                                         ? pane.accentColor
-                                         : Color.primary.opacity(0.50))
+                                         ? EchoPalette.accent
+                                         : Color.primary.opacity(0.55))
                 }
+                .scaleEffect(isHovered ? 1.05 : 1.0)
+                
                 Text(pane.rawValue)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? .primary : Color.primary.opacity(0.70))
+                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .semibold))
+                    .foregroundStyle(isSelected ? Color.primary : (isHovered ? Color.primary : Color.primary.opacity(0.70)))
+                    .offset(x: isHovered && !isSelected ? 1.5 : 0)
+                
                 Spacer(minLength: 0)
             }
-            // Pin content to leading edge — prevents Button from centering
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .contentShape(Rectangle())
             .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                        .fill(isSelected ? EchoPalette.indigo.opacity(0.12) : .clear)
+                    
+                    RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                        .fill(isHovered && !isSelected ? Color.primary.opacity(0.04) : .clear)
+                }
+            )
+            .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? pane.accentColor.opacity(0.10)
-                            : (hovering ? Color.primary.opacity(0.04) : Color.clear)
+                    .strokeBorder(
+                        isSelected ? EchoPalette.strokeBright.opacity(0.5) : (isHovered ? EchoPalette.stroke.opacity(0.3) : .clear),
+                        lineWidth: 0.5
                     )
             )
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(EchoPalette.accent)
+                    .frame(width: 3, height: isSelected ? 14 : 0)
+                    .offset(x: 3)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isSelected)
+            }
+            .shadow(color: isSelected ? EchoPalette.indigo.opacity(0.08) : .clear, radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                isHovered = hovering
+            }
+        }
         .echoPointingCursor()
-        .onHover { hovering = $0 }
-        .animation(EchoDesign.subtle, value: isSelected)
-        .animation(EchoDesign.subtle, value: hovering)
     }
 }
 
@@ -200,13 +215,11 @@ private struct SettingsPaneContainer: View {
 
     private var settingsPaneBackground: some View {
         ZStack {
-            EchoPalette.graphite
-            LinearGradient(
-                colors: [pane.accentColor.opacity(0.04), Color.clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            EchoDesign.ambientBackground.ignoresSafeArea()
+            
+            AmbientGlowView()
+                .opacity(0.4)
+                .allowsHitTesting(false)
         }
-        .ignoresSafeArea()
     }
 }

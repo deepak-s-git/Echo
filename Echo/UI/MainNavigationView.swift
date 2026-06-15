@@ -162,17 +162,14 @@ struct SidebarItem: View {
 // MARK: - Echo Wordmark
 
 struct EchoWordmark: View {
-    @State private var isAnimating = false
-
     var body: some View {
         HStack(spacing: 10) {
             ZStack {
                 // Outer ambient pulse glow
                 Circle()
-                    .fill(EchoPalette.indigo.opacity(isAnimating ? 0.22 : 0.08))
+                    .fill(EchoPalette.indigo.opacity(0.08))
                     .frame(width: 28, height: 28)
-                    .blur(radius: isAnimating ? 2 : 0)
-                    .scaleEffect(isAnimating ? 1.15 : 0.95)
+                    .scaleEffect(0.95)
 
                 // Inner ring border
                 Circle()
@@ -190,7 +187,7 @@ struct EchoWordmark: View {
                         )
                     )
                     .frame(width: 8, height: 8)
-                    .shadow(color: EchoPalette.indigo.opacity(isAnimating ? 0.6 : 0.2), radius: isAnimating ? 4 : 1)
+                    .shadow(color: EchoPalette.indigo.opacity(0.2), radius: 1)
             }
             .frame(width: 28, height: 28)
             
@@ -200,14 +197,6 @@ struct EchoWordmark: View {
                 .foregroundStyle(.primary)
             
             Spacer()
-        }
-        .onAppear {
-            withAnimation(
-                .easeInOut(duration: 2.2)
-                .repeatForever(autoreverses: true)
-            ) {
-                isAnimating = true
-            }
         }
     }
 }

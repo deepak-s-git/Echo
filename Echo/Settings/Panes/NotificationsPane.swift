@@ -10,10 +10,10 @@ struct NotificationsPane: View {
                 icon: "bell.badge.fill",
                 title: "Notifications",
                 subtitle: "Control when Echo alerts you",
-                color: Color(red: 0.95, green: 0.65, blue: 0.30)
+                color: EchoPalette.indigo
             )
 
-            let orange = Color(red: 0.95, green: 0.65, blue: 0.30)
+            let orange = EchoPalette.indigo
 
             // MARK: Session Events
             SettingsGroup(label: "Session Events") {

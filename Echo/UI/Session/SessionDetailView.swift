@@ -299,7 +299,7 @@ struct SessionDetailView: View {
             .background(Capsule().fill(EchoPalette.indigo.opacity(0.1)))
 
             Text(memory.session.title ?? "Untitled memory")
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: 28, weight: .bold))
                 .lineLimit(3)
 
             HStack(spacing: 16) {
@@ -307,7 +307,7 @@ struct SessionDetailView: View {
                 Label(memory.session.duration.shortLabel, systemImage: "clock")
                 Label("\(appCountLabel(memory)) apps", systemImage: "square.grid.2x2")
             }
-            .font(.system(size: 12))
+            .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -325,8 +325,8 @@ struct SessionDetailView: View {
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(continuityNarrative(memory))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.95))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                     
@@ -625,7 +625,7 @@ struct SessionDetailView: View {
                 }
                 
                 Text(momentum.description)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                 
                 Divider()
@@ -704,8 +704,8 @@ struct SessionDetailView: View {
                         .padding(.top, 4)
                     } else {
                         Text("No context drifts recorded. You remained fully focused on the primary workflow.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
                             .padding(.vertical, 4)
                     }
                 }
@@ -718,8 +718,8 @@ struct SessionDetailView: View {
     private func recoveryStatBlock(label: String, value: String) -> some View {
         VStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.secondary)
                 .textCase(.uppercase)
             Text(value)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -767,7 +767,7 @@ private struct AppTransitionRow: View {
                         .font(.system(size: 13, weight: .medium))
                 }
                 Text(t.timestamp, style: .time)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.secondary)
             }
             Spacer(minLength: 0)

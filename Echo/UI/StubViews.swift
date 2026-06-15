@@ -30,12 +30,28 @@ struct SearchView: View {
     @State private var searchResults: [SemanticSearchResult] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var selectedCluster: WorkflowCluster? = nil
+
+    private var filteredResults: [SemanticSearchResult] {
+        if let selectedCluster {
+            return searchResults.filter { $0.session.cluster == selectedCluster }
+        }
+        return searchResults
+    }
 
     var body: some View {
         ZStack {
             EchoDesign.ambientBackground.ignoresSafeArea()
+            AmbientGlowView()
+                .opacity(0.45)
 
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 18) {
+                // Header
+                Text("Search Workflows")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .padding(.bottom, 2)
+
                 // Premium glassmorphic search bar
                 HStack(spacing: 12) {
                     ZStack {
@@ -95,16 +111,48 @@ struct SearchView: View {
                     runSearch(for: query)
                 }
 
-                if searchResults.isEmpty {
+                // Category Filter Pills
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        CategoryPill(
+                            label: "All",
+                            icon: "square.grid.2x2",
+                            isSelected: selectedCluster == nil,
+                            color: EchoPalette.indigoSoft
+                        ) {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                selectedCluster = nil
+                            }
+                        }
+                        
+                        ForEach(WorkflowCluster.allCases, id: \.self) { cluster in
+                            let colors = cluster.colors
+                            CategoryPill(
+                                label: cluster.label,
+                                icon: cluster.icon,
+                                isSelected: selectedCluster == cluster,
+                                color: colors[0]
+                            ) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                    selectedCluster = cluster
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 4)
+                }
+
+                if filteredResults.isEmpty {
                     Spacer()
                     VStack(spacing: 12) {
                         Image(systemName: "sparkle.magnifyingglass")
                             .font(.system(size: 32, weight: .thin))
                             .foregroundStyle(EchoPalette.indigo.opacity(0.35))
-                        Text("No sessions match")
+                        Text(selectedCluster != nil ? "No workflows in this category" : "No sessions match")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text("Try searching for tags, app names, or titles.")
+                        Text(selectedCluster != nil ? "Try clearing the filter or searching something else." : "Try searching for tags, app names, or titles.")
                             .font(.system(size: 12))
                             .foregroundStyle(.tertiary)
                     }
@@ -113,7 +161,7 @@ struct SearchView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
-                            ForEach(searchResults) { result in
+                            ForEach(filteredResults) { result in
                                 SearchResultCard(result: result) {
                                     appStore.openSessionDetail(result.session.id)
                                 }
@@ -185,6 +233,52 @@ struct SearchView: View {
     }
 }
 
+struct CategoryPill: View {
+    let label: String
+    let icon: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+    
+    @State private var hovering = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background {
+                if isSelected {
+                    Capsule()
+                        .fill(color.opacity(0.18))
+                } else {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                }
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        isSelected ? color.opacity(0.5) : (hovering ? EchoPalette.strokeBright : EchoPalette.stroke),
+                        lineWidth: 0.5
+                    )
+            }
+            .foregroundStyle(isSelected ? color : (hovering ? .primary : .secondary))
+            .scaleEffect(hovering ? 1.03 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: hovering)
+            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isSelected)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .echoPointingCursor()
+    }
+}
+
 private struct SearchResultCard: View {
     let result: SemanticSearchResult
     let action: () -> Void
@@ -193,63 +287,108 @@ private struct SearchResultCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
+                // Category icon badge with gradient
+                let cluster = result.session.cluster
+                let colors = cluster.colors
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(badgeColor.opacity(0.12))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: iconName)
-                        .font(.system(size: 15))
-                        .foregroundStyle(badgeColor)
+                    Circle()
+                        .fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .shadow(color: colors[0].opacity(0.35), radius: 4, y: 2)
+                    
+                    Image(systemName: cluster.icon)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
                 }
+                .frame(width: 32, height: 32)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(result.session.title ?? "Untitled segment")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     
                     if !result.matchedChunks.isEmpty {
                         // Show up to 2 distinct chunk type snippets
                         let displayChunks = deduplicatedChunks(result.matchedChunks, maxCount: 2)
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             ForEach(Array(displayChunks.enumerated()), id: \.offset) { _, chunk in
-                                HStack(spacing: 4) {
+                                HStack(spacing: 5) {
                                     Image(systemName: snippetIcon(kind: chunk.kind))
                                         .font(.system(size: 9))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(badgeColor)
                                     Text(formatMatchedSnippet(document: chunk.document, kind: chunk.kind))
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 11, weight: .medium))
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
                                 }
                             }
                         }
                     } else if let doc = result.matchedDocument, let kind = result.matchedKind {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Image(systemName: snippetIcon(kind: kind))
                                 .font(.system(size: 9))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(badgeColor)
                             Text(formatMatchedSnippet(document: doc, kind: kind))
-                                .font(.system(size: 11))
+                                .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                     } else {
                         HStack(spacing: 6) {
                             Text(result.session.startedAt.formatted(date: .abbreviated, time: .shortened))
-                                .foregroundStyle(.secondary.opacity(0.85))
-                            if result.session.appCount > 0 {
-                                Text("·")
-                                    .foregroundStyle(.tertiary)
-                                Text("\(result.session.appCount) apps")
-                                    .foregroundStyle(.secondary.opacity(0.85))
-                            }
+                                .foregroundStyle(.secondary)
+                            
+                            Text("·")
+                                .foregroundStyle(.tertiary)
+                            
+                            Text(result.session.duration.shortLabel)
+                                .foregroundStyle(.secondary)
                         }
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, weight: .medium))
                     }
                 }
 
                 Spacer()
+
+                // Overlapping App Icon Stack from restore plan
+                let appItems = result.session.restorePlan?.items.filter { $0.kind == .application } ?? []
+                let bundleIds = Array(Set(appItems.compactMap { $0.bundleId }))
+                if !bundleIds.isEmpty {
+                    HStack(spacing: -6) {
+                        ForEach(Array(bundleIds.prefix(5).enumerated()), id: \.element) { index, bundleId in
+                            AppIconView(bundleId: bundleId, size: 20)
+                                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .stroke(Color.black.opacity(0.2), lineWidth: 0.5)
+                                )
+                                .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
+                                .zIndex(Double(bundleIds.count - index))
+                        }
+                        if bundleIds.count > 5 {
+                            Text("+\(bundleIds.count - 5)")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.primary.opacity(0.06), in: Capsule())
+                                .padding(.leading, 4)
+                        }
+                    }
+                    .padding(.trailing, 4)
+                } else if result.session.appCount > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 8))
+                        Text("\(result.session.appCount) apps")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.primary.opacity(0.04), in: Capsule())
+                    .padding(.trailing, 4)
+                }
 
                 if let score = result.score {
                     Text("\(Int(score * 100))% Match")
@@ -261,41 +400,27 @@ private struct SearchResultCard: View {
                                 .fill(badgeColor.opacity(0.12))
                         }
                         .foregroundStyle(badgeColor)
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(badgeColor.opacity(0.24), lineWidth: 0.5)
+                        }
                 } else {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(hovering ? .secondary : .quaternary)
                         .offset(x: hovering ? 2 : 0)
-                        .animation(EchoDesign.subtle, value: hovering)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.5), value: hovering)
                 }
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 14)
-            .background {
-                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .fill(Color.primary.opacity(0.01))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                    .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
-            )
-            .scaleEffect(hovering ? 1.005 : 1.0)
-            .animation(EchoDesign.subtle, value: hovering)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .echoCard(material: .ultraThinMaterial)
+            .scaleEffect(hovering ? 1.008 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
             .echoHoverHighlight()
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
-    }
-
-    private var iconName: String {
-        guard let kind = result.matchedKind else { return "folder.fill" }
-        switch kind {
-        case "browser": return "globe"
-        case "terminal": return "terminal.fill"
-        case "file": return "doc.text.fill"
-        case "summary": return "sparkles"
-        default: return "folder.fill"
-        }
     }
 
     private var badgeColor: Color {

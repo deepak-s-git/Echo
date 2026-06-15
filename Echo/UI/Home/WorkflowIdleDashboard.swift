@@ -206,8 +206,7 @@ struct WorkflowCreateSheet: View {
                 
                 Spacer()
                 
-                let displayName = workflowName.trimmingCharacters(in: .whitespacesAndNewlines)
-                Button(displayName.isEmpty ? "Create Workflow" : "Create Workflow \(displayName)") {
+                Button("Create Workflow") {
                     isWorking = true
                     Task {
                         let name = workflowName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -987,8 +986,6 @@ struct WorkflowSelectionCard: View {
 // MARK: - Ambient Glow
 
 struct AmbientGlowView: View {
-    @State private var rotation: Double = 0.0
-    
     var body: some View {
         ZStack {
             // First glowing blob (Vibrant Indigo/Blue Gradient)
@@ -1020,14 +1017,6 @@ struct AmbientGlowView: View {
                 .blur(radius: 50)
                 .opacity(0.18)
                 .offset(x: 70, y: 50)
-        }
-        .rotationEffect(.degrees(rotation))
-        .onAppear {
-            DispatchQueue.main.async {
-                withAnimation(.linear(duration: 30.0).repeatForever(autoreverses: false)) {
-                    rotation = 360.0
-                }
-            }
         }
     }
 }

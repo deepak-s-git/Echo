@@ -3,6 +3,7 @@ import SwiftUI
 struct MiniTimelineView: View, Equatable {
     let segments: [TimelineSegment]
     let focusIntensity: Double
+    var isLive: Bool = false
 
     static func == (lhs: MiniTimelineView, rhs: MiniTimelineView) -> Bool {
         lhs.segments == rhs.segments
@@ -178,8 +179,10 @@ struct MiniTimelineView: View, Equatable {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.72).delay(0.08)) {
                 isLoaded = true
             }
-            withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
-                pulsePhase = 1.0
+            if isLive {
+                withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+                    pulsePhase = 1.0
+                }
             }
         }
     }

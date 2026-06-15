@@ -10,10 +10,10 @@ struct AppearancePane: View {
                 icon: "paintbrush.pointed.fill",
                 title: "Appearance",
                 subtitle: "Theme, display options and visual preferences",
-                color: Color(red: 0.72, green: 0.48, blue: 0.88)
+                color: EchoPalette.indigo
             )
 
-            let purple = Color(red: 0.72, green: 0.48, blue: 0.88)
+            let purple = EchoPalette.indigo
 
             // MARK: Theme
             SettingsGroup(label: "Theme") {
@@ -80,7 +80,7 @@ private struct ThemeCard: View {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .strokeBorder(
                                     isSelected
-                                        ? Color(red: 0.72, green: 0.48, blue: 0.88)
+                                        ? EchoPalette.indigo
                                         : Color.primary.opacity(hovering ? 0.14 : 0.06),
                                     lineWidth: isSelected ? 2 : 0.5
                                 )
@@ -111,15 +111,15 @@ private struct ThemeCard: View {
                 HStack(spacing: 5) {
                     Image(systemName: theme.icon)
                         .font(.system(size: 11))
-                        .foregroundStyle(isSelected ? Color(red: 0.72, green: 0.48, blue: 0.88) : .secondary)
+                        .foregroundStyle(isSelected ? EchoPalette.indigo : .secondary)
                     Text(theme.label)
                         .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? Color(red: 0.72, green: 0.48, blue: 0.88) : .primary)
+                        .foregroundStyle(isSelected ? EchoPalette.indigo : .primary)
                 }
 
                 // Selected dot
                 Circle()
-                    .fill(isSelected ? Color(red: 0.72, green: 0.48, blue: 0.88) : Color.clear)
+                    .fill(isSelected ? EchoPalette.indigo : Color.clear)
                     .frame(width: 5, height: 5)
             }
         }
@@ -176,11 +176,11 @@ private struct AppearancePreviewCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                .fill(Color(red: 0.72, green: 0.48, blue: 0.88).opacity(0.05))
+                .fill(EchoPalette.indigo.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                .strokeBorder(Color(red: 0.72, green: 0.48, blue: 0.88).opacity(0.10), lineWidth: 0.5)
+                .strokeBorder(EchoPalette.indigo.opacity(0.10), lineWidth: 0.5)
         )
     }
 }

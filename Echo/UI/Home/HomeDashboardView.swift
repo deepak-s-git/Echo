@@ -9,11 +9,26 @@ struct HomeView: View {
             EchoDesign.ambientBackground
                 .ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
-                    if !activityStore.isRecording {
-                        WorkflowIdleDashboard()
-                    } else {
+            if !activityStore.isRecording {
+                GeometryReader { geo in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                WorkflowIdleDashboard()
+                                    .frame(maxWidth: 640)
+                                Spacer()
+                            }
+                            Spacer()
+                        }
+                        .frame(minWidth: geo.size.width)
+                        .frame(minHeight: geo.size.height)
+                    }
+                }
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 20) {
                         SessionControlBar(compact: false)
 
                         HomeHeroSection(
@@ -43,14 +58,13 @@ struct HomeView: View {
                         ActivityFeedView(events: activityStore.recentEvents)
                             .equatable()
                     }
+                    .padding(28)
+                    .padding(.bottom, 12)
                 }
-                .padding(28)
-                .padding(.bottom, 12)
             }
         }
     }
 }
-
 // MARK: - Hero
 
 private struct HomeHeroSection: View {

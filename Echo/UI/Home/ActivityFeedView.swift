@@ -92,7 +92,6 @@ private struct ActivityFeedRow: View {
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                 .fill(hovering ? Color.primary.opacity(0.03) : .clear)
         )
-        .echoPointingCursor()
         .onHover { hovering = $0 }
     }
 

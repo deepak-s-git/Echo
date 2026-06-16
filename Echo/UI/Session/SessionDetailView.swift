@@ -549,7 +549,6 @@ struct SessionDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(sessionDetailStore.isRestoring)
-                .echoPointingCursor()
             }
         }
         .padding(EchoDesign.cardPadding)
@@ -779,7 +778,6 @@ private struct AppTransitionRow: View {
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                 .fill(hovering ? Color.primary.opacity(0.04) : Color.primary.opacity(0.01))
         )
-        .echoPointingCursor()
         .onHover { hovering = $0 }
     }
 }

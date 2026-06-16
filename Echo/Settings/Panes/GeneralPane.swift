@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GeneralPane: View {
     @EnvironmentObject var settings: EchoSettings
+    @EnvironmentObject var appStore: AppStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -67,6 +68,36 @@ struct GeneralPane: View {
                     showDivider: false
                 )
             }
+
+            // MARK: Developer Settings
+            #if DEBUG
+            SettingsGroup(label: "Developer Settings") {
+                HStack(spacing: 12) {
+                    Image(systemName: "ladybug.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(steelBlue)
+                        .frame(width: 18)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Onboarding Intro")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.primary)
+                        Text("Relaunches the cinematic first-launch animation immediately.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button("Play Animation") {
+                        UserDefaults.standard.set(false, forKey: "echo.onboardingComplete")
+                        appStore.isOnboardingPresented = true
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
+            }
+            #endif
 
             // MARK: Info card
             IdleTimeoutInfoCard(minutes: settings.idleTimeoutMinutes, steelBlue: steelBlue)

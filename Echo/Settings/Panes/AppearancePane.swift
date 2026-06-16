@@ -124,7 +124,6 @@ private struct ThemeCard: View {
             }
         }
         .buttonStyle(.plain)
-        .echoPointingCursor()
         .onHover { hovering = $0 }
         .animation(EchoDesign.subtle, value: isSelected)
         .animation(EchoDesign.subtle, value: hovering)

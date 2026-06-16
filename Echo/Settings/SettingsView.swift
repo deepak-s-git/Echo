@@ -177,7 +177,6 @@ private struct SettingsSidebarRow: View {
                 isHovered = hovering
             }
         }
-        .echoPointingCursor()
     }
 }
 

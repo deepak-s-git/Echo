@@ -155,7 +155,6 @@ struct SidebarItem: View {
                 isHovered = hovering
             }
         }
-        .echoPointingCursor()
     }
 }
 

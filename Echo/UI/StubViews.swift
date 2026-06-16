@@ -86,7 +86,6 @@ struct SearchView: View {
                                 .font(.system(size: 13))
                         }
                         .buttonStyle(.plain)
-                        .echoPointingCursor()
                     }
                 }
                 .padding(.horizontal, 16)
@@ -275,7 +274,6 @@ struct CategoryPill: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .echoPointingCursor()
     }
 }
 
@@ -505,35 +503,7 @@ struct LaunchView: View {
     }
 }
 
-// MARK: - OnboardingView
 
-struct OnboardingView: View {
-    @EnvironmentObject var appStore: AppStore
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "memorychip")
-                .font(.system(size: 52, weight: .thin))
-                .foregroundStyle(EchoPalette.indigoSoft)
-            Text("Welcome to Echo")
-                .font(.system(size: 24, weight: .semibold))
-            Text("Echo remembers your workflow so you don't have to.")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Spacer()
-            Button("Get Started") {
-                appStore.completeOnboarding()
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            Spacer()
-        }
-        .frame(maxWidth: 400)
-        .padding(40)
-    }
-}
 
 // MARK: - ErrorView
 
@@ -560,38 +530,121 @@ struct ErrorView: View {
 
 struct PermissionsView: View {
     @EnvironmentObject var permissionsManager: PermissionsManager
+    
+    @State private var gridOpacity: Double = 0.0
+    @State private var cardOpacity: Double = 0.0
+    @State private var cardOffset: CGFloat = 25.0
+    @State private var isHovered = false
+    
+    private let brandCopper = Color(red: 0.85, green: 0.42, blue: 0.18)
+    private let brandAmber = Color(red: 0.95, green: 0.65, blue: 0.15)
+    private let brandGold = Color(red: 0.82, green: 0.74, blue: 0.55)
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "lock.shield")
-                .font(.system(size: 52, weight: .thin))
-                .foregroundStyle(EchoPalette.indigoSoft)
-            Text("Accessibility Access Required")
-                .font(.system(size: 20, weight: .semibold))
-            Text("Echo uses Accessibility to detect which apps you use and how long you use them. No keystrokes or content is ever recorded.")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
-
-            VStack(spacing: 12) {
-                Button("Open System Settings") {
-                    permissionsManager.requestAccessibility()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-
-                Text("Toggle the switch for **Echo** (or **Xcode** if running in debug mode) in Privacy & Security → Accessibility.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
+        ZStack {
+            // Deep obsidian charcoal background
+            Color(red: 0.05, green: 0.05, blue: 0.055)
+                .ignoresSafeArea()
+            
+            // Background dotted grid & constellation (warm gold accents)
+            SwiftUI.TimelineView(.animation) { timeline in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                
+                BackgroundConstellationView(
+                    time: time,
+                    accentColor: brandGold
+                )
+                .opacity(gridOpacity)
             }
-
-            Spacer()
+            .allowsHitTesting(false)
+            
+            // Centered glassmorphic container
+            VStack(spacing: 0) {
+                VStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(brandCopper.opacity(0.12))
+                            .frame(width: 72, height: 72)
+                            .shadow(color: brandCopper.opacity(0.15), radius: 8)
+                        
+                        Image(systemName: "lock.shield")
+                            .font(.system(size: 32, weight: .light))
+                            .foregroundStyle(brandCopper)
+                    }
+                    .padding(.top, 10)
+                    
+                    Text("Accessibility Access Required")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                    
+                    Text("Echo uses Accessibility to detect which apps you use and how long you use them. No keystrokes or content is ever recorded.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                        .frame(maxWidth: 360)
+                    
+                    Text("Toggle the switch for **Echo** (or **Xcode** if running in debug mode) in Privacy & Security → Accessibility.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 320)
+                        .padding(.top, 4)
+                    
+                    Button {
+                        permissionsManager.requestAccessibility()
+                    } label: {
+                        Text("Open System Settings")
+                            .font(.system(size: 13, weight: .bold))
+                              .foregroundStyle(.white)
+                            .frame(width: 240)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [brandCopper, brandAmber],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(.white.opacity(0.24), lineWidth: 0.5)
+                            )
+                            .shadow(color: brandCopper.opacity(isHovered ? 0.38 : 0.16), radius: isHovered ? 14 : 7, y: 3)
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        withAnimation(.spring(response: 0.24, dampingFraction: 0.75)) {
+                            isHovered = hovering
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+                .padding(32)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.white.opacity(0.015))
+                        .background(.ultraThinMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.white.opacity(0.06), lineWidth: 0.5)
+                )
+                .frame(width: 440)
+                .opacity(cardOpacity)
+                .offset(y: cardOffset)
+            }
         }
-        .padding(40)
+        .onAppear {
+            withAnimation(.easeIn(duration: 0.6)) {
+                gridOpacity = 1.0
+            }
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.76)) {
+                cardOpacity = 1.0
+                cardOffset = 0
+            }
+        }
     }
 }
 
@@ -731,7 +784,6 @@ struct MenuBarView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
                             }
                             .buttonStyle(.plain)
-                            .echoPointingCursor()
                             
                             // Stop Session
                             Button {
@@ -754,7 +806,6 @@ struct MenuBarView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(EchoPalette.destructive.opacity(0.25), lineWidth: 0.5))
                             }
                             .buttonStyle(.plain)
-                            .echoPointingCursor()
                         }
                     }
                 } else {
@@ -789,7 +840,6 @@ struct MenuBarView: View {
                                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.red.opacity(0.2), lineWidth: 0.5))
                             }
                             .buttonStyle(.plain)
-                            .echoPointingCursor()
                         }
                         
                         // Preset Tag Suggestions
@@ -814,7 +864,6 @@ struct MenuBarView: View {
                                             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
                                     }
                                     .buttonStyle(.plain)
-                                    .echoPointingCursor()
                                 }
                             }
                             .padding(.vertical, 2)
@@ -894,7 +943,6 @@ struct MenuBarView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(restoringSessionId != nil)
-                                .echoPointingCursor()
                             }
                             .padding(.vertical, 4)
                             .padding(.horizontal, 6)
@@ -916,7 +964,6 @@ struct MenuBarView: View {
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.primary.opacity(0.85))
-                .echoPointingCursor()
                 
                 Spacer()
                 
@@ -926,7 +973,6 @@ struct MenuBarView: View {
                 .buttonStyle(.plain)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-                .echoPointingCursor()
             }
             .padding(.horizontal, 4)
         }

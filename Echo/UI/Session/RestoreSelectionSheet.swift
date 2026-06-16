@@ -52,7 +52,6 @@ struct RestoreSelectionSheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
-                    .echoPointingCursor()
                     
                     Spacer()
                     
@@ -88,7 +87,6 @@ struct RestoreSelectionSheet: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(selected.isEmpty)
-                    .echoPointingCursor()
 
                     Button {
                         onRestoreAndContinue()
@@ -120,7 +118,6 @@ struct RestoreSelectionSheet: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(selected.isEmpty)
-                    .echoPointingCursor()
                 }
                 .padding(.horizontal, 4)
             }
@@ -571,7 +568,6 @@ private struct AppGroupSection: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .echoPointingCursor()
 
                 if hasSubItems {
                     Button {
@@ -586,7 +582,6 @@ private struct AppGroupSection: View {
                             .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
-                    .echoPointingCursor()
                 }
             }
 
@@ -624,7 +619,6 @@ private struct AppGroupSection: View {
                                     .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 6))
                                 }
                                 .buttonStyle(.plain)
-                                .echoPointingCursor()
                                 .padding(.leading, 8)
                                 
                                 // Tabs/Children under Profile

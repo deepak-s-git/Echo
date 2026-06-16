@@ -89,7 +89,6 @@ struct TimelineView: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .echoPointingCursor()
                         
                         Button(action: {
                             activeAlert = .bulkDelete(count: selectedThreadIds.count)
@@ -100,7 +99,6 @@ struct TimelineView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Color.red)
                         .disabled(selectedThreadIds.isEmpty)
-                        .echoPointingCursor()
                     } else if isSessionSelectMode {
                         Text("Delete Sessions")
                             .font(.system(size: 20, weight: .bold))
@@ -116,7 +114,6 @@ struct TimelineView: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .echoPointingCursor()
                         
                         Button(action: {
                             activeAlert = .bulkDeleteSessions(count: selectedSessionIds.count)
@@ -127,7 +124,6 @@ struct TimelineView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Color.red)
                         .disabled(selectedSessionIds.isEmpty)
-                        .echoPointingCursor()
                     } else {
                         Text("Timeline")
                             .font(.system(size: 24, weight: .bold))
@@ -157,7 +153,6 @@ struct TimelineView: View {
                         }
                         .menuStyle(.button)
                         .buttonStyle(.plain)
-                        .echoPointingCursor()
                     }
                 }
                 .padding(.horizontal, EchoDesign.containerRadius)
@@ -442,7 +437,6 @@ struct TimelineView: View {
             .shadow(color: (activityStore.isSessionPaused ? Color.orange : EchoPalette.live).opacity(0.04), radius: 6, y: 2)
         }
         .buttonStyle(.plain)
-        .echoPointingCursor()
         .contentShape(Rectangle())
     }
 
@@ -570,7 +564,6 @@ private struct WorkflowThreadCard: View {
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .disabled(isSessionSelectMode)
-                .echoPointingCursor()
                 .padding(.top, 6)
                 .onTapGesture {} // Prevent card toggle on menu click
 
@@ -740,7 +733,6 @@ private struct SessionHistoryRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .echoPointingCursor()
         .contextMenu {
             if !showCheckbox {
                 Button("Delete Session…", role: .destructive) {

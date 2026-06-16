@@ -342,7 +342,6 @@ private struct HeroActionButton: View {
             .shadow(color: hovering ? EchoPalette.indigoSoft.opacity(0.05) : Color.clear, radius: 10, y: 3)
             .scaleEffect(hovering ? 1.005 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
-            .echoPointingCursor()
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
@@ -412,7 +411,6 @@ private struct GridActionButton: View {
             .shadow(color: hovering ? gradientColors[0].opacity(0.04) : Color.clear, radius: 8, y: 3)
             .scaleEffect(hovering ? 1.008 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
-            .echoPointingCursor()
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
@@ -470,7 +468,6 @@ private struct SubtleActionButton: View {
             )
             .scaleEffect(hovering ? 1.003 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: hovering)
-            .echoPointingCursor()
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
@@ -613,7 +610,6 @@ struct SelectWorkflowSheet: View {
                     .foregroundStyle(EchoPalette.indigoSoft)
                 }
                 .buttonStyle(.plain)
-                .echoPointingCursor()
                 
                 Spacer()
             }
@@ -661,7 +657,6 @@ struct SelectWorkflowSheet: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5))
             }
             .buttonStyle(.plain)
-            .echoPointingCursor()
             .padding(.vertical, 4)
             
             Text("PAST SESSIONS")
@@ -727,7 +722,6 @@ struct SelectWorkflowSheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
                         }
                         .buttonStyle(.plain)
-                        .echoPointingCursor()
                     }
                 }
                 .padding(.vertical, 2)
@@ -757,7 +751,6 @@ struct SelectWorkflowSheet: View {
                     .foregroundStyle(EchoPalette.indigoSoft)
                 }
                 .buttonStyle(.plain)
-                .echoPointingCursor()
                 
                 Spacer()
             }
@@ -833,7 +826,6 @@ struct SelectWorkflowSheet: View {
                                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
                                 }
                                 .buttonStyle(.plain)
-                                .echoPointingCursor()
                             }
                         }
                         .padding(.vertical, 2)
@@ -889,7 +881,6 @@ struct SelectWorkflowSheet: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isWorking)
-                .echoPointingCursor()
             }
             .padding(.top, 4)
         }
@@ -976,7 +967,6 @@ struct WorkflowSelectionCard: View {
             )
             .scaleEffect(hovering ? 1.005 : 1.0)
             .animation(EchoDesign.subtle, value: hovering)
-            .echoPointingCursor()
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
@@ -987,37 +977,7 @@ struct WorkflowSelectionCard: View {
 
 struct AmbientGlowView: View {
     var body: some View {
-        ZStack {
-            // First glowing blob (Vibrant Indigo/Blue Gradient)
-            Circle()
-                .fill(LinearGradient(
-                    colors: [
-                        Color(red: 0.25, green: 0.35, blue: 0.95),
-                        Color(red: 0.15, green: 0.55, blue: 0.90)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .frame(width: 340, height: 340)
-                .blur(radius: 55)
-                .opacity(0.24)
-                .offset(x: -70, y: -50)
-            
-            // Second glowing blob (Vibrant Purple/Pink Gradient)
-            Circle()
-                .fill(LinearGradient(
-                    colors: [
-                        Color(red: 0.60, green: 0.25, blue: 0.85),
-                        Color(red: 0.90, green: 0.20, blue: 0.65)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .frame(width: 300, height: 300)
-                .blur(radius: 50)
-                .opacity(0.18)
-                .offset(x: 70, y: 50)
-        }
+        EmptyView()
     }
 }
 
@@ -1096,7 +1056,6 @@ struct RecentSessionRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .echoPointingCursor()
     }
 }
 

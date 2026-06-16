@@ -30,6 +30,7 @@ struct EchoApp: App {
             SettingsView()
                 .environmentObject(echoSettings)
                 .environmentObject(appDelegate.permissionsManager)
+                .environmentObject(appDelegate.appStore)
         }
 
         MenuBarExtra {

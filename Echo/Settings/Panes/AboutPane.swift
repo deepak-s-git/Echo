@@ -207,7 +207,6 @@ private struct AboutLinkRow: View {
                 .background(hovering ? Color.primary.opacity(0.03) : Color.clear)
             }
             .buttonStyle(.plain)
-            .echoPointingCursor()
             .onHover { hovering = $0 }
             .animation(EchoDesign.subtle, value: hovering)
 
@@ -265,7 +264,6 @@ private struct AcknowledgementRow: View {
                 .background(hovering ? Color.primary.opacity(0.03) : Color.clear)
             }
             .buttonStyle(.plain)
-            .echoPointingCursor()
             .onHover { hovering = $0 }
             .animation(EchoDesign.subtle, value: hovering)
 

@@ -288,7 +288,6 @@ struct SettingsDestructiveButton: View {
             )
         }
         .buttonStyle(.plain)
-        .echoPointingCursor()
         .onHover { hovering = $0 }
         .animation(EchoDesign.subtle, value: hovering)
     }

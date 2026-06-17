@@ -36,8 +36,8 @@ struct OnboardingView: View {
     // Cinematic build-up states
     @State private var ringScale: CGFloat = 0.0
     @State private var waveAmplitudeScale: CGFloat = 0.0
-    @State private var logoYOffset: CGFloat = 60.0 // Adjusted upward for spacious gap at bottom in center state
-    @State private var visualizerScale: CGFloat = 1.7 // Built up in center as huge
+    @State private var logoYOffset: CGFloat = 40.0 // Adjusted for spacious gap at bottom in center state
+    @State private var visualizerScale: CGFloat = 1.25 // More compact, elegant starting scale
     @State private var gridOpacity: Double = 0.0
     @State private var visualizerOpacity: Double = 0.0
     @State private var monogramScale: CGFloat = 0.0
@@ -93,10 +93,9 @@ struct OnboardingView: View {
                         .frame(width: 380, height: 220)
 
                         // Elegant E-Wave Monogram Logo (builds first)
-                        MonogramView(copper: brandCopper, amber: brandAmber, gold: brandGold)
+                        MonogramView()
                             .scaleEffect(monogramScale)
                             .opacity(monogramOpacity)
-                            .shadow(color: brandAmber.opacity(0.35 * monogramOpacity), radius: 10, y: 2)
                     }
                     .frame(height: 230)
                     .scaleEffect(visualizerScale) // Dynamic scale (Stage 1/2: 1.7, Stage 3/4: 1.0)
@@ -549,74 +548,17 @@ private struct CentralVisualizerCanvas: View {
 private struct MonogramView: View {
     @State private var isBreathing = false
     
-    // Custom Brand Colors
-    let copper: Color
-    let amber: Color
-    let gold: Color
-    
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            amber.opacity(0.28),
-                            .clear
-                        ],
-                        center: .center,
-                        startRadius: 2,
-                        endRadius: 36
-                    )
-                )
-                .frame(width: 72, height: 72)
-                .scaleEffect(isBreathing ? 1.14 : 0.96)
-                .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isBreathing)
-            
-            ZStack {
-                Arc(startAngle: .degrees(-135), endAngle: .degrees(135), clockwise: false)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white, gold.opacity(0.5)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 2.6, lineCap: .round)
-                    )
-                    .frame(width: 32, height: 32)
-                
-                Arc(startAngle: .degrees(-120), endAngle: .degrees(120), clockwise: false)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white, amber],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        style: StrokeStyle(lineWidth: 2.0, lineCap: .round)
-                    )
-                    .frame(width: 22, height: 22)
-                
-                Arc(startAngle: .degrees(-95), endAngle: .degrees(95), clockwise: false)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white, copper],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 1.6, lineCap: .round)
-                    )
-                    .frame(width: 12, height: 12)
-                
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.white)
-                    .frame(width: 8, height: 2.2)
-                    .offset(x: 3.5)
+        Image("butterfly_logo")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 52, height: 52)
+            .offset(y: 2) // Visual alignment adjustment for center of gravity
+            .scaleEffect(isBreathing ? 1.05 : 0.95)
+            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isBreathing)
+            .onAppear {
+                isBreathing = true
             }
-            .scaleEffect(isBreathing ? 1.04 : 0.98)
-            .animation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true), value: isBreathing)
-        }
-        .onAppear {
-            isBreathing = true
-        }
     }
 }
 

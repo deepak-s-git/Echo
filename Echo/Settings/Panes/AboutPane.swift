@@ -27,29 +27,29 @@ struct AboutPane: View {
                     HStack(spacing: 18) {
                         // App icon placeholder
                         ZStack {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
                                 .fill(
                                     LinearGradient(
                                         colors: [
-                                            EchoPalette.indigo,
-                                            EchoPalette.indigoSoft.opacity(0.7)
+                                            Color(white: 0.14),
+                                            Color(white: 0.08)
                                         ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
                                 )
                                 .frame(width: 60, height: 60)
-                                .shadow(color: Color.black.opacity(0.25), radius: 6, y: 3)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                        .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+                                )
+                                .shadow(color: Color.black.opacity(0.35), radius: 6, y: 3)
 
-                            // Echo logo glyph
-                            ZStack {
-                                Circle()
-                                    .fill(.white.opacity(0.15))
-                                    .frame(width: 36, height: 36)
-                                Circle()
-                                    .fill(.white.opacity(0.9))
-                                    .frame(width: 10, height: 10)
-                            }
+                            Image("butterfly_logo")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 42, height: 42)
+                                .offset(y: 1.0) // Align visual center of gravity
                         }
 
                         VStack(alignment: .leading, spacing: 4) {

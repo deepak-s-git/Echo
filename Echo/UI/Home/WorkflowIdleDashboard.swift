@@ -65,7 +65,7 @@ struct WorkflowIdleDashboard: View {
                         title: "Record in Existing",
                         subtitle: "Start a session under an active project",
                         icon: "folder.badge.plus",
-                        gradientColors: [Color(red: 0.18, green: 0.72, blue: 0.72), EchoPalette.indigoSoft]
+                        gradientColors: [EchoPalette.indigo, EchoPalette.warmHighlight]
                     ) {
                         showSelectWorkflowSheet = true
                     }
@@ -392,8 +392,8 @@ private struct GridActionButton: View {
                 
                 Spacer(minLength: 0)
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, minHeight: 136)
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 144, maxHeight: 144)
             .background {
                 ZStack {
                     RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)

@@ -664,9 +664,10 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 14) {
             // Header: Brand & Live Pulse
             HStack(spacing: 8) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(EchoPalette.premiumGradient)
+                Image("butterfly_logo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
                 
                 Text("ECHO")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -846,10 +847,10 @@ struct MenuBarView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
                                 ForEach([
-                                    ("Coding 💻", "Coding"),
-                                    ("Research 🔍", "Research"),
-                                    ("Design 🎨", "Design"),
-                                    ("Writing ✍️", "Writing")
+                                    ("Coding", "Coding"),
+                                    ("Research", "Research"),
+                                    ("Design", "Design"),
+                                    ("Writing", "Writing")
                                 ], id: \.1) { label, name in
                                     Button {
                                         Task {
@@ -880,13 +881,13 @@ struct MenuBarView: View {
 
             // Card 3: Recent Memories list
             let recentMemories = sessionStore.recentSessions.prefix(3)
-            if !recentMemories.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("RECENT MEMORIES")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 2)
-                    
+            VStack(alignment: .leading, spacing: 8) {
+                Text("RECENT MEMORIES")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 2)
+                
+                if !recentMemories.isEmpty {
                     VStack(spacing: 8) {
                         ForEach(recentMemories) { session in
                             HStack(spacing: 10) {
@@ -951,8 +952,24 @@ struct MenuBarView: View {
                     .padding(6)
                     .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 10))
                     .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
+                } else {
+                    VStack(spacing: 4) {
+                        Text("No Recent Workflows")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Your recorded sessions will appear here.")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
                 }
             }
+
+            Spacer()
 
             Divider().opacity(0.3)
 
@@ -977,7 +994,7 @@ struct MenuBarView: View {
             .padding(.horizontal, 4)
         }
         .padding(16)
-        .frame(width: 320)
+        .frame(width: 320, height: 410)
     }
 
     private func relativeTimeString(for date: Date) -> String {

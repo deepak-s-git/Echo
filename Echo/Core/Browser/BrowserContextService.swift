@@ -17,9 +17,9 @@ nonisolated enum BrowserContextService {
 
     /// Active tab metadata only — no bulk tab harvesting during normal tracking.
     @MainActor
-    static func captureActiveTab(for bundleId: String) -> BrowserTab? {
+    static func captureActiveTab(for bundleId: String, windowTitle: String? = nil) -> BrowserTab? {
         guard isBrowser(bundleId) else { return nil }
-        return BrowserTabScraper.activeTab(forBundleId: bundleId)
+        return BrowserTabScraper.activeTab(forBundleId: bundleId, windowTitle: windowTitle)
     }
 
     /// Produces a privacy-safe activity event from tab metadata (domain + title only).

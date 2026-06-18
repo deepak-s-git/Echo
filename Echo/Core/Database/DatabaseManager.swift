@@ -154,8 +154,12 @@ nonisolated final class DatabaseManager: Sendable {
         }
 
         migrator.registerMigration("v5_activity_profile_name") { db in
-            try db.alter(table: ActivityEvent.databaseTableName) { t in
-                t.add(column: "profileName", .text)
+            let tableInfo = try Row.fetchAll(db, sql: "PRAGMA table_info(activities)")
+            let columnExists = tableInfo.contains { $0["name"] == "profileName" }
+            if !columnExists {
+                try db.alter(table: ActivityEvent.databaseTableName) { t in
+                    t.add(column: "profileName", .text)
+                }
             }
         }
 

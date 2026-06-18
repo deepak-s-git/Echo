@@ -14,45 +14,45 @@ enum EchoPalette {
     }
     
     static let graphite = adaptive(
-        dark: NSColor(red: 0.04, green: 0.04, blue: 0.04, alpha: 1.0),
+        dark: NSColor(red: 0.045, green: 0.045, blue: 0.05, alpha: 1.0),
         light: NSColor(red: 0.96, green: 0.96, blue: 0.97, alpha: 1.0)
     )
     
     static let sidebar = adaptive(
-        dark: NSColor(red: 0.067, green: 0.067, blue: 0.067, alpha: 1.0),
-        light: NSColor(red: 0.92, green: 0.92, blue: 0.92, alpha: 1.0)
+        dark: NSColor(red: 0.06, green: 0.06, blue: 0.065, alpha: 1.0),
+        light: NSColor(red: 0.92, green: 0.92, blue: 0.93, alpha: 1.0)
     )
     
     static let graphiteElevated = adaptive(
-        dark: NSColor(red: 0.09, green: 0.09, blue: 0.09, alpha: 1.0),
+        dark: NSColor(red: 0.09, green: 0.09, blue: 0.10, alpha: 1.0),
         light: NSColor(white: 1.0, alpha: 1.0)
     )
     
     static let stroke = adaptive(
-        dark: NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
-        light: NSColor(red: 0.88, green: 0.88, blue: 0.90, alpha: 1.0)
+        dark: NSColor(red: 0.18, green: 0.15, blue: 0.13, alpha: 1.0),
+        light: NSColor(red: 0.86, green: 0.85, blue: 0.83, alpha: 1.0)
     )
     
     static let strokeBright = adaptive(
-        dark: NSColor(red: 0.22, green: 0.22, blue: 0.22, alpha: 1.0),
-        light: NSColor(red: 0.80, green: 0.80, blue: 0.82, alpha: 1.0)
+        dark: NSColor(red: 0.28, green: 0.23, blue: 0.19, alpha: 1.0),
+        light: NSColor(red: 0.76, green: 0.74, blue: 0.70, alpha: 1.0)
     )
     
     static let accent = adaptive(
-        dark: NSColor(red: 0.89, green: 0.89, blue: 0.91, alpha: 1.0),
-        light: NSColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.0)
+        dark: NSColor(red: 0.85, green: 0.42, blue: 0.18, alpha: 1.0), // Cybernetic Copper
+        light: NSColor(red: 0.75, green: 0.32, blue: 0.08, alpha: 1.0)
     )
     
     static let indigo = accent
     
     static let indigoSoft = adaptive(
-        dark: NSColor(red: 0.63, green: 0.63, blue: 0.67, alpha: 1.0),
-        light: NSColor(red: 0.44, green: 0.44, blue: 0.48, alpha: 1.0)
+        dark: NSColor(red: 0.82, green: 0.74, blue: 0.55, alpha: 1.0), // Champagne Gold
+        light: NSColor(red: 0.65, green: 0.57, blue: 0.38, alpha: 1.0)
     )
     
     static let warmHighlight = adaptive(
-        dark: NSColor(red: 0.72, green: 0.72, blue: 0.75, alpha: 1.0),
-        light: NSColor(red: 0.50, green: 0.50, blue: 0.52, alpha: 1.0)
+        dark: NSColor(red: 0.95, green: 0.65, blue: 0.15, alpha: 1.0), // Warm Amber
+        light: NSColor(red: 0.80, green: 0.50, blue: 0.05, alpha: 1.0)
     )
     
     static let live = adaptive(
@@ -70,15 +70,9 @@ enum EchoPalette {
         light: NSColor(red: 0.86, green: 0.15, blue: 0.15, alpha: 1.0)
     )
     
-    static let glowBlue = adaptive(
-        dark: NSColor(white: 0.75, alpha: 1.0),
-        light: NSColor(white: 0.20, alpha: 1.0)
-    )
+    static let glowBlue = accent
     
-    static let glowPurple = adaptive(
-        dark: NSColor(white: 0.55, alpha: 1.0),
-        light: NSColor(white: 0.40, alpha: 1.0)
-    )
+    static let glowPurple = indigoSoft
     
     static var premiumGradient: LinearGradient {
         LinearGradient(

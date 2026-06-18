@@ -16,10 +16,16 @@ struct BrowserTabScraper {
     // MARK: - Active tab (privacy-first)
 
     @MainActor
-    static func activeTab(forBundleId bundleId: String) -> BrowserTab? {
+    static func activeTab(forBundleId bundleId: String, windowTitle: String? = nil) -> BrowserTab? {
         guard let (browser, appName) = bundleToAppName[bundleId],
               isRunning(bundleId: bundleId) || isRunning(appName: appName)
         else { return nil }
+
+        let escapedTitle = (windowTitle ?? "")
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
 
         let script: String
         switch browser {
@@ -27,7 +33,22 @@ struct BrowserTabScraper {
             script = """
             try {
                 var app = Application('Safari');
-                var tab = app.windows[0].currentTab();
+                var win = app.windows[0];
+                var targetTitle = "\(escapedTitle)";
+                if (targetTitle.length > 0) {
+                    var cleanTarget = targetTitle.replace(/ - Safari$/, "").trim().toLowerCase();
+                    for (var i = 0; i < app.windows.length; i++) {
+                        try {
+                            var w = app.windows[i];
+                            var t = w.currentTab().name().trim().toLowerCase();
+                            if (t === cleanTarget || cleanTarget.indexOf(t) !== -1 || t.indexOf(cleanTarget) !== -1) {
+                                win = w;
+                                break;
+                            }
+                        } catch(e) {}
+                    }
+                }
+                var tab = win.currentTab();
                 JSON.stringify({url: tab.url(), title: tab.name()});
             } catch(e) { JSON.stringify(null); }
             """
@@ -35,10 +56,25 @@ struct BrowserTabScraper {
             script = """
             try {
                 var app = Application('Arc');
-                var tab = app.windows[0].activeTab;
+                var win = app.windows[0];
+                var targetTitle = "\(escapedTitle)";
+                if (targetTitle.length > 0) {
+                    var cleanTarget = targetTitle.replace(/ - Arc$/, "").trim().toLowerCase();
+                    for (var i = 0; i < app.windows.length; i++) {
+                        try {
+                            var w = app.windows[i];
+                            var t = w.activeTab.name().trim().toLowerCase();
+                            if (t === cleanTarget || cleanTarget.indexOf(t) !== -1 || t.indexOf(cleanTarget) !== -1) {
+                                win = w;
+                                break;
+                            }
+                        } catch(e) {}
+                    }
+                }
+                var tab = win.activeTab;
                 var sName = "";
-                try { sName = app.windows[0].activeSpace.name(); } catch(e) {
-                    try { sName = app.windows[0].activeSpace.title(); } catch(e2) {}
+                try { sName = win.activeSpace.name(); } catch(e) {
+                    try { sName = win.activeSpace.title(); } catch(e2) {}
                 }
                 JSON.stringify({url: tab.url(), title: tab.name(), profileName: sName});
             } catch(e) { JSON.stringify(null); }
@@ -49,6 +85,20 @@ struct BrowserTabScraper {
                 var app = Application('\(appName)');
                 if (app.windows.length > 0) {
                     var win = app.windows[0];
+                    var targetTitle = "\(escapedTitle)";
+                    if (targetTitle.length > 0) {
+                        var cleanTarget = targetTitle.replace(/ - Google Chrome$/, "").replace(/ - Brave$/, "").replace(/ - Microsoft Edge$/, "").replace(/ - Chromium$/, "").trim().toLowerCase();
+                        for (var i = 0; i < app.windows.length; i++) {
+                            try {
+                                var w = app.windows[i];
+                                var t = w.activeTab().name().trim().toLowerCase();
+                                if (t === cleanTarget || cleanTarget.indexOf(t) !== -1 || t.indexOf(cleanTarget) !== -1) {
+                                    win = w;
+                                    break;
+                                }
+                            } catch(e) {}
+                        }
+                    }
                     var tab = win.activeTab();
                     var urls = [];
                     for (var j = 0; j < win.tabs.length; j++) {

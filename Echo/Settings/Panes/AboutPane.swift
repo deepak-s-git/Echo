@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import Sparkle
 
 struct AboutPane: View {
 
@@ -86,7 +88,7 @@ struct AboutPane: View {
                 AboutLinkRow(
                     icon: "safari",
                     label: "Visit Website",
-                    action: { openURL("https://github.com") },
+                    action: { openURL("https://echo-macos.vercel.app") },
                     showDivider: true
                 )
 
@@ -100,7 +102,7 @@ struct AboutPane: View {
                 AboutLinkRow(
                     icon: "ant",
                     label: "Report a Bug",
-                    action: { openURL("https://github.com") },
+                    action: { openURL("https://github.com/deepak-s-git/Echo-Web/issues") },
                     showDivider: false
                 )
             }
@@ -139,7 +141,18 @@ struct AboutPane: View {
     }
 
     private func checkForUpdates() {
-        // Stub — would integrate Sparkle or a custom update mechanism
+        print("[Echo] checkForUpdates button clicked!")
+        guard let appDelegate = AppDelegate.shared else {
+            print("[Echo] Error: AppDelegate.shared is nil.")
+            return
+        }
+        print("[Echo] Found AppDelegate shared instance. updaterController is: \(String(describing: appDelegate.updaterController))")
+        if let updaterController = appDelegate.updaterController {
+            print("[Echo] Calling updaterController.updater.checkForUpdates()")
+            updaterController.updater.checkForUpdates()
+        } else {
+            print("[Echo] Error: updaterController is nil!")
+        }
     }
 }
 

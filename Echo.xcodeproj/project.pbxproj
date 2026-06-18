@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3CA28D752FE326C7006CBD2A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 3CA28D742FE326C7006CBD2A /* Sparkle */; };
 		8415A6D02FB7411D0070B811 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 8415A6CF2FB7411D0070B811 /* GRDB */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8415A6D02FB7411D0070B811 /* GRDB in Frameworks */,
+				3CA28D752FE326C7006CBD2A /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +81,7 @@
 			name = Echo;
 			packageProductDependencies = (
 				8415A6CF2FB7411D0070B811 /* GRDB */,
+				3CA28D742FE326C7006CBD2A /* Sparkle */,
 			);
 			productName = Echo;
 			productReference = 8415A6822FB738950070B811 /* Echo.app */;
@@ -110,6 +113,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				8415A6C92FB73FE80070B811 /* XCRemoteSwiftPackageReference "GRDB" */,
+				3CA28D732FE326C7006CBD2A /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8415A6832FB738950070B811 /* Products */;
@@ -272,12 +276,15 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 35QHTB3ZH2;
 				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Echo/Info.plist;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Echo needs to control your browser to capture active tabs for workflow restoration.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_SUFeedURL = "https://echo-macos.vercel.app/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "bIbhmwyz4ZwMkQzjPOQB42QZlkdZU4A/+1cO+UlPQQM=";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -309,8 +316,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Echo/Info.plist;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Echo needs to control your browser to capture active tabs for workflow restoration.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_SUFeedURL = "https://echo-macos.vercel.app/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "bIbhmwyz4ZwMkQzjPOQB42QZlkdZU4A/+1cO+UlPQQM=";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -352,6 +362,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		3CA28D732FE326C7006CBD2A /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.3;
+			};
+		};
 		8415A6C92FB73FE80070B811 /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
@@ -363,6 +381,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		3CA28D742FE326C7006CBD2A /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3CA28D732FE326C7006CBD2A /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		8415A6CF2FB7411D0070B811 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8415A6C92FB73FE80070B811 /* XCRemoteSwiftPackageReference "GRDB" */;

@@ -192,47 +192,37 @@ actor ActivityTracker {
         else { return }
         lastWindowRecheckTime = now
         
-        if let pending = pendingFocusEvent {
-            pendingFocusEvent = RawActivityEvent(
-                id: pending.id,
-                timestamp: pending.timestamp,
-                type: pending.type,
-                appBundleId: pending.appBundleId,
-                appName: pending.appName,
-                windowTitle: snapshot.windowTitle,
-                url: snapshot.documentURL,
-                profileName: pending.profileName,
-                duration: pending.duration
-            )
-            lastEmittedWindowFingerprint = fingerprint
-            return
+        guard let bundleId = currentBundleId, let name = currentAppName else { return }
+        
+        let focusEvent = RawActivityEvent(
+            id: UUID(),
+            timestamp: now,
+            type: .appFocus,
+            appBundleId: bundleId,
+            appName: name,
+            windowTitle: snapshot.windowTitle,
+            url: snapshot.documentURL,
+            profileName: nil,
+            duration: 0
+        )
+        
+        pendingFocusEmitTask?.cancel()
+        pendingFocusEvent = focusEvent
+        lastEmittedWindowFingerprint = fingerprint
+        
+        let delaySeconds = await MainActor.run {
+            let isBrowser = BrowserContextService.isBrowser(bundleId)
+            if isBrowser {
+                return EchoSettings.shared.browserCaptureDelaySeconds + EchoSettings.shared.tabEligibilitySeconds
+            } else {
+                return EchoSettings.shared.appFocusEligibilitySeconds
+            }
         }
         
-        lastEmittedWindowFingerprint = fingerprint
-
-        guard let bundleId = currentBundleId, let name = currentAppName else { return }
-
-        // For browsers: schedule AppleScript enrichment to capture the actual URL.
-        // For document apps that expose kAXDocument: emit immediately with the file URL.
-        // For all other apps: emit with window title as-is.
-        if BrowserContextService.isBrowser(bundleId) {
-            // Emit a placeholder immediately so the UI updates fast, then enrich with URL.
-            emit(RawActivityEvent(
-                id: UUID(), timestamp: now, type: .appFocus,
-                appBundleId: bundleId, appName: name,
-                windowTitle: snapshot.windowTitle, url: nil,
-                profileName: nil, duration: 0
-            ))
-            scheduleWindowEnrichment(bundleId: bundleId, name: name, timestamp: now)
-        } else {
-            emit(RawActivityEvent(
-                id: UUID(), timestamp: now, type: .appFocus,
-                appBundleId: bundleId, appName: name,
-                windowTitle: snapshot.windowTitle,
-                url: snapshot.documentURL,   // populated by kAXDocument in captureWithWindow()
-                profileName: nil,
-                duration: 0
-            ))
+        pendingFocusEmitTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delaySeconds))
+            guard !Task.isCancelled else { return }
+            await self?.emitPendingFocusEvent(matching: bundleId)
         }
     }
 
@@ -336,8 +326,9 @@ actor ActivityTracker {
                     guard !Task.isCancelled else { return }
                     guard await self?.currentBundleId == bundleId else { return }
                     
+                    let expectedTitle = await self?.lastVerifiedSnapshot?.windowTitle
                     tab = await MainActor.run {
-                        BrowserContextService.captureActiveTab(for: bundleId)
+                        BrowserContextService.captureActiveTab(for: bundleId, windowTitle: expectedTitle)
                     }
                     if tab != nil { break }
                 }

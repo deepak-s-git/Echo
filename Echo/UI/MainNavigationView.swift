@@ -163,32 +163,10 @@ struct SidebarItem: View {
 struct EchoWordmark: View {
     var body: some View {
         HStack(spacing: 10) {
-            ZStack {
-                // Outer ambient pulse glow
-                Circle()
-                    .fill(EchoPalette.indigo.opacity(0.08))
-                    .frame(width: 28, height: 28)
-                    .scaleEffect(0.95)
-
-                // Inner ring border
-                Circle()
-                    .strokeBorder(EchoPalette.indigo.opacity(0.25), lineWidth: 1)
-                    .frame(width: 20, height: 20)
-
-                // Core dot
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [EchoPalette.indigo, EchoPalette.indigoSoft.opacity(0.8)],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 5
-                        )
-                    )
-                    .frame(width: 8, height: 8)
-                    .shadow(color: EchoPalette.indigo.opacity(0.2), radius: 1)
-            }
-            .frame(width: 28, height: 28)
+            Image("butterfly_logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 22, height: 22)
             
             Text("Echo")
                 .font(.system(size: 18, weight: .bold, design: .rounded))

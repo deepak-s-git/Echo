@@ -752,39 +752,31 @@ actor SessionEngine {
     private func captureBrowserContext(bundleId: String, appName: String, sessionId: UUID) async {
         guard currentSession?.id == sessionId else { return }
 
-        let tabs = await MainActor.run {
-            BrowserTabScraper.tabsForRestore(bundleId: bundleId)
-        }
-        guard !tabs.isEmpty else { return }
+        let trackTabs = await MainActor.run { EchoSettings.shared.trackBrowserTabs }
+        guard trackTabs else { return }
 
-        var addedCount = 0
-        for tab in tabs {
-            let urlKey = tab.url.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            guard capturedBrowserURLs.insert(urlKey).inserted else { continue }
-            addedCount += 1
+        // Capture only the active tab for privacy and focus accuracy
+        let tab = await MainActor.run {
+            BrowserContextService.captureActiveTab(for: bundleId, windowTitle: nil)
+        }
+        guard let tab else { return }
 
-            let browserEvent = BrowserContextService.activityEvent(
-                from: tab,
-                sessionId: sessionId,
-                bundleId: bundleId,
-                appName: appName
-            )
-            pendingEvents.append(browserEvent)
-        }
-        if addedCount > 0 {
-            ActivityPersistenceLogger.log(
-                "Queued \(addedCount) new browser tab(s) for \(sessionId.uuidString)"
-            )
-        }
-        if let last = tabs.last {
-            let liveEvent = BrowserContextService.activityEvent(
-                from: last,
-                sessionId: sessionId,
-                bundleId: bundleId,
-                appName: appName
-            )
-            await activityStore.applyLiveEvent(liveEvent)
-        }
+        let urlKey = tab.url.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard capturedBrowserURLs.insert(urlKey).inserted else { return }
+
+        let browserEvent = BrowserContextService.activityEvent(
+            from: tab,
+            sessionId: sessionId,
+            bundleId: bundleId,
+            appName: appName
+        )
+        pendingEvents.append(browserEvent)
+        ActivityPersistenceLogger.log(
+            "Queued active browser tab for \(sessionId.uuidString)"
+        )
+        
+        await activityStore.applyLiveEvent(browserEvent)
+        
         if pendingEvents.count >= EchoConfig.batchWriteEventThreshold {
             await flushPendingEvents()
         }
@@ -939,6 +931,7 @@ actor SessionEngine {
 
     private func captureBrowserTabsForSnapshot(events: [ActivityEvent]) async -> [BrowserTab] {
         await MainActor.run {
+            guard EchoSettings.shared.trackBrowserTabs else { return [] }
             var tabs = BrowserTabScraper.fetchAllBrowserTabsForRestore()
             if tabs.isEmpty {
                 let browserBundles = Set(

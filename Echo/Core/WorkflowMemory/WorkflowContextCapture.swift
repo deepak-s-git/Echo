@@ -443,7 +443,21 @@ nonisolated enum WorkflowContextCapture {
     event: ActivityEvent,
     seen: inout Set<String>
   ) -> [RestoreItem] {
-    guard let cwd = extractTerminalDirectory(from: event.windowTitle) else { return [] }
+    let terminalAppKey = "terminal_app:\(event.appBundleId)"
+    if seen.contains(terminalAppKey) {
+        return []
+    }
+
+    let cwdOpt: String?
+    if let urlStr = event.url, urlStr.hasPrefix("file://"), let url = URL(string: urlStr) {
+        cwdOpt = url.path
+    } else {
+        cwdOpt = extractTerminalDirectory(from: event.windowTitle)
+    }
+    
+    guard let cwd = cwdOpt, FileManager.default.fileExists(atPath: cwd) else { return [] }
+    seen.insert(terminalAppKey)
+    
     let key = "term:\(cwd)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
@@ -524,8 +538,33 @@ nonisolated enum WorkflowContextCapture {
 
   private static func extractTerminalDirectory(from title: String?) -> String? {
     guard let title else { return nil }
-    let trimmed = title.trimmingCharacters(in: .whitespaces)
-    if trimmed.hasPrefix("/"), FileManager.default.fileExists(atPath: trimmed) { return trimmed }
+    
+    // 1. Try our custom path extraction that searches for /Users/ or /Volumes/
+    if let extracted = extractPath(from: title) {
+        let clean = extracted.trimmingCharacters(in: .whitespacesAndNewlines)
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: clean, isDirectory: &isDir), isDir.boolValue {
+            return clean
+        }
+    }
+    
+    // 2. Fallback: split the title by separators and see if any component is a valid directory path starting with /
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let separators = [" — ", " – ", " - "]
+    var components = [trimmed]
+    for sep in separators {
+        components = components.flatMap { $0.components(separatedBy: sep) }
+    }
+    
+    for component in components {
+        let path = component.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard path.hasPrefix("/") else { continue }
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+            return path
+        }
+    }
+    
     return nil
   }
 

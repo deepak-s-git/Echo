@@ -331,19 +331,72 @@ struct TerminalDirectoryRestorer: WorkflowRestoring {
 
     func restore(_ item: RestoreItem) async throws {
         guard let cwd = item.workingDirectory else { throw RestoreError.targetUnavailable }
+        guard FileManager.default.fileExists(atPath: cwd) else { throw RestoreError.targetUnavailable }
+        
         let escaped = cwd.replacingOccurrences(of: "\"", with: "\\\"")
-        let script = """
-        tell application "Terminal"
-            activate
-            do script "cd \\"\(escaped)\\""
-        end tell
-        """
-        var error: NSDictionary?
+        let bundleId = item.bundleId ?? "com.apple.Terminal"
+        
+        if bundleId == "com.apple.Terminal" {
+            let script = """
+            tell application "Terminal"
+                activate
+                do script "cd \\"\(escaped)\\""
+            end tell
+            """
+            try runAppleScript(script)
+        } else if bundleId == "com.googlecode.iterm2" {
+            let script = """
+            tell application "iTerm"
+                activate
+                try
+                    if (count of windows) is 0 then
+                        create window with default profile
+                    else
+                        tell current window
+                            create tab with default profile
+                        end tell
+                    end if
+                on error
+                    create window with default profile
+                end try
+                delay 0.1
+                tell current session of current window
+                    write text "cd \\"\(escaped)\\""
+                end tell
+            end tell
+            """
+            try runAppleScript(script)
+        } else {
+            // Fallback for other terminals (Warp, Hyper, etc.) using open -a
+            let appName: String
+            if bundleId.lowercased().contains("warp") {
+                appName = "Warp"
+            } else if bundleId.lowercased().contains("hyper") {
+                appName = "Hyper"
+            } else {
+                appName = "Terminal"
+            }
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = ["-a", appName, cwd]
+            do {
+                try process.run()
+                process.waitUntilExit()
+            } catch {
+                throw RestoreError.scriptFailed
+            }
+        }
+    }
+    
+    private func runAppleScript(_ script: String) throws {
+        var errorInfo: NSDictionary?
         guard let appleScript = NSAppleScript(source: script) else {
             throw RestoreError.scriptFailed
         }
-        appleScript.executeAndReturnError(&error)
-        if error != nil { throw RestoreError.scriptFailed }
+        appleScript.executeAndReturnError(&errorInfo)
+        if errorInfo != nil {
+            throw RestoreError.scriptFailed
+        }
     }
 }
 

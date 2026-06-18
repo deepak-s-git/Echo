@@ -115,6 +115,7 @@ nonisolated enum SessionFinalizationRunner {
 
     @MainActor
     private static func captureBrowserTabs(events: [ActivityEvent]) -> [BrowserTab] {
+        guard EchoSettings.shared.trackBrowserTabs else { return [] }
         var tabs = BrowserTabScraper.fetchAllBrowserTabsForRestore()
         if tabs.isEmpty {
             let bundles = Set(

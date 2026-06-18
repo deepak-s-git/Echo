@@ -1,6 +1,17 @@
 import AppKit
+import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+
+    static private(set) var shared: AppDelegate?
+
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
+
+    // MARK: - Sparkle Updater
+    var updaterController: SPUStandardUpdaterController?
 
     // MARK: - Stores (created eagerly so SwiftUI can access them immediately)
 
@@ -20,6 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
+
+        print("[Echo] AppDelegate: initializing SPUStandardUpdaterController")
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        print("[Echo] AppDelegate: updaterController is \(String(describing: updaterController))")
 
         do {
             container = try ServiceContainer(

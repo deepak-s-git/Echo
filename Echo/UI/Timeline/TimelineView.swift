@@ -612,6 +612,7 @@ private struct WorkflowThreadCard: View {
     @EnvironmentObject var sessionControl: SessionControlStore
 
     @State private var hovering = false
+    @State private var hoveredSessionId: UUID? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -657,15 +658,10 @@ private struct WorkflowThreadCard: View {
                         }
                     }
 
-                    HStack(spacing: 6) {
-                        Text("Last Active: \(summary.latestActiveLabel)")
-                        Text("·")
-                        Text("Total Time: \(summary.totalDuration.shortLabel)")
-                        Text("·")
-                        Text("\(summary.segments.count) \(summary.segments.count == 1 ? "Session" : "Sessions")")
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    Text("Last Active: \(summary.latestActiveLabel)  ·  Total Time: \(summary.totalDuration.shortLabel)  ·  \(summary.segments.count) \(summary.segments.count == 1 ? "Session" : "Sessions")")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
 
                 Spacer(minLength: 8)
@@ -751,7 +747,8 @@ private struct WorkflowThreadCard: View {
                                 TimelineNodeView(
                                     isFirst: index == 0,
                                     isLast: index == chronologicalSegments.count - 1,
-                                    isActive: segment.isActive
+                                    isActive: segment.isActive,
+                                    isHovered: hoveredSessionId == segment.id
                                 )
                                 .padding(.leading, EchoDesign.cardPadding)
                                 
@@ -760,6 +757,14 @@ private struct WorkflowThreadCard: View {
                                     segment: segment,
                                     showCheckbox: isSessionSelectMode && sessionSelectThreadId == summary.id,
                                     isSelected: selectedSessionIds.contains(segment.id),
+                                    isHoveredFromParent: hoveredSessionId == segment.id,
+                                    onHoverChange: { isHovering in
+                                        if isHovering {
+                                            hoveredSessionId = segment.id
+                                        } else if hoveredSessionId == segment.id {
+                                            hoveredSessionId = nil
+                                        }
+                                    },
                                     onTap: {
                                         if isSessionSelectMode && sessionSelectThreadId == summary.id {
                                             onToggleSessionSelect(segment.id)
@@ -814,6 +819,8 @@ private struct SessionHistoryRow: View {
     let segment: Session
     let showCheckbox: Bool
     let isSelected: Bool
+    let isHoveredFromParent: Bool
+    let onHoverChange: (Bool) -> Void
     let onTap: () -> Void
     let onDelete: () -> Void
     
@@ -834,7 +841,7 @@ private struct SessionHistoryRow: View {
                     HStack(spacing: 6) {
                         Text(displayName)
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(segment.isActive ? EchoPalette.live : .primary)
+                            .foregroundStyle(segment.isActive ? EchoPalette.live : (isHoveredFromParent ? EchoPalette.accent : .primary))
                         
                         if segment.isActive {
                             Text("LIVE")
@@ -879,7 +886,10 @@ private struct SessionHistoryRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onHover { hovering in
+            self.hovering = hovering
+            onHoverChange(hovering)
+        }
         .contextMenu {
             if !showCheckbox {
                 Button("Delete Session…", role: .destructive) {
@@ -960,33 +970,32 @@ fileprivate struct TimelineNodeView: View {
     let isFirst: Bool
     let isLast: Bool
     let isActive: Bool
+    var isHovered: Bool = false
     
     var body: some View {
         VStack(spacing: 0) {
             if isFirst {
                 Spacer()
-                    .frame(height: 22)
             } else {
                 Rectangle()
-                    .fill(Color.primary.opacity(0.12))
+                    .fill(isHovered ? EchoPalette.accent.opacity(0.3) : Color.primary.opacity(0.12))
                     .frame(width: 1.5)
             }
             
             Circle()
-                .fill(isActive ? EchoPalette.live : Color.primary.opacity(0.25))
+                .fill(isActive ? EchoPalette.live : (isHovered ? EchoPalette.accent : Color.primary.opacity(0.25)))
                 .frame(width: 6, height: 6)
                 .padding(.vertical, 4)
                 .overlay(
                     Circle()
-                        .stroke(isActive ? EchoPalette.live.opacity(0.35) : Color.clear, lineWidth: 3)
+                        .stroke(isActive ? EchoPalette.live.opacity(0.35) : (isHovered ? EchoPalette.accent.opacity(0.35) : Color.clear), lineWidth: 3)
                 )
             
             if isLast {
                 Spacer()
-                    .frame(height: 22)
             } else {
                 Rectangle()
-                    .fill(Color.primary.opacity(0.12))
+                    .fill(isHovered ? EchoPalette.accent.opacity(0.3) : Color.primary.opacity(0.12))
                     .frame(width: 1.5)
             }
         }

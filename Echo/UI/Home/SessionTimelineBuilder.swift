@@ -191,45 +191,25 @@ enum SessionTimelineBuilder {
         return grouped
     }
 
-    private static let curatedPalette: [Color] = [
-        Color(red: 0.25, green: 0.42, blue: 0.68), // Sapphire Blue
-        Color(red: 0.35, green: 0.60, blue: 0.45), // Sage Green
-        Color(red: 0.78, green: 0.42, blue: 0.35), // Terracotta Clay
-        Color(red: 0.58, green: 0.42, blue: 0.72), // Lavender Amethyst
-        Color(red: 0.82, green: 0.62, blue: 0.25), // Warm Gold
-        Color(red: 0.28, green: 0.55, blue: 0.62), // Muted Teal
-        Color(red: 0.70, green: 0.30, blue: 0.45), // Rich Rose
-        Color(red: 0.45, green: 0.50, blue: 0.55)  // Steel Blue
-    ]
-
     private static func color(for bundleId: String) -> Color {
-        let id = bundleId.lowercased()
-        if id.contains("chrome") {
-            return Color(red: 0.88, green: 0.65, blue: 0.15) // Gold Chrome
-        } else if id.contains("xcode") {
-            return Color(red: 0.08, green: 0.48, blue: 0.92) // Developer Blue Xcode
-        } else if id.contains("terminal") || id.contains("warp") || id.contains("iterm") {
-            return Color(red: 0.12, green: 0.55, blue: 0.35) // Emerald Terminal
-        } else if id.contains("finder") {
-            return Color(red: 0.25, green: 0.58, blue: 0.72) // Finder Slate Blue
-        } else if id.contains("safari") {
-            return Color(red: 0.02, green: 0.52, blue: 0.68) // Safari Blue
-        } else if id.contains("vscode") || id.contains("visualstudio") || id.contains("cursor") {
-            return Color(red: 0.12, green: 0.52, blue: 0.82) // Electric Blue VS Code
-        } else if id.contains("figma") {
-            return Color(red: 0.92, green: 0.32, blue: 0.22) // Coral Figma
-        } else if id.contains("slack") || id.contains("discord") {
-            return Color(red: 0.72, green: 0.18, blue: 0.48) // Plum Slack/Discord
-        } else if id.contains("spotify") || id.contains("music") {
-            return Color(red: 0.11, green: 0.68, blue: 0.32) // Spotify Green
+        let cleanId = bundleId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        
+        // 1. Compute standard DJB2 hash of the bundle ID
+        var hash: UInt32 = 5381
+        for byte in cleanId.utf8 {
+            hash = ((hash << 5) &+ hash) &+ UInt32(byte)
         }
         
-        // Curated fallback hash
-        var hash: UInt64 = 5381
-        for byte in bundleId.utf8 {
-            hash = ((hash << 5) &+ hash) &+ UInt64(byte)
-        }
-        let index = Int(hash % UInt64(curatedPalette.count))
-        return curatedPalette[index]
+        // 2. Generate Hue deterministically (0.0 to 1.0)
+        let hue = Double(hash % 360) / 360.0
+        
+        // 3. Keep saturation and brightness within highly aesthetic, harmonious ranges
+        // Saturation: 60% to 80% (vibrant but cohesive)
+        let saturation = 0.60 + Double((hash >> 8) % 20) / 100.0
+        // Brightness: 55% to 65% (ideal contrast for readable blocks)
+        let brightness = 0.55 + Double((hash >> 16) % 10) / 100.0
+        
+        // 4. Return deterministic HSB color
+        return Color(hue: hue, saturation: saturation, brightness: brightness)
     }
 }

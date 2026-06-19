@@ -8,7 +8,7 @@ struct SessionControlBar: View {
     @EnvironmentObject var sessionStore: SessionStore
 
     private var hasSession: Bool {
-        activityStore.isRecording && activityStore.currentSession != nil
+        activityStore.isRecording
     }
 
     var body: some View {

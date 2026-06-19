@@ -71,24 +71,6 @@ struct WorkflowIdleDashboard: View {
                     }
                 }
             }
-
-            // 3. History Section
-            VStack(alignment: .leading, spacing: 8) {
-                Text("History")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .tracking(0.5)
-                    .textCase(.uppercase)
-                
-                SubtleActionButton(
-                    title: "Browse Memories",
-                    subtitle: "Open timeline without recording",
-                    icon: "timeline.selection"
-                ) {
-                    appStore.selectTab(.timeline)
-                }
-            }
-
             // Recent Sessions Section
             let recent = Array(sessionStore.recentSessions.prefix(3))
             if !recent.isEmpty {

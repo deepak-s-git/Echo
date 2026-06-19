@@ -879,6 +879,8 @@ struct MenuBarView: View {
                     .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
             )
 
+            Spacer()
+
             // Card 3: Recent Memories list
             let recentMemories = sessionStore.recentSessions.prefix(3)
             VStack(alignment: .leading, spacing: 8) {
@@ -969,8 +971,6 @@ struct MenuBarView: View {
                 }
             }
 
-            Spacer()
-
             Divider().opacity(0.3)
 
             // Card 4: Footer quick actions
@@ -994,7 +994,7 @@ struct MenuBarView: View {
             .padding(.horizontal, 4)
         }
         .padding(16)
-        .frame(width: 320, height: 410)
+        .frame(width: 320, height: 440)
     }
 
     private func relativeTimeString(for date: Date) -> String {
@@ -1021,7 +1021,7 @@ struct MenuBarView: View {
 
 struct MenuBarLabel: View {
     var body: some View {
-        Image(systemName: "waveform.circle.fill")
+        Image("menubar_butterfly")
     }
 }
 

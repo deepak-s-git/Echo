@@ -113,6 +113,13 @@ struct AboutPane: View {
                     name: "GRDB.swift",
                     description: "A toolkit for SQLite databases",
                     url: "https://github.com/groue/GRDB.swift",
+                    showDivider: true
+                )
+                
+                AcknowledgementRow(
+                    name: "Sparkle",
+                    description: "A software update framework for macOS",
+                    url: "https://github.com/sparkle-project/Sparkle",
                     showDivider: false
                 )
             }
@@ -239,6 +246,7 @@ private struct AcknowledgementRow: View {
     let name: String
     let description: String
     let url: String
+    var license: String = "MIT"
     var showDivider: Bool = true
 
     @State private var hovering = false
@@ -265,7 +273,7 @@ private struct AcknowledgementRow: View {
 
                     Spacer()
 
-                    Text("MIT")
+                    Text(license)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.quaternary)
                         .padding(.horizontal, 7)

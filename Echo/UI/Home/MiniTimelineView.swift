@@ -318,7 +318,7 @@ private struct TimelineBeadVisualView: View {
                 .overlay(
                     Group {
                         if beadWidth >= 28 && isHovered {
-                            AppIconView(bundleId: segment.bundleId, size: 12)
+                            AppIconView(bundleId: segment.bundleId, size: 18)
                                 .clipShape(Circle())
                                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                         }

@@ -45,20 +45,14 @@ struct TimelineView: View {
     @State private var sessionSelectThreadId: UUID? = nil
     @State private var selectedSessionIds = Set<UUID>()
     
-    // Search & Filter State
-    @State private var searchText = ""
-    @State private var isSearchExpanded = false
+    // Filter State
     @State private var selectedClusterFilter: WorkflowCluster? = nil
     @State private var isFilterExpanded = false
 
     var filteredThreads: [WorkflowThreadSummary] {
         sessionStore.workflowThreads.filter { summary in
-            let matchesSearch = searchText.isEmpty || summary.displayTitle.localizedCaseInsensitiveContains(searchText)
-            
             let cluster = summary.segments.first?.cluster ?? .mixed
-            let matchesCluster = selectedClusterFilter == nil || cluster == selectedClusterFilter
-            
-            return matchesSearch && matchesCluster
+            return selectedClusterFilter == nil || cluster == selectedClusterFilter
         }
     }
 
@@ -166,23 +160,6 @@ struct TimelineView: View {
                         Spacer()
                         
                         HStack(spacing: 8) {
-                            // Search Button
-                            Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                                    isSearchExpanded.toggle()
-                                    if !isSearchExpanded {
-                                        searchText = ""
-                                    }
-                                }
-                            }) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(isSearchExpanded ? EchoPalette.accent : Color.secondary)
-                                    .frame(width: 28, height: 28)
-                                    .background(Color.primary.opacity(isSearchExpanded ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain)
-                            
                             // Filter Button
                             Button(action: {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
@@ -229,39 +206,6 @@ struct TimelineView: View {
                 .padding(.top, EchoDesign.containerRadius)
                 .padding(.bottom, 12)
                 
-                // Collapsible Search Field
-                if isSearchExpanded {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 8)
-                        
-                        TextField("Search workflows…", text: $searchText)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12))
-                        
-                        if !searchText.isEmpty {
-                            Button(action: { searchText = "" }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.trailing, 8)
-                        }
-                    }
-                    .frame(height: 28)
-                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                    )
-                    .padding(.horizontal, EchoDesign.containerRadius)
-                    .padding(.bottom, 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-                
                 // Collapsible Filter Bar
                 if isFilterExpanded {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -305,21 +249,20 @@ struct TimelineView: View {
                 } else if filteredThreads.isEmpty {
                     Spacer()
                     VStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass.circle")
+                        Image(systemName: "line.3.horizontal.decrease.circle")
                             .font(.system(size: 36, weight: .thin))
                             .foregroundStyle(EchoPalette.indigo.opacity(0.35))
                         Text("No matching workflows")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text("Try adjusting your search query or category filter.")
+                        Text("Try adjusting your category filter.")
                             .font(.system(size: 13))
                             .foregroundStyle(.tertiary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                         
-                        Button("Reset filters") {
+                        Button("Reset filter") {
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                                searchText = ""
                                 selectedClusterFilter = nil
                             }
                         }

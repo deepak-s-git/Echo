@@ -44,6 +44,23 @@ struct TimelineView: View {
     @State private var isSessionSelectMode = false
     @State private var sessionSelectThreadId: UUID? = nil
     @State private var selectedSessionIds = Set<UUID>()
+    
+    // Search & Filter State
+    @State private var searchText = ""
+    @State private var isSearchExpanded = false
+    @State private var selectedClusterFilter: WorkflowCluster? = nil
+    @State private var isFilterExpanded = false
+
+    var filteredThreads: [WorkflowThreadSummary] {
+        sessionStore.workflowThreads.filter { summary in
+            let matchesSearch = searchText.isEmpty || summary.displayTitle.localizedCaseInsensitiveContains(searchText)
+            
+            let cluster = summary.segments.first?.cluster ?? .mixed
+            let matchesCluster = selectedClusterFilter == nil || cluster == selectedClusterFilter
+            
+            return matchesSearch && matchesCluster
+        }
+    }
 
     var body: some View {
         Group {
@@ -125,55 +142,148 @@ struct TimelineView: View {
                         .tint(Color.red)
                         .disabled(selectedSessionIds.isEmpty)
                     } else {
-                        Text("Timeline")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(.primary)
+                        HStack(alignment: .center, spacing: 10) {
+                            Text("Timeline")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.primary)
+                            
+                            if !sessionStore.workflowThreads.isEmpty {
+                                let totalWorkflows = sessionStore.workflowThreads.count
+                                let totalSessions = sessionStore.workflowThreads.map { $0.segments.count }.reduce(0, +)
+                                let totalDuration = sessionStore.workflowThreads.map { $0.totalDuration }.reduce(0, +)
+                                
+                                HStack(spacing: 6) {
+                                    InlineMetricBadge(label: "\(totalWorkflows) active", icon: "point.3.connected.trianglepath", color: EchoPalette.accent)
+                                    InlineMetricBadge(label: "\(totalSessions) sessions", icon: "clock.arrow.circlepath", color: EchoPalette.indigoSoft)
+                                    if totalDuration > 0 {
+                                        InlineMetricBadge(label: totalDuration.sessionDurationFormatted, icon: "clock", color: .secondary)
+                                    }
+                                }
+                                .transition(.opacity)
+                            }
+                        }
                         
                         Spacer()
                         
-                        Menu {
+                        HStack(spacing: 8) {
+                            // Search Button
                             Button(action: {
-                                withAnimation(EchoDesign.subtle) {
-                                    isSelectMode = true
-                                    selectedThreadIds.removeAll()
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                    isSearchExpanded.toggle()
+                                    if !isSearchExpanded {
+                                        searchText = ""
+                                    }
                                 }
                             }) {
-                                Label("Delete Workflows", systemImage: "checklist")
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(isSearchExpanded ? EchoPalette.accent : Color.secondary)
+                                    .frame(width: 28, height: 28)
+                                    .background(Color.primary.opacity(isSearchExpanded ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 8))
                             }
+                            .buttonStyle(.plain)
                             
-                            Button(role: .destructive, action: {
-                                activeAlert = .eraseAll
+                            // Filter Button
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                    isFilterExpanded.toggle()
+                                }
                             }) {
-                                Label("Erase Timeline", systemImage: "trash")
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(selectedClusterFilter != nil || isFilterExpanded ? EchoPalette.accent : Color.secondary)
+                                    .frame(width: 28, height: 28)
+                                    .background(Color.primary.opacity(selectedClusterFilter != nil || isFilterExpanded ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 8))
                             }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: 18))
-                                .foregroundStyle(Color.secondary)
+                            .buttonStyle(.plain)
+                            
+                            // Ellipsis/Menu Button
+                            Menu {
+                                Button(action: {
+                                    withAnimation(EchoDesign.subtle) {
+                                        isSelectMode = true
+                                        selectedThreadIds.removeAll()
+                                    }
+                                }) {
+                                    Label("Delete Workflows", systemImage: "checklist")
+                                }
+                                
+                                Button(role: .destructive, action: {
+                                    activeAlert = .eraseAll
+                                }) {
+                                    Label("Erase Timeline", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(Color.secondary)
+                                    .frame(width: 28, height: 28)
+                                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+                            }
+                            .menuStyle(.button)
+                            .buttonStyle(.plain)
                         }
-                        .menuStyle(.button)
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, EchoDesign.containerRadius)
                 .padding(.top, EchoDesign.containerRadius)
                 .padding(.bottom, 12)
                 
-                // Timeline Statistics metric header badges
-                if !isSelectMode && !isSessionSelectMode && !sessionStore.workflowThreads.isEmpty {
-                    let totalWorkflows = sessionStore.workflowThreads.count
-                    let totalSessions = sessionStore.workflowThreads.map { $0.segments.count }.reduce(0, +)
-                    let totalDuration = sessionStore.workflowThreads.map { $0.totalDuration }.reduce(0, +)
-                    
-                    HStack(spacing: 10) {
-                        MetricBadge(label: "\(totalWorkflows) active \(totalWorkflows == 1 ? "workflow" : "workflows")", icon: "folder.fill")
-                        MetricBadge(label: "\(totalSessions) \(totalSessions == 1 ? "session" : "sessions")", icon: "clock.arrow.circlepath")
-                        if totalDuration > 0 {
-                            MetricBadge(label: "Tracked \(totalDuration.sessionDurationFormatted)", icon: "hourglass")
+                // Collapsible Search Field
+                if isSearchExpanded {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 8)
+                        
+                        TextField("Search workflows…", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12))
+                        
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.trailing, 8)
                         }
                     }
+                    .frame(height: 28)
+                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                    )
                     .padding(.horizontal, EchoDesign.containerRadius)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                
+                // Collapsible Filter Bar
+                if isFilterExpanded {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            FilterPill(label: "All", isSelected: selectedClusterFilter == nil) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                                    selectedClusterFilter = nil
+                                }
+                            }
+                            
+                            ForEach(WorkflowCluster.allCases, id: \.self) { cluster in
+                                FilterPill(label: cluster.label, isSelected: selectedClusterFilter == cluster, clusterColor: cluster.colors.first ?? EchoPalette.accent) {
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                                        selectedClusterFilter = cluster
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, EchoDesign.containerRadius)
+                    }
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
                 if sessionStore.isLoading {
@@ -192,16 +302,42 @@ struct TimelineView: View {
                         Spacer()
                     }
                     Spacer()
+                } else if filteredThreads.isEmpty {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass.circle")
+                            .font(.system(size: 36, weight: .thin))
+                            .foregroundStyle(EchoPalette.indigo.opacity(0.35))
+                        Text("No matching workflows")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Text("Try adjusting your search query or category filter.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Button("Reset filters") {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                                searchText = ""
+                                selectedClusterFilter = nil
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    Spacer()
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
                             if activityStore.isRecording && !isSelectMode {
                                 SessionControlBar(compact: false)
                                     .padding(.bottom, 4)
-                                liveBanner
+                                  liveBanner
                             }
 
-                            ForEach(sessionStore.workflowThreads) { summary in
+                            ForEach(filteredThreads) { summary in
                                 HStack(spacing: 12) {
                                     if isSelectMode {
                                         let isSelected = selectedThreadIds.contains(summary.id)
@@ -480,99 +616,110 @@ private struct WorkflowThreadCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header Row (Clickable to Expand/Collapse)
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .center, spacing: 14) {
                 // Dynamic Icon based on category cluster of latest segment
                 let cluster = summary.segments.first?.cluster ?? .mixed
                 ClusterIconView(cluster: cluster)
-                    .padding(.top, 2)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .center, spacing: 8) {
                         Text(summary.displayTitle)
                             .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(.primary)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         
-                        if summary.segments.count > 1 {
-                            let count = summary.segments.count
-                            Text("↺ Continued \(count - 1) \(count - 1 == 1 ? "time" : "times")")
-                                .font(.system(size: 10, weight: .bold))
+                        if summary.activeSegment != nil {
+                            Text("Active")
+                                .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(EchoPalette.indigo.opacity(0.12), in: Capsule())
-                                .foregroundStyle(EchoPalette.indigo)
+                                .background(Color.green.opacity(0.12))
+                                .cornerRadius(5)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .stroke(Color.green.opacity(0.25), lineWidth: 0.5)
+                                )
+                                .foregroundStyle(Color.green)
+                        } else if summary.segments.count > 1 {
+                            let count = summary.segments.count
+                            Text("Continued \(count - 1) \(count - 1 == 1 ? "time" : "times")")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.12))
+                                .cornerRadius(5)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .stroke(Color.orange.opacity(0.25), lineWidth: 0.5)
+                                )
+                                .foregroundStyle(Color.orange)
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
                         Text("Last Active: \(summary.latestActiveLabel)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        
-                        HStack(spacing: 8) {
-                            Text("Total Time: \(summary.totalDuration.shortLabel)")
-                            Text("·")
-                            Text("\(summary.segments.count) \(summary.segments.count == 1 ? "Session" : "Sessions")")
-                        }
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        
-                        // App Icon Overlapping Stack
-                        let bundleIds = summary.bundleIds
-                        if !bundleIds.isEmpty {
-                            HStack(spacing: -6) {
-                                ForEach(Array(bundleIds.prefix(6).enumerated()), id: \.element) { index, bundleId in
-                                    AppIconView(bundleId: bundleId, size: 18)
-                                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                                .stroke(Color.black.opacity(0.2), lineWidth: 0.5)
-                                        )
-                                        .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
-                                        .zIndex(Double(bundleIds.count - index))
-                                }
-                                if bundleIds.count > 6 {
-                                    Text("+\(bundleIds.count - 6)")
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundStyle(.secondary)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 1.5)
-                                        .background(Color.primary.opacity(0.06), in: Capsule())
-                                        .padding(.leading, 4)
-                                }
-                            }
-                            .padding(.top, 4)
-                        }
+                        Text("·")
+                        Text("Total Time: \(summary.totalDuration.shortLabel)")
+                        Text("·")
+                        Text("\(summary.segments.count) \(summary.segments.count == 1 ? "Session" : "Sessions")")
                     }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 8)
 
-                // 3-dot Menu Button (discoverable card actions)
-                Menu {
-                    Button("Delete Sessions…") {
-                        onStartSessionSelect()
+                // App Icon Overlapping Stack and actions
+                HStack(spacing: 12) {
+                    let bundleIds = summary.bundleIds
+                    if !bundleIds.isEmpty {
+                        HStack(spacing: -6) {
+                            ForEach(Array(bundleIds.prefix(5).enumerated()), id: \.element) { index, bundleId in
+                                AppIconView(bundleId: bundleId, size: 18)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                            .stroke(Color.black.opacity(0.2), lineWidth: 0.5)
+                                    )
+                                    .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
+                                    .zIndex(Double(bundleIds.count - index))
+                            }
+                            if bundleIds.count > 5 {
+                                Text("+\(bundleIds.count - 5)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1.5)
+                                    .background(Color.primary.opacity(0.06), in: Capsule())
+                                    .padding(.leading, 4)
+                            }
+                        }
                     }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 14, weight: .semibold))
+
+                    // 3-dot Menu Button (discoverable card actions)
+                    Menu {
+                        Button("Delete Sessions…") {
+                            onStartSessionSelect()
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary.opacity(0.7))
+                            .frame(width: 24, height: 24)
+                            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .disabled(isSessionSelectMode)
+                    .onTapGesture {} // Prevent card toggle on menu click
+
+                    // Expand Chevron
+                    Image(systemName: logsExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.secondary.opacity(0.7))
                         .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
                 }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .disabled(isSessionSelectMode)
-                .padding(.top, 6)
-                .onTapGesture {} // Prevent card toggle on menu click
-
-                // Rotating Chevron
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary.opacity(0.7))
-                    .rotationEffect(.degrees(logsExpanded ? 90 : 0))
-                    .padding(.top, 12)
             }
             .padding(EchoDesign.cardPadding)
             .contentShape(Rectangle())
@@ -797,15 +944,15 @@ fileprivate struct ClusterIconView: View {
     
     var body: some View {
         ZStack {
-            Circle()
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                .shadow(color: colors[0].opacity(0.3), radius: 3, y: 1.5)
+                .shadow(color: colors[0].opacity(0.25), radius: 4, y: 2)
             
             Image(systemName: cluster.icon)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.white)
         }
-        .frame(width: 32, height: 32)
+        .frame(width: 36, height: 36)
     }
 }
 
@@ -869,5 +1016,65 @@ fileprivate struct MetricBadge: View {
             Capsule()
                 .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
         )
+    }
+}
+
+fileprivate struct InlineMetricBadge: View {
+    let label: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 8))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3.5)
+        .background(
+            Capsule()
+                .fill(Color.primary.opacity(0.04))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
+    }
+}
+
+fileprivate struct FilterPill: View {
+    let label: String
+    let isSelected: Bool
+    var clusterColor: Color = EchoPalette.accent
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                if isSelected && label != "All" {
+                    Circle()
+                        .fill(clusterColor)
+                        .frame(width: 5, height: 5)
+                }
+                Text(label)
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(isSelected ? Color.white : Color.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(isSelected ? clusterColor.opacity(0.85) : Color.primary.opacity(0.04))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? clusterColor.opacity(0.3) : Color.primary.opacity(0.06), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }

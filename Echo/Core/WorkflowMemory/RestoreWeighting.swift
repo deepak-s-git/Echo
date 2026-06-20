@@ -83,13 +83,14 @@ nonisolated enum RestoreWeighting {
     }
 
     nonisolated static func itemKey(_ item: RestoreItem) -> String {
+        let bId = item.bundleId ?? ""
         switch item.kind {
-        case .application: return "app:\(item.bundleId ?? "")"
-        case .url, .browserPage: return "url:\(item.url ?? "")"
-        case .folder: return "folder:\(item.path ?? "")"
-        case .document: return "doc:\(item.path ?? "")"
-        case .terminalDirectory: return "term:\(item.workingDirectory ?? "")"
-        case .workspace: return "ws:\(item.path ?? "")"
+        case .application: return "app:\(bId)"
+        case .url, .browserPage: return "url:\(item.url ?? ""):\(bId)"
+        case .folder: return "folder:\(item.path ?? ""):\(bId)"
+        case .document: return "doc:\(item.path ?? ""):\(bId)"
+        case .terminalDirectory: return "term:\(item.workingDirectory ?? ""):\(bId)"
+        case .workspace: return "ws:\(item.path ?? ""):\(bId)"
         }
     }
 

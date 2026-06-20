@@ -873,6 +873,7 @@ struct MenuBarView: View {
                 }
             }
             .padding(12)
+            .frame(height: 156, alignment: .top) // Force static height to prevent dynamic resizing/jumping
             .background(EchoPalette.graphiteElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -889,86 +890,87 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 2)
                 
-                if !recentMemories.isEmpty {
-                    VStack(spacing: 8) {
-                        ForEach(recentMemories) { session in
-                            HStack(spacing: 10) {
-                                // Category Icon
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .fill(Color.primary.opacity(0.04))
-                                        .frame(width: 26, height: 26)
-                                    Image(systemName: session.cluster.icon)
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(EchoPalette.indigoSoft)
-                                }
-                                
-                                // Text details
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(session.title ?? "Untitled segment")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                    
-                                    HStack(spacing: 5) {
-                                        Text(relativeTimeString(for: session.startedAt))
-                                            .foregroundStyle(.secondary)
-                                        Text("·")
-                                            .foregroundStyle(.tertiary)
-                                        Text(session.duration.shortLabel)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .font(.system(size: 9))
-                                }
-                                
-                                Spacer()
-                                
-                                // Restore action button
-                                Button {
-                                    restoreSession(session)
-                                } label: {
+                VStack {
+                    if !recentMemories.isEmpty {
+                        VStack(spacing: 8) {
+                            ForEach(recentMemories) { session in
+                                HStack(spacing: 10) {
+                                    // Category Icon
                                     ZStack {
-                                        if restoringSessionId == session.id {
-                                            ProgressView()
-                                                .scaleEffect(0.6)
-                                        } else {
-                                            Image(systemName: "arrow.uturn.backward")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundStyle(.primary.opacity(0.7))
-                                        }
+                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            .fill(Color.primary.opacity(0.04))
+                                            .frame(width: 26, height: 26)
+                                        Image(systemName: session.cluster.icon)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(EchoPalette.indigoSoft)
                                     }
-                                    .frame(width: 24, height: 24)
-                                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                                    )
+                                    
+                                    // Text details
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(session.title ?? "Untitled segment")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(1)
+                                        
+                                        HStack(spacing: 5) {
+                                            Text(relativeTimeString(for: session.startedAt))
+                                                .foregroundStyle(.secondary)
+                                            Text("·")
+                                                .foregroundStyle(.tertiary)
+                                            Text(session.duration.shortLabel)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .font(.system(size: 9))
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    // Restore action button
+                                    Button {
+                                        restoreSession(session)
+                                    } label: {
+                                        ZStack {
+                                            if restoringSessionId == session.id {
+                                                ProgressView()
+                                                    .scaleEffect(0.6)
+                                            } else {
+                                                Image(systemName: "arrow.uturn.backward")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundStyle(.primary.opacity(0.7))
+                                            }
+                                        }
+                                        .frame(width: 24, height: 24)
+                                        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(restoringSessionId != nil)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(restoringSessionId != nil)
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 6)
                             }
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 6)
+                            Spacer(minLength: 0)
                         }
+                        .padding(6)
+                    } else {
+                        VStack(spacing: 4) {
+                            Text("No Recent Workflows")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            Text("Your recorded sessions will appear here.")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .padding(6)
-                    .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
-                } else {
-                    VStack(spacing: 4) {
-                        Text("No Recent Workflows")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Text("Your recorded sessions will appear here.")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.tertiary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
                 }
+                .frame(height: 145, alignment: .top)
+                .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
             }
 
             Divider().opacity(0.3)
@@ -994,7 +996,7 @@ struct MenuBarView: View {
             .padding(.horizontal, 4)
         }
         .padding(16)
-        .frame(width: 320, height: 440)
+        .frame(width: 320, height: 450)
     }
 
     private func relativeTimeString(for date: Date) -> String {

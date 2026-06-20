@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 nonisolated enum WorkflowMemoryBuilder {
 
@@ -89,7 +90,7 @@ nonisolated enum WorkflowMemoryBuilder {
     private static func buildBrowserContexts(from events: [ActivityEvent]) -> [BrowserContextEntry] {
         var seen = Set<String>()
         return events.compactMap { event -> BrowserContextEntry? in
-            guard event.type == .browserTab || event.url != nil else { return nil }
+            guard event.type == .browserTab || (event.url != nil && BrowserContextService.isBrowser(event.appBundleId)) else { return nil }
             let host = domain(from: event.url) ?? event.appName
             let lowerHost = host.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             guard !lowerHost.isEmpty && seen.insert(lowerHost).inserted else { return nil }
@@ -229,8 +230,8 @@ nonisolated enum WorkflowRestorePlanBuilder {
         let threshold = {
             let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
             let hold = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
-            let actualDelay = delay > 0 ? delay : 1.2
-            let actualHold = hold > 0 ? hold : 12.0
+            let actualDelay = delay > 0 ? delay : 5.0
+            let actualHold = hold > 0 ? hold : 10.0
             return actualDelay + actualHold
         }()
 
@@ -243,10 +244,57 @@ nonisolated enum WorkflowRestorePlanBuilder {
             if item.kind == .browserPage || item.kind == .url, let u = item.url {
                 let host = URL(string: u)?.host?.lowercased() ?? ""
                 let profile = item.profileName ?? "default"
-                let titleKey = "title:\(profile):\(host):\(item.label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
+                let titleKey = "title:\(profile):\(host):\(item.label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)):\(item.bundleId ?? "")"
                 _ = seen.insert(titleKey)
             }
             items.append(item)
+        }
+
+        // Query currently open workspaces/folders for running IDEs to ensure we don't miss open background windows
+        let ides = [
+            "com.apple.dt.Xcode",
+            "com.microsoft.VSCode",
+            "com.todesktop.230313mzl4w4u92",
+            "com.google.antigravity-ide",
+            "com.google.antigravity"
+        ]
+        
+        for bundleId in ides {
+            let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+            for app in runningApps {
+                guard !app.isTerminated else { continue }
+                let pid = app.processIdentifier
+                let contexts = WindowContextCapture.allOpenWindowsContexts(for: pid)
+                for ctx in contexts {
+                    // Resolve workspace path just like we do for events
+                    var pathOpt = ctx.documentURL.flatMap { URL(string: $0)?.path } ?? WorkflowContextCapture.extractWorkspacePath(from: ctx.title)
+                    if pathOpt == nil && (bundleId == "com.google.antigravity-ide" || bundleId == "com.google.antigravity") {
+                        pathOpt = WorkflowContextCapture.resolveWorkspacePath(from: ctx.title, bundleId: bundleId)
+                    }
+                    
+                    guard let path = pathOpt, FileManager.default.fileExists(atPath: path) else { continue }
+                    
+                    let resolvedPath: String
+                    if bundleId == "com.microsoft.VSCode" || bundleId == "com.todesktop.230313mzl4w4u92" || bundleId == "com.google.antigravity-ide" || bundleId == "com.google.antigravity" {
+                        resolvedPath = WorkflowContextCapture.resolveProjectRoot(filePath: path, windowTitle: ctx.title, bundleId: bundleId)
+                    } else {
+                        resolvedPath = path
+                    }
+                    
+                    let key = "ws:\(resolvedPath):\(bundleId)"
+                    guard seen.insert(key).inserted else { continue }
+                    
+                    items.append(RestoreItem(
+                        id: UUID(),
+                        kind: .workspace,
+                        label: (resolvedPath as NSString).lastPathComponent,
+                        bundleId: bundleId,
+                        url: nil,
+                        path: resolvedPath,
+                        workingDirectory: nil
+                    ))
+                }
+            }
         }
 
         let rankedBundles = bundleDurations(from: events)
@@ -353,11 +401,12 @@ nonisolated enum WorkflowRestorePlanBuilder {
                 continue
             }
 
+            let bId = browserBundleId(for: ctx.browser) ?? ""
             let host = URL(string: url)?.host?.lowercased() ?? ctx.domain.lowercased()
             let profile = ctx.profileName ?? "default"
-            let titleKey = "title:\(profile):\(host):\(lowerT)"
+            let titleKey = "title:\(profile):\(host):\(lowerT):\(bId)"
 
-            guard seen.insert("page:\(normalizeURL(url))").inserted else { continue }
+            guard seen.insert("page:\(normalizeURL(url)):\(bId)").inserted else { continue }
             guard seen.insert(titleKey).inserted else { continue }
 
             items.append(RestoreItem(
@@ -372,30 +421,34 @@ nonisolated enum WorkflowRestorePlanBuilder {
             ))
         }
 
-        if let folder = extractProjectPath(from: events),
-           !seen.contains("ws:\(folder)"),
-           seen.insert("folder:\(folder)").inserted {
-            items.append(RestoreItem(
-                id: UUID(),
-                kind: .folder,
-                label: (folder as NSString).lastPathComponent,
-                bundleId: nil,
-                url: nil,
-                path: folder,
-                workingDirectory: nil
-            ))
+        if let folder = extractProjectPath(from: events) {
+            let alreadyHasWorkspace = seen.contains { $0.hasPrefix("ws:\(folder)") || $0.hasPrefix("folder:\(folder)") }
+            if !alreadyHasWorkspace, seen.insert("folder:\(folder):").inserted {
+                items.append(RestoreItem(
+                    id: UUID(),
+                    kind: .folder,
+                    label: (folder as NSString).lastPathComponent,
+                    bundleId: nil,
+                    url: nil,
+                    path: folder,
+                    workingDirectory: nil
+                ))
+            }
         }
 
-        if let cwd = extractTerminalDirectory(from: events), seen.insert("term:\(cwd)").inserted {
-            items.append(RestoreItem(
-                id: UUID(),
-                kind: .terminalDirectory,
-                label: "Terminal — \((cwd as NSString).lastPathComponent)",
-                bundleId: "com.apple.Terminal",
-                url: nil,
-                path: nil,
-                workingDirectory: cwd
-            ))
+        if let cwd = extractTerminalDirectory(from: events) {
+            let alreadyHasTerminal = seen.contains { $0.hasPrefix("term:\(cwd)") }
+            if !alreadyHasTerminal, seen.insert("term:\(cwd):com.apple.Terminal").inserted {
+                items.append(RestoreItem(
+                    id: UUID(),
+                    kind: .terminalDirectory,
+                    label: "Terminal — \((cwd as NSString).lastPathComponent)",
+                    bundleId: "com.apple.Terminal",
+                    url: nil,
+                    path: nil,
+                    workingDirectory: cwd
+                ))
+            }
         }
 
         let filtered = filterPrefixURLs(items)
@@ -403,17 +456,18 @@ nonisolated enum WorkflowRestorePlanBuilder {
     }
 
     private static func restoreKey(_ item: RestoreItem) -> String {
+        let bId = item.bundleId ?? ""
         switch item.kind {
-        case .application: return "app:\(item.bundleId ?? "")"
+        case .application: return "app:\(bId)"
         case .url, .browserPage:
             if let u = item.url {
-                return "page:\(normalizeURL(u))"
+                return "page:\(normalizeURL(u)):\(bId)"
             }
-            return "url:\(item.label)"
-        case .folder: return "folder:\(item.path ?? "")"
-        case .document: return "doc:\(item.path ?? "")"
-        case .terminalDirectory: return "term:\(item.workingDirectory ?? "")"
-        case .workspace: return "ws:\(item.path ?? "")"
+            return "url:\(item.label):\(bId)"
+        case .folder: return "folder:\(item.path ?? ""):\(bId)"
+        case .document: return "doc:\(item.path ?? ""):\(bId)"
+        case .terminalDirectory: return "term:\(item.workingDirectory ?? ""):\(bId)"
+        case .workspace: return "ws:\(item.path ?? ""):\(bId)"
         }
     }
 

@@ -508,7 +508,11 @@ nonisolated enum WorkflowRecordingState: String, Sendable {
 
 /// App-wide constants. Deliberately nonisolated so any actor can read these values.
 nonisolated enum EchoConfig {
+    #if DEBUG
     static let sessionIdleTimeout: TimeInterval = 300
+    #else
+    static let sessionIdleTimeout: TimeInterval = 900
+    #endif
     static let batchWriteInterval: TimeInterval = 5
     /// Flush to SQLite after this many queued events (in addition to the timer).
     static let batchWriteEventThreshold: Int = 4

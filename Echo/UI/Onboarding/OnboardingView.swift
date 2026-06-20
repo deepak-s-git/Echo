@@ -167,8 +167,7 @@ struct OnboardingView: View {
                     .offset(y: cardOffsets[2])
                 }
                 .padding(.horizontal, 48)
-                .frame(height: 124)
-                .clipped()
+                .frame(height: 140)
 
                 Spacer()
 
@@ -177,7 +176,7 @@ struct OnboardingView: View {
                     if !permissionsManager.allGranted {
                         permissionsManager.requestAccessibility()
                     }
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                    withAnimation(.spring(response: 0.65, dampingFraction: 0.88)) {
                         appStore.completeOnboarding()
                     }
                 } label: {
@@ -589,47 +588,162 @@ private struct FeatureCardView: View {
     let glowColor: Color
     
     @State private var isHovered = false
+    @State private var hoverLocation: CGPoint = .zero
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                // Glass prism icon container
                 ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(glowColor.opacity(0.12))
-                        .frame(width: 22, height: 22)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: isHovered
+                                    ? [glowColor.opacity(0.35), glowColor.opacity(0.12)]
+                                    : [glowColor.opacity(0.18), glowColor.opacity(0.04)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: isHovered
+                                            ? [.white.opacity(0.4), glowColor.opacity(0.2)]
+                                            : [glowColor.opacity(0.35), glowColor.opacity(0.1)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.6
+                                )
+                        )
+                        .shadow(
+                            color: glowColor.opacity(isHovered ? 0.45 : 0.12),
+                            radius: isHovered ? 8 : 3,
+                            y: isHovered ? 2 : 1
+                        )
                     
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(glowColor)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(isHovered ? .white : glowColor)
+                        .scaleEffect(isHovered ? 1.15 : 1.0)
+                        .rotationEffect(isHovered ? .degrees(8) : .degrees(0))
+                        .offset(y: isHovered ? -1 : 0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
                 }
+                .frame(width: 28, height: 28)
                 
                 Text(title)
-                    .font(.system(size: 12.5, weight: .bold))
+                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
             }
             
             Text(description)
-                .font(.system(size: 10))
+                .font(.system(size: 10.5, weight: .medium, design: .rounded))
                 .lineSpacing(3.5)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(isHovered ? 0.75 : 0.55))
                 .fixedSize(horizontal: false, vertical: true)
+                .animation(.easeInOut(duration: 0.2), value: isHovered)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 120, alignment: .topLeading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.015))
-                .background(.ultraThinMaterial)
+            GeometryReader { geo in
+                let size = geo.size
+                ZStack {
+                    // Glass backdrop
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.black.opacity(0.3))
+                        .background(.ultraThinMaterial)
+                    
+                    // Base glow tint
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [glowColor.opacity(isHovered ? 0.05 : 0.02), Color.clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    
+                    // Dynamic Spotlight Glow
+                    if isHovered {
+                        RadialGradient(
+                            colors: [glowColor.opacity(0.15), Color.clear],
+                            center: .init(x: hoverLocation.x / size.width, y: hoverLocation.y / size.height),
+                            startRadius: 0,
+                            endRadius: 100
+                        )
+                        .blur(radius: 8)
+                    }
+                }
+            }
         )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(isHovered ? glowColor.opacity(0.32) : .white.opacity(0.06), lineWidth: 0.5)
+            GeometryReader { geo in
+                let size = geo.size
+                ZStack {
+                    // Border stroke
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: isHovered
+                                    ? [glowColor.opacity(0.55), glowColor.opacity(0.12)]
+                                    : [Color.white.opacity(0.12), Color.white.opacity(0.03)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.6
+                        )
+                    
+                    // Dynamic cursor stroke highlight
+                    if isHovered {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(
+                                RadialGradient(
+                                    colors: [glowColor.opacity(0.7), Color.clear],
+                                    center: .init(x: hoverLocation.x / size.width, y: hoverLocation.y / size.height),
+                                    startRadius: 0,
+                                    endRadius: 50
+                                ),
+                                lineWidth: 1.0
+                            )
+                            .blendMode(.screen)
+                    }
+                    
+                    // Top beveled specular highlight
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.white.opacity(isHovered ? 0.22 : 0.10), .white.opacity(0.02), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 0.6
+                        )
+                        .blendMode(.plusLighter)
+                }
+            }
         )
-        .scaleEffect(isHovered ? 1.025 : 1.0)
-        .shadow(color: isHovered ? glowColor.opacity(0.18) : Color.clear, radius: 12, y: 4)
-        .onHover { hovering in
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
-                isHovered = hovering
+        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .shadow(
+            color: isHovered ? glowColor.opacity(0.16) : Color.black.opacity(0.12),
+            radius: isHovered ? 12 : 5,
+            y: isHovered ? 5 : 2
+        )
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let location):
+                hoverLocation = location
+                withAnimation(.easeOut(duration: 0.1)) {
+                    isHovered = true
+                }
+            case .ended:
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isHovered = false
+                }
             }
         }
     }

@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 
 /// Extracts restorable working context from window titles, URLs, and bundle IDs.
 nonisolated enum WorkflowContextCapture {
@@ -7,8 +8,8 @@ nonisolated enum WorkflowContextCapture {
     let threshold = tabEligibility ?? {
         let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
         let hold = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
-        let actualDelay = delay > 0 ? delay : 1.2
-        let actualHold = hold > 0 ? hold : 12.0
+        let actualDelay = delay > 0 ? delay : 5.0
+        let actualHold = hold > 0 ? hold : 10.0
         return actualDelay + actualHold
     }()
 
@@ -149,8 +150,8 @@ nonisolated enum WorkflowContextCapture {
     let threshold = tabEligibility ?? {
         let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
         let hold = UserDefaults.standard.double(forKey: "echo.settings.tabEligibilitySeconds")
-        let actualDelay = delay > 0 ? delay : 1.2
-        let actualHold = hold > 0 ? hold : 12.0
+        let actualDelay = delay > 0 ? delay : 5.0
+        let actualHold = hold > 0 ? hold : 10.0
         return actualDelay + actualHold
     }()
 
@@ -162,6 +163,8 @@ nonisolated enum WorkflowContextCapture {
     case "com.apple.dt.Xcode":
       return workspaceItems(event: event, seen: &seen)
     case "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92":
+      return workspaceItems(event: event, seen: &seen)
+    case "com.google.antigravity-ide", "com.google.antigravity":
       return workspaceItems(event: event, seen: &seen)
     default:
       if BrowserContextService.isBrowser(event.appBundleId) {
@@ -186,7 +189,7 @@ nonisolated enum WorkflowContextCapture {
   private static func finderItems(event: ActivityEvent, seen: inout Set<String>) -> [RestoreItem] {
     guard let path = getFilePath(from: event) ?? extractPath(from: event.windowTitle),
           FileManager.default.fileExists(atPath: path) else { return [] }
-    let key = "folder:\(path)"
+    let key = "folder:\(path):\(event.appBundleId)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
@@ -205,7 +208,7 @@ nonisolated enum WorkflowContextCapture {
     guard let path = getFilePath(from: event) ?? extractFilePath(from: event.windowTitle),
           FileManager.default.fileExists(atPath: path)
     else { return [] }
-    let key = "doc:\(path)"
+    let key = "doc:\(path):\(event.appBundleId)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
@@ -224,19 +227,24 @@ nonisolated enum WorkflowContextCapture {
     event: ActivityEvent,
     seen: inout Set<String>
   ) -> [RestoreItem] {
-    let pathOpt = getFilePath(from: event) ?? extractWorkspacePath(from: event.windowTitle)
+    var pathOpt = getFilePath(from: event) ?? extractWorkspacePath(from: event.windowTitle)
+    
+    if pathOpt == nil && (event.appBundleId == "com.google.antigravity-ide" || event.appBundleId == "com.google.antigravity") {
+        pathOpt = resolveWorkspacePath(from: event.windowTitle, bundleId: event.appBundleId)
+    }
+    
     guard let path = pathOpt,
           FileManager.default.fileExists(atPath: path)
     else { return [] }
     
     let resolvedPath: String
-    if event.appBundleId == "com.microsoft.VSCode" || event.appBundleId == "com.todesktop.230313mzl4w4u92" {
+    if event.appBundleId == "com.microsoft.VSCode" || event.appBundleId == "com.todesktop.230313mzl4w4u92" || event.appBundleId == "com.google.antigravity-ide" || event.appBundleId == "com.google.antigravity" {
       resolvedPath = resolveProjectRoot(filePath: path, windowTitle: event.windowTitle, bundleId: event.appBundleId)
     } else {
       resolvedPath = path
     }
     
-    let key = "ws:\(resolvedPath)"
+    let key = "ws:\(resolvedPath):\(event.appBundleId)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
@@ -249,7 +257,149 @@ nonisolated enum WorkflowContextCapture {
     )]
   }
 
-  private static func resolveProjectRoot(filePath: String, windowTitle: String?, bundleId: String) -> String {
+  static func resolveWorkspacePath(from windowTitle: String?, bundleId: String) -> String? {
+    guard let title = windowTitle, !title.isEmpty else { return nil }
+    
+    var recentFolders: [String] = []
+    
+    // Antigravity and Antigravity IDE share the same application support storage directory
+    let supportDirName = "Antigravity IDE"
+    
+    // 1. Read from state.vscdb (SQLite)
+    let vscdbPath = "/Users/DEvdev/Library/Application Support/\(supportDirName)/User/globalStorage/state.vscdb"
+    let tempBase = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    if (try? FileManager.default.createDirectory(at: tempBase, withIntermediateDirectories: true)) != nil {
+        let tempURL = tempBase.appendingPathComponent("state.vscdb")
+        if FileManager.default.fileExists(atPath: vscdbPath) {
+            if (try? FileManager.default.copyItem(at: URL(fileURLWithPath: vscdbPath), to: tempURL)) != nil {
+                var db: OpaquePointer?
+                if sqlite3_open_v2(tempURL.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK {
+                    var statement: OpaquePointer?
+                    let query = "SELECT value FROM ItemTable WHERE key = 'history.recentlyOpenedPathsList' LIMIT 1"
+                    if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+                        if sqlite3_step(statement) == SQLITE_ROW {
+                            var jsonString: String? = nil
+                            if let blobPtr = sqlite3_column_blob(statement, 0) {
+                                let blobBytes = sqlite3_column_bytes(statement, 0)
+                                let data = Data(bytes: blobPtr, count: Int(blobBytes))
+                                jsonString = String(data: data, encoding: .utf8)
+                            }
+                            
+                            if let jsonString = jsonString,
+                               let jsonData = jsonString.data(using: .utf8) {
+                                struct RecentlyOpenedList: Codable {
+                                    struct Entry: Codable {
+                                        let folderUri: String?
+                                        struct WorkspaceInfo: Codable {
+                                            let configPath: String?
+                                        }
+                                        let workspace: WorkspaceInfo?
+                                    }
+                                    let entries: [Entry]?
+                                }
+                                
+                                if let decoded = try? JSONDecoder().decode(RecentlyOpenedList.self, from: jsonData),
+                                   let entries = decoded.entries {
+                                    for entry in entries {
+                                        if let folderUri = entry.folderUri,
+                                           let url = URL(string: folderUri),
+                                           url.scheme == "file" {
+                                            recentFolders.append(url.path)
+                                        } else if let configPath = entry.workspace?.configPath,
+                                                  let url = URL(string: configPath),
+                                                  url.scheme == "file" {
+                                            recentFolders.append(url.path)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        sqlite3_finalize(statement)
+                    }
+                    sqlite3_close(db)
+                }
+            }
+        }
+        try? FileManager.default.removeItem(at: tempBase)
+    }
+    
+    // 2. Read from storage.json as fallback
+    let storagePath = "/Users/DEvdev/Library/Application Support/\(supportDirName)/User/globalStorage/storage.json"
+    
+    if FileManager.default.fileExists(atPath: storagePath),
+       let data = try? Data(contentsOf: URL(fileURLWithPath: storagePath)),
+       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let backupWorkspaces = json["backupWorkspaces"] as? [String: Any],
+       let folders = backupWorkspaces["folders"] as? [[String: Any]] {
+        for folder in folders {
+            if let uriStr = folder["folderUri"] as? String,
+               let url = URL(string: uriStr),
+               url.scheme == "file" {
+                let path = url.path
+                if !recentFolders.contains(path) {
+                    recentFolders.append(path)
+                }
+            }
+        }
+    }
+    
+    if FileManager.default.fileExists(atPath: storagePath),
+       let data = try? Data(contentsOf: URL(fileURLWithPath: storagePath)),
+       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let profileAssociations = json["profileAssociations"] as? [String: Any],
+       let workspaces = profileAssociations["workspaces"] as? [String: Any] {
+        for key in workspaces.keys {
+            if let url = URL(string: key), url.scheme == "file" {
+                let path = url.path
+                if !recentFolders.contains(path) {
+                    recentFolders.append(path)
+                }
+            }
+        }
+    }
+    
+    let commonDirs = [
+        "/Users/DEvdev/Desktop",
+        "/Users/DEvdev/Documents"
+    ]
+    for dir in commonDirs {
+        if let subdirs = try? FileManager.default.contentsOfDirectory(atPath: dir) {
+            for subdir in subdirs {
+                let fullPath = (dir as NSString).appendingPathComponent(subdir)
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
+                    if !recentFolders.contains(fullPath) {
+                        recentFolders.append(fullPath)
+                    }
+                }
+            }
+        }
+    }
+    
+    let sortedFolders = recentFolders.sorted {
+        let len0 = ($0 as NSString).lastPathComponent.count
+        let len1 = ($1 as NSString).lastPathComponent.count
+        if len0 != len1 {
+            return len0 > len1
+        }
+        let idx0 = recentFolders.firstIndex(of: $0) ?? 0
+        let idx1 = recentFolders.firstIndex(of: $1) ?? 0
+        return idx0 < idx1
+    }
+    
+    for folderPath in sortedFolders {
+        let folderName = (folderPath as NSString).lastPathComponent
+        guard !folderName.isEmpty else { continue }
+        
+        if title.localizedCaseInsensitiveContains(folderName) {
+            return folderPath
+        }
+    }
+    
+    return nil
+  }
+
+  static func resolveProjectRoot(filePath: String, windowTitle: String?, bundleId: String) -> String {
     guard let title = windowTitle else { return filePath }
     let separators = [" — ", " – ", " - "]
     
@@ -367,7 +517,7 @@ nonisolated enum WorkflowContextCapture {
 
     if isPDF {
         let path = event.url?.hasPrefix("file://") == true ? URL(string: event.url!)?.path : nil
-        let key = "doc:\(pdfLabel)"
+        let key = "doc:\(pdfLabel):"
         guard seen.insert(key).inserted else { return [] }
         return [RestoreItem(
           id: UUID(),
@@ -392,7 +542,7 @@ nonisolated enum WorkflowContextCapture {
         } else {
             path = urlString
         }
-        let key = "doc:\(path)"
+        let key = "doc:\(path):"
         guard seen.insert(key).inserted else { return [] }
         return [RestoreItem(
           id: UUID(),
@@ -418,10 +568,10 @@ nonisolated enum WorkflowContextCapture {
     }
     
     let normalizedURLString = normalizeURL(url.absoluteString)
-    let key = "browser:\(normalizedURLString)"
+    let key = "browser:\(normalizedURLString):\(event.appBundleId)"
     let profile = event.profileName ?? "default"
     let host = url.host?.lowercased() ?? ""
-    let titleKey = "title:\(profile):\(host):\(lowerT)"
+    let titleKey = "title:\(profile):\(host):\(lowerT):\(event.appBundleId)"
     
     guard seen.insert(key).inserted else { return [] }
     guard seen.insert(titleKey).inserted else { return [] }
@@ -458,7 +608,7 @@ nonisolated enum WorkflowContextCapture {
     guard let cwd = cwdOpt, FileManager.default.fileExists(atPath: cwd) else { return [] }
     seen.insert(terminalAppKey)
     
-    let key = "term:\(cwd)"
+    let key = "term:\(cwd):\(event.appBundleId)"
     guard seen.insert(key).inserted else { return [] }
     return [RestoreItem(
       id: UUID(),
@@ -477,7 +627,7 @@ nonisolated enum WorkflowContextCapture {
   ) -> [RestoreItem] {
     guard let path = getFilePath(from: event) ?? extractPath(from: event.windowTitle),
           FileManager.default.fileExists(atPath: path) else { return [] }
-    let key = "path:\(path)"
+    let key = "path:\(path):\(event.appBundleId)"
     guard seen.insert(key).inserted else { return [] }
     if path.hasSuffix(".xcworkspace") || path.hasSuffix(".xcodeproj") || path.hasSuffix(".code-workspace") {
       return [RestoreItem(
@@ -513,7 +663,7 @@ nonisolated enum WorkflowContextCapture {
     return extractPath(from: title)
   }
 
-  private static func extractWorkspacePath(from title: String?) -> String? {
+  static func extractWorkspacePath(from title: String?) -> String? {
     guard let title else { return nil }
     let separators = [" — ", " – ", " - "]
     var candidates = [title]

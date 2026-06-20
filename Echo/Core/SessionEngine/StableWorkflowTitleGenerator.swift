@@ -154,7 +154,8 @@ enum StableWorkflowTitleGenerator {
 
     private static func workflowVerb(for bundleId: String) -> String {
         switch bundleId {
-        case "com.apple.dt.Xcode", "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92":
+        case "com.apple.dt.Xcode", "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92",
+             "com.google.antigravity-ide", "com.google.antigravity":
             return "Building in"
         case "com.apple.Safari", "com.google.Chrome", "company.thebrowser.Browser",
              "com.brave.Browser", "com.microsoft.edgemac":

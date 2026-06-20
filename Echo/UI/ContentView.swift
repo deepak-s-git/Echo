@@ -18,17 +18,45 @@ struct ContentView: View {
                     ZStack {
                         if appStore.isOnboardingPresented {
                             OnboardingView()
-                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                        removal: .opacity
+                                            .combined(with: .scale(scale: 1.05))
+                                            .combined(with: .offset(y: -20))
+                                    )
+                                )
+                                .zIndex(3)
                         } else if !permissionsManager.allGranted {
                             PermissionsView()
-                                .transition(.opacity.combined(with: .scale(scale: 1.02)))
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .opacity
+                                            .combined(with: .scale(scale: 1.05))
+                                            .combined(with: .offset(y: -20)),
+                                        removal: .opacity
+                                            .combined(with: .scale(scale: 0.95))
+                                            .combined(with: .offset(y: 20))
+                                    )
+                                )
+                                .zIndex(2)
                         } else {
                             MainNavigationView()
-                                .transition(.opacity)
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .opacity
+                                            .combined(with: .scale(scale: 0.92))
+                                            .combined(with: .offset(y: 24)),
+                                        removal: .opacity
+                                            .combined(with: .scale(scale: 1.05))
+                                            .combined(with: .offset(y: -24))
+                                    )
+                                )
+                                .zIndex(1)
                         }
                     }
-                    .animation(.spring(response: 0.7, dampingFraction: 0.82), value: appStore.isOnboardingPresented)
-                    .animation(.spring(response: 0.7, dampingFraction: 0.82), value: permissionsManager.allGranted)
+                    .animation(.spring(response: 0.65, dampingFraction: 0.88), value: appStore.isOnboardingPresented)
+                    .animation(.spring(response: 0.65, dampingFraction: 0.88), value: permissionsManager.allGranted)
                 }
             case .failed(let error):
                 ErrorView(error: error)

@@ -32,7 +32,7 @@ final class PermissionsManager: ObservableObject {
     func checkAll() {
         let isTrusted = AXIsProcessTrusted()
         if isTrusted != accessibilityGranted {
-            withAnimation(.spring(response: 0.75, dampingFraction: 0.85)) {
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.88)) {
                 accessibilityGranted = isTrusted
             }
         }

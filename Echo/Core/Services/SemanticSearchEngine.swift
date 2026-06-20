@@ -481,7 +481,9 @@ actor SemanticSearchEngine {
             "com.apple.TextEdit",
             "com.jetbrains.",
             "org.vim.",
-            "com.macromates.TextMate"
+            "com.macromates.TextMate",
+            "com.google.antigravity-ide",
+            "com.google.antigravity"
         ]
         let isEditor = editors.contains { bundleId.hasPrefix($0) }
         guard isEditor else { return false }

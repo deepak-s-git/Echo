@@ -102,7 +102,11 @@ final class EchoSettings: ObservableObject {
 
     init() {
         // General
+        #if DEBUG
         idleTimeoutMinutes = defaults.object(forKey: Keys.idleTimeoutMinutes) as? Double ?? 5.0
+        #else
+        idleTimeoutMinutes = defaults.object(forKey: Keys.idleTimeoutMinutes) as? Double ?? 15.0
+        #endif
         minimumSessionSeconds = defaults.object(forKey: Keys.minimumSessionSeconds) as? Double ?? 30.0
         showInMenuBar = defaults.object(forKey: Keys.showInMenuBar) as? Bool ?? true
         launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
@@ -116,9 +120,9 @@ final class EchoSettings: ObservableObject {
         }
         trackBrowserTabs = defaults.object(forKey: Keys.trackBrowserTabs) as? Bool ?? true
         recordWindowTitles = defaults.object(forKey: Keys.recordWindowTitles) as? Bool ?? true
-        browserCaptureDelaySeconds = defaults.object(forKey: Keys.browserCaptureDelaySeconds) as? Double ?? 1.2
-        tabEligibilitySeconds = defaults.object(forKey: Keys.tabEligibilitySeconds) as? Double ?? 12.0
-        appFocusEligibilitySeconds = defaults.object(forKey: Keys.appFocusEligibilitySeconds) as? Double ?? 10.0
+        browserCaptureDelaySeconds = defaults.object(forKey: Keys.browserCaptureDelaySeconds) as? Double ?? 5.0
+        tabEligibilitySeconds = defaults.object(forKey: Keys.tabEligibilitySeconds) as? Double ?? 10.0
+        appFocusEligibilitySeconds = defaults.object(forKey: Keys.appFocusEligibilitySeconds) as? Double ?? 12.0
 
         // Privacy
         dataRetentionDays = defaults.object(forKey: Keys.dataRetentionDays) as? Int ?? 90

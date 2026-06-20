@@ -22,10 +22,10 @@ nonisolated enum AppMetadataResolver {
         "com.apple.Notes": "Notes",
         "com.spotify.client": "Spotify",
         "com.apple.finder": "Finder",
-        "com.google.antigravity": "Antigravity"
+        "com.google.antigravity": "Antigravity IDE",
+        "com.google.antigravity-ide": "Antigravity IDE"
     ]
 
-    @MainActor
     static func displayName(bundleId: String, rawName: String?) -> String {
         if let known = knownNames[bundleId] { return known }
 

@@ -847,17 +847,18 @@ actor SessionEngine {
     }
 
     private func restoreKey(_ item: RestoreItem) -> String {
+        let bId = item.bundleId ?? ""
         switch item.kind {
-        case .application: return "app:\(item.bundleId ?? "")"
+        case .application: return "app:\(bId)"
         case .url, .browserPage:
             if let u = item.url {
-                return "page:\(normalizeURL(u))"
+                return "page:\(normalizeURL(u)):\(bId)"
             }
-            return "url:\(item.label)"
-        case .folder: return "folder:\(item.path ?? "")"
-        case .document: return "doc:\(item.path ?? "")"
-        case .terminalDirectory: return "term:\(item.workingDirectory ?? "")"
-        case .workspace: return "ws:\(item.path ?? "")"
+            return "url:\(item.label):\(bId)"
+        case .folder: return "folder:\(item.path ?? ""):\(bId)"
+        case .document: return "doc:\(item.path ?? ""):\(bId)"
+        case .terminalDirectory: return "term:\(item.workingDirectory ?? ""):\(bId)"
+        case .workspace: return "ws:\(item.path ?? ""):\(bId)"
         }
     }
 

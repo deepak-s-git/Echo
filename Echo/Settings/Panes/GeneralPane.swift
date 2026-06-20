@@ -23,10 +23,10 @@ struct GeneralPane: View {
                     iconColor: steelBlue,
                     label: "Idle timeout",
                     value: $settings.idleTimeoutMinutes,
-                    range: 1...30,
-                    step: 1,
+                    range: 5...60,
+                    step: 5,
                     valueFormatter: { v in
-                        v == 1 ? "1 min" : "\(Int(v)) min"
+                        "\(Int(v)) min"
                     },
                     showDivider: true
                 )

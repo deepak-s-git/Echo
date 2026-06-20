@@ -36,7 +36,7 @@ nonisolated struct FrontmostSnapshot: Sendable, Equatable {
     @MainActor
     static func captureWithWindow() -> FrontmostSnapshot? {
         guard let base = captureAppOnly() else { return nil }
-        let ctx = WindowContextCapture.focusedWindowContext()
+        let ctx = WindowContextCapture.focusedWindowContext(for: base.pid)
         return FrontmostSnapshot(
             bundleId: base.bundleId,
             displayName: base.displayName,

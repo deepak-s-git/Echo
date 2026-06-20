@@ -13,7 +13,6 @@ struct MiniTimelineView: View, Equatable {
     // Animation & Interaction States
     @State private var isLoaded = false
     @State private var hoveredSegmentId: UUID? = nil
-    @State private var pulsePhase: Double = 0.0
 
     private func totalMinutes() -> Int {
         let totalSecs = segments.reduce(0) { $0 + $1.duration }
@@ -85,19 +84,7 @@ struct MiniTimelineView: View, Equatable {
                     .frame(height: 2)
                     .padding(.horizontal, 4)
                     .overlay(
-                        GeometryReader { trackGeo in
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.clear, EchoPalette.accent.opacity(0.35), .clear],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: 45)
-                                .offset(x: -45 + (trackGeo.size.width + 90) * pulsePhase)
-                        }
-                        .clipped()
+                        PulsingTrackOverlay(isLive: isLive)
                     )
 
                 // Dynamic Time Ticks
@@ -126,8 +113,7 @@ struct MiniTimelineView: View, Equatable {
                     ZStack {
                         // Visual Layer (renders beads and tooltips, pass-through hit testing)
                         HStack(alignment: .center, spacing: 3.5) {
-                            ForEach(0..<segments.count, id: \.self) { index in
-                                let segment = segments[index]
+                            ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                                 let width = widths[index]
                                 let cardOffset = cardXOffsetForBead(at: index, widths: widths, totalWidth: geo.size.width)
                                 
@@ -146,8 +132,7 @@ struct MiniTimelineView: View, Equatable {
                         
                         // Hover Detection Layer (completely static, catches hover, transparent)
                         HStack(alignment: .center, spacing: 3.5) {
-                            ForEach(0..<segments.count, id: \.self) { index in
-                                let segment = segments[index]
+                            ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                                 let width = widths[index]
                                 
                                 Color.white.opacity(0.0001)
@@ -179,11 +164,6 @@ struct MiniTimelineView: View, Equatable {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.72).delay(0.08)) {
                 isLoaded = true
             }
-            if isLive {
-                withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
-                    pulsePhase = 1.0
-                }
-            }
         }
     }
 
@@ -209,20 +189,7 @@ struct MiniTimelineView: View, Equatable {
                         .fill(gradient)
                         .frame(width: max(0, geo.size.width * focusIntensity))
                         .overlay(
-                            // Smooth scanning light overlay representing continuous attention stream
-                            GeometryReader { innerGeo in
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.clear, .white.opacity(0.4), .clear],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: 35)
-                                    .offset(x: -35 + (innerGeo.size.width + 70) * pulsePhase)
-                            }
-                            .clipped()
+                            ScanningLightOverlay(isLive: isLive)
                         )
                 }
             }
@@ -413,5 +380,61 @@ private struct TimelineBeadVisualView: View {
             },
             alignment: .top
         )
+    }
+}
+
+private struct PulsingTrackOverlay: View {
+    let isLive: Bool
+    @State private var pulsePhase: Double = 0.0
+
+    var body: some View {
+        GeometryReader { trackGeo in
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [.clear, EchoPalette.accent.opacity(0.35), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: 45)
+                .offset(x: -45 + (trackGeo.size.width + 90) * pulsePhase)
+                .onAppear {
+                    if isLive {
+                        withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+                            pulsePhase = 1.0
+                        }
+                    }
+                }
+        }
+        .clipped()
+    }
+}
+
+private struct ScanningLightOverlay: View {
+    let isLive: Bool
+    @State private var pulsePhase: Double = 0.0
+
+    var body: some View {
+        GeometryReader { innerGeo in
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.4), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: 35)
+                .offset(x: -35 + (innerGeo.size.width + 70) * pulsePhase)
+                .onAppear {
+                    if isLive {
+                        withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+                            pulsePhase = 1.0
+                        }
+                    }
+                }
+        }
+        .clipped()
     }
 }

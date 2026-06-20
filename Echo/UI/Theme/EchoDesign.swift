@@ -199,17 +199,36 @@ enum AppIconCache {
     private static let cache = NSCache<NSString, AnyObject>()
     private static let failureSentinel = NSObject()
 
-    static func icon(for bundleId: String) -> NSImage? {
+    static func cachedIcon(for bundleId: String) -> NSImage? {
         let key = bundleId as NSString
         if let cached = cache.object(forKey: key) {
             if cached === failureSentinel { return nil }
             return cached as? NSImage
         }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+        return nil
+    }
+
+    static func loadIcon(for bundleId: String) async -> NSImage? {
+        let key = bundleId as NSString
+        
+        if let cached = cache.object(forKey: key) {
+            if cached === failureSentinel { return nil }
+            return cached as? NSImage
+        }
+
+        let appUrl = await MainActor.run {
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId)
+        }
+        
+        guard let url = appUrl else {
             cache.setObject(failureSentinel, forKey: key)
             return nil
         }
-        let image = NSWorkspace.shared.icon(forFile: url.path)
+        
+        let image = await MainActor.run {
+            NSWorkspace.shared.icon(forFile: url.path)
+        }
+        
         cache.setObject(image, forKey: key)
         return image
     }
@@ -218,10 +237,17 @@ enum AppIconCache {
 struct AppIconView: View {
     let bundleId: String
     var size: CGFloat = 36
+    @State private var iconImage: NSImage?
+
+    init(bundleId: String, size: CGFloat = 36) {
+        self.bundleId = bundleId
+        self.size = size
+        self._iconImage = State(initialValue: AppIconCache.cachedIcon(for: bundleId))
+    }
 
     var body: some View {
         Group {
-            if let image = AppIconCache.icon(for: bundleId) {
+            if let image = iconImage {
                 Image(nsImage: image)
                     .resizable()
             } else {
@@ -231,6 +257,16 @@ struct AppIconView: View {
             }
         }
         .frame(width: size, height: size)
+        .task(id: bundleId) {
+            if let cached = AppIconCache.cachedIcon(for: bundleId) {
+                self.iconImage = cached
+                return
+            }
+            let image = await AppIconCache.loadIcon(for: bundleId)
+            if !Task.isCancelled {
+                self.iconImage = image
+            }
+        }
     }
 }
 

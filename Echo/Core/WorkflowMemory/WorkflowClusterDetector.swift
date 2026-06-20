@@ -4,7 +4,8 @@ nonisolated enum WorkflowClusterDetector {
 
     private static let coding: Set<String> = [
         "com.apple.dt.Xcode", "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92",
-        "com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable"
+        "com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable",
+        "com.google.antigravity-ide", "com.google.antigravity"
     ]
     private static let research: Set<String> = [
         "com.apple.Safari", "com.google.Chrome", "company.thebrowser.Browser",

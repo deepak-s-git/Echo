@@ -179,18 +179,19 @@ nonisolated enum SessionFinalizationRunner {
                 }
             }
             let key: String
+            let bId = item.bundleId ?? ""
             switch item.kind {
-            case .application: key = "app:\(item.bundleId ?? "")"
+            case .application: key = "app:\(bId)"
             case .url, .browserPage:
                 if let u = item.url {
-                    key = "page:\(normalizeURL(u))"
+                    key = "page:\(normalizeURL(u)):\(bId)"
                 } else {
-                    key = "url:\(item.label)"
+                    key = "url:\(item.label):\(bId)"
                 }
-            case .folder: key = "folder:\(item.path ?? "")"
-            case .document: key = "doc:\(item.path ?? "")"
-            case .terminalDirectory: key = "term:\(item.workingDirectory ?? "")"
-            case .workspace: key = "ws:\(item.path ?? "")"
+            case .folder: key = "folder:\(item.path ?? ""):\(bId)"
+            case .document: key = "doc:\(item.path ?? ""):\(bId)"
+            case .terminalDirectory: key = "term:\(item.workingDirectory ?? ""):\(bId)"
+            case .workspace: key = "ws:\(item.path ?? ""):\(bId)"
             }
             guard seen.insert(key).inserted else { continue }
             items.append(item)

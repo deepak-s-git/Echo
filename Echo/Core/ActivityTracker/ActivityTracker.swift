@@ -149,10 +149,33 @@ actor ActivityTracker {
     private func verifyFrontmostFocus(includeWindow: Bool) async {
         guard isRunning, !capturePaused else { return }
 
-        let snapshot = await MainActor.run {
-            includeWindow ? FrontmostSnapshot.captureWithWindow() : FrontmostSnapshot.captureAppOnly()
+        guard let baseSnapshot = await MainActor.run(resultType: FrontmostSnapshot?.self, body: {
+            FrontmostSnapshot.captureAppOnly()
+        }) else { return }
+
+        let snapshot: FrontmostSnapshot
+        if includeWindow {
+            let ctx = WindowContextCapture.focusedWindowContext(for: baseSnapshot.pid)
+            snapshot = FrontmostSnapshot(
+                bundleId: baseSnapshot.bundleId,
+                displayName: baseSnapshot.displayName,
+                pid: baseSnapshot.pid,
+                windowTitle: ctx.title,
+                documentURL: ctx.documentURL
+            )
+        } else {
+            if let last = lastVerifiedSnapshot, last.bundleId == baseSnapshot.bundleId {
+                snapshot = FrontmostSnapshot(
+                    bundleId: baseSnapshot.bundleId,
+                    displayName: baseSnapshot.displayName,
+                    pid: baseSnapshot.pid,
+                    windowTitle: last.windowTitle,
+                    documentURL: last.documentURL
+                )
+            } else {
+                snapshot = baseSnapshot
+            }
         }
-        guard let snapshot else { return }
 
         if let last = lastVerifiedSnapshot, last == snapshot {
             return
@@ -181,7 +204,6 @@ actor ActivityTracker {
             initialDocumentURL: snapshot.documentURL
         )
     }
-
     private func handleSameAppWindowChange(_ snapshot: FrontmostSnapshot) async {
         let fingerprint = snapshot.windowFingerprint
         guard !fingerprint.isEmpty else { return }
@@ -345,21 +367,34 @@ actor ActivityTracker {
                 await self?.updateLastEmittedWindowFingerprint(url ?? title ?? "")
             } else {
                 // AX: get window title + kAXDocument in one call.
-                let ctx = await MainActor.run {
-                    WindowContextCapture.focusedWindowContext()
-                }
+                guard let self = self else { return }
+                guard let pid = await self.getCurrentPid(for: bundleId) else { return }
+                let ctx = WindowContextCapture.focusedWindowContext(for: pid)
                 let title = ctx.title
                 let docURL = ctx.documentURL
                 guard title != nil || docURL != nil else { return }
-                guard await self?.currentBundleId == bundleId else { return }
-                await self?.emit(RawActivityEvent(
+                guard await self.currentBundleId == bundleId else { return }
+                await self.emit(RawActivityEvent(
                     id: UUID(), timestamp: timestamp, type: .appFocus,
                     appBundleId: bundleId, appName: name,
                     windowTitle: title, url: docURL,
                     profileName: nil, duration: 0
                 ))
-                await self?.updateLastEmittedWindowFingerprint(docURL ?? title ?? "")
+                await self.updateLastEmittedWindowFingerprint(docURL ?? title ?? "")
             }
+        }
+    }
+
+    private func getCurrentPid(for bundleId: String) async -> pid_t? {
+        if let last = lastVerifiedSnapshot, last.bundleId == bundleId {
+            return last.pid
+        }
+        return await MainActor.run {
+            if let front = NSWorkspace.shared.frontmostApplication,
+               front.bundleIdentifier == bundleId {
+                return front.processIdentifier
+            }
+            return NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first?.processIdentifier
         }
     }
 

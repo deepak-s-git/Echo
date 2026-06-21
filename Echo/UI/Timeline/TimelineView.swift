@@ -48,9 +48,20 @@ struct TimelineView: View {
     // Filter State
     @State private var selectedClusterFilter: WorkflowCluster? = nil
     @State private var isFilterExpanded = false
+    @State private var showArchived = false
+
+    private var activeThreads: [WorkflowThreadSummary] {
+        sessionStore.workflowThreads.filter { summary in
+            if showArchived {
+                return summary.thread.statusRaw == "archived"
+            } else {
+                return summary.thread.statusRaw != "archived"
+            }
+        }
+    }
 
     var filteredThreads: [WorkflowThreadSummary] {
-        sessionStore.workflowThreads.filter { summary in
+        activeThreads.filter { summary in
             let cluster = summary.segments.first?.cluster ?? .mixed
             return selectedClusterFilter == nil || cluster == selectedClusterFilter
         }
@@ -141,13 +152,14 @@ struct TimelineView: View {
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.primary)
                             
-                            if !sessionStore.workflowThreads.isEmpty {
-                                let totalWorkflows = sessionStore.workflowThreads.count
-                                let totalSessions = sessionStore.workflowThreads.map { $0.segments.count }.reduce(0, +)
-                                let totalDuration = sessionStore.workflowThreads.map { $0.totalDuration }.reduce(0, +)
+                            let threads = activeThreads
+                            if !threads.isEmpty {
+                                let totalWorkflows = threads.count
+                                let totalSessions = threads.map { $0.segments.count }.reduce(0, +)
+                                let totalDuration = threads.map { $0.totalDuration }.reduce(0, +)
                                 
                                 HStack(spacing: 6) {
-                                    InlineMetricBadge(label: "\(totalWorkflows) active", icon: "point.3.connected.trianglepath", color: EchoPalette.accent)
+                                    InlineMetricBadge(label: "\(totalWorkflows) \(showArchived ? "archived" : "active")", icon: "network", color: EchoPalette.accent)
                                     InlineMetricBadge(label: "\(totalSessions) sessions", icon: "clock.arrow.circlepath", color: EchoPalette.indigoSoft)
                                     if totalDuration > 0 {
                                         InlineMetricBadge(label: totalDuration.sessionDurationFormatted, icon: "clock", color: .secondary)
@@ -210,6 +222,16 @@ struct TimelineView: View {
                 if isFilterExpanded {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
+                            FilterPill(label: "Show Archived", isSelected: showArchived, clusterColor: Color.gray) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                                    showArchived.toggle()
+                                }
+                            }
+                            
+                            Divider()
+                                .frame(height: 12)
+                                .opacity(0.3)
+                            
                             FilterPill(label: "All", isSelected: selectedClusterFilter == nil) {
                                 withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                                     selectedClusterFilter = nil
@@ -238,7 +260,7 @@ struct TimelineView: View {
                         Spacer()
                     }
                     Spacer()
-                } else if sessionStore.workflowThreads.isEmpty {
+                } else if activeThreads.isEmpty {
                     Spacer()
                     HStack {
                         Spacer()
@@ -275,9 +297,12 @@ struct TimelineView: View {
                     ScrollView {
                         LazyVStack(spacing: 10) {
                             if activityStore.isRecording && !isSelectMode {
-                                SessionControlBar(compact: false)
-                                    .padding(.bottom, 4)
-                                  liveBanner
+                                VStack(spacing: 0) {
+                                    SessionControlBar(compact: false)
+                                        .padding(.bottom, 4)
+                                    liveBanner
+                                }
+                                .transition(.move(edge: .top).combined(with: .opacity))
                             }
 
                             ForEach(filteredThreads) { summary in
@@ -293,14 +318,17 @@ struct TimelineView: View {
                                     WorkflowThreadCard(
                                         summary: summary,
                                         logsExpanded: expandedLogsThreadIds.contains(summary.id) || (isSessionSelectMode && sessionSelectThreadId == summary.id),
+                                        isSelectMode: isSelectMode,
                                         isSessionSelectMode: isSessionSelectMode,
                                         sessionSelectThreadId: sessionSelectThreadId,
                                         selectedSessionIds: selectedSessionIds,
                                         onToggleLogs: {
-                                            if expandedLogsThreadIds.contains(summary.id) {
-                                                expandedLogsThreadIds.remove(summary.id)
-                                            } else {
-                                                expandedLogsThreadIds.insert(summary.id)
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                                if expandedLogsThreadIds.contains(summary.id) {
+                                                    expandedLogsThreadIds.remove(summary.id)
+                                                } else {
+                                                    expandedLogsThreadIds.insert(summary.id)
+                                                }
                                             }
                                         },
                                         onSelectSegment: { appStore.openSessionDetail($0) },
@@ -327,25 +355,9 @@ struct TimelineView: View {
                                     )
                                     .disabled(isSelectMode || (isSessionSelectMode && sessionSelectThreadId != summary.id))
                                     .opacity((isSessionSelectMode && sessionSelectThreadId != summary.id) ? 0.4 : 1.0)
-                                    .contextMenu {
-                                        if !isSelectMode && !isSessionSelectMode {
-                                            Button("Rename workflow…") {
-                                                appStore.renameThreadDraft = WorkflowThreadRenameDraft(
-                                                    threadId: summary.id,
-                                                    title: summary.displayTitle,
-                                                    tags: summary.thread.tags
-                                                )
-                                            }
-                                            Button("Archive") {
-                                                Task { await sessionControl.archiveWorkflowThread(id: summary.id) }
-                                            }
-                                            Button("Delete workflow…", role: .destructive) {
-                                                activeAlert = .deleteSingle(summary)
-                                            }
-                                        }
-                                    }
                                 }
                                 .contentShape(Rectangle())
+                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
                                 .onTapGesture {
                                     if isSelectMode {
                                         if selectedThreadIds.contains(summary.id) {
@@ -357,6 +369,9 @@ struct TimelineView: View {
                                 }
                             }
                         }
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: filteredThreads.map(\.id))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activityStore.isRecording)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSelectMode)
                         .padding(.horizontal, EchoDesign.containerRadius)
                         .padding(.bottom, EchoDesign.containerRadius)
                     }
@@ -541,6 +556,7 @@ struct TimelineView: View {
 private struct WorkflowThreadCard: View {
     let summary: WorkflowThreadSummary
     let logsExpanded: Bool
+    let isSelectMode: Bool
     let isSessionSelectMode: Bool
     let sessionSelectThreadId: UUID?
     let selectedSessionIds: Set<UUID>
@@ -556,6 +572,7 @@ private struct WorkflowThreadCard: View {
 
     @State private var hovering = false
     @State private var hoveredSessionId: UUID? = nil
+    @State private var isVisible = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -573,7 +590,19 @@ private struct WorkflowThreadCard: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         
-                        if summary.activeSegment != nil {
+                        if summary.thread.statusRaw == "archived" {
+                            Text("Archived")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.primary.opacity(0.1))
+                                .cornerRadius(5)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
+                                )
+                                .foregroundStyle(.secondary)
+                        } else if summary.activeSegment != nil {
                             Text("Active")
                                 .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 6)
@@ -638,8 +667,34 @@ private struct WorkflowThreadCard: View {
 
                     // 3-dot Menu Button (discoverable card actions)
                     Menu {
-                        Button("Delete Sessions…") {
-                            onStartSessionSelect()
+                        if !isSelectMode && !isSessionSelectMode {
+                            Button("Rename workflow") {
+                                appStore.renameThreadDraft = WorkflowThreadRenameDraft(
+                                    threadId: summary.id,
+                                    title: summary.displayTitle,
+                                    tags: summary.thread.tags
+                                )
+                            }
+                            
+                            if summary.thread.statusRaw == "archived" {
+                                Button("Unarchive") {
+                                    Task { await sessionControl.unarchiveWorkflowThread(id: summary.id) }
+                                }
+                            } else {
+                                Button("Archive") {
+                                    Task { await sessionControl.archiveWorkflowThread(id: summary.id) }
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            Button("Delete Sessions") {
+                                onStartSessionSelect()
+                            }
+                            
+                            Button("Delete workflow", role: .destructive) {
+                                onDeleteWorkflow()
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -715,7 +770,14 @@ private struct WorkflowThreadCard: View {
                                             onSelectSegment(segment.id)
                                         }
                                     },
-                                    onDelete: { onDeleteSession(segment, index + 1) }
+                                    onDelete: { onDeleteSession(segment, index + 1) },
+                                    onRename: {
+                                        appStore.renameSessionDraft = SessionRenameDraft(
+                                            sessionId: segment.id,
+                                            title: segment.title ?? "",
+                                            tags: segment.tags
+                                        )
+                                    }
                                 )
                             }
                         }
@@ -754,6 +816,13 @@ private struct WorkflowThreadCard: View {
         .onHover { hovering in
             self.hovering = hovering
         }
+        .opacity(isVisible ? 1.0 : 0.0)
+        .offset(y: isVisible ? 0 : 8)
+        .onAppear {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                isVisible = true
+            }
+        }
     }
 }
 
@@ -766,6 +835,7 @@ private struct SessionHistoryRow: View {
     let onHoverChange: (Bool) -> Void
     let onTap: () -> Void
     let onDelete: () -> Void
+    let onRename: () -> Void
     
     @State private var hovering = false
     
@@ -835,7 +905,10 @@ private struct SessionHistoryRow: View {
         }
         .contextMenu {
             if !showCheckbox {
-                Button("Delete Session…", role: .destructive) {
+                Button("Rename Session") {
+                    onRename()
+                }
+                Button("Delete Session", role: .destructive) {
                     onDelete()
                 }
             }

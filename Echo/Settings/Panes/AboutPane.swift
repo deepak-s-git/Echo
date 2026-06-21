@@ -102,7 +102,7 @@ struct AboutPane: View {
                 AboutLinkRow(
                     icon: "ant",
                     label: "Report a Bug",
-                    action: { openURL("https://github.com/deepak-s-git/Echo-Web/issues") },
+                    action: { openURL("https://github.com/deepak-s-git/Echo/issues") },
                     showDivider: false
                 )
             }

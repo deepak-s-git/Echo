@@ -60,7 +60,7 @@ final class SessionRepository: Sendable {
         let key = id.uuidString
         try await database.writeAsync { db in
             let session = try Session.filter(Column("id") == key).fetchOne(db)
-            let threadId = session?.workflowThreadId
+            let threadId = session?.workflowThreadId?.uuidString
             
             try db.execute(
                 sql: "DELETE FROM activities WHERE sessionId = ?",
@@ -76,17 +76,23 @@ final class SessionRepository: Sendable {
             )
             
             if let threadId {
-                let count = try Session.filter(Column("workflowThreadId") == threadId).fetchCount(db)
-                if count == 0 {
+                let remainingSessions = try Session.filter(Column("workflowThreadId") == threadId).fetchAll(db)
+                if remainingSessions.isEmpty {
                     try db.execute(
                         sql: "DELETE FROM workflow_threads WHERE id = ?",
                         arguments: [threadId]
                     )
                 } else {
-                    let activeCount = try Session
-                        .filter(Column("workflowThreadId") == threadId)
-                        .filter(Column("endedAt") == nil)
-                        .fetchCount(db)
+                    // Recalculate total accumulated duration based on remaining sessions
+                    let totalDuration = remainingSessions.reduce(0.0) { sum, s in
+                        sum + s.duration
+                    }
+                    try db.execute(
+                        sql: "UPDATE workflow_threads SET totalAccumulatedDuration = ? WHERE id = ?",
+                        arguments: [totalDuration, threadId]
+                    )
+                    
+                    let activeCount = remainingSessions.filter { $0.endedAt == nil }.count
                     if activeCount == 0 {
                         try db.execute(
                             sql: "UPDATE workflow_threads SET statusRaw = 'idle' WHERE id = ?",
@@ -389,6 +395,15 @@ final class SessionRepository: Sendable {
             try db.execute(
                 sql: "UPDATE workflow_threads SET statusRaw = ? WHERE id = ?",
                 arguments: [WorkflowThreadStatus.archived.rawValue, id.uuidString]
+            )
+        }
+    }
+
+    func unarchiveWorkflowThread(id: UUID) async throws {
+        try await database.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE workflow_threads SET statusRaw = ? WHERE id = ?",
+                arguments: [WorkflowThreadStatus.idle.rawValue, id.uuidString]
             )
         }
     }

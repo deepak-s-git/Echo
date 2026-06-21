@@ -7,6 +7,7 @@ struct WorkflowIdleDashboard: View {
     @EnvironmentObject var sessionControl: SessionControlStore
     @State private var showCreateSheet = false
     @State private var showSelectWorkflowSheet = false
+    @State private var animateContent = false
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             // Header with Ambient Glow & Modern Typography
@@ -27,6 +28,8 @@ struct WorkflowIdleDashboard: View {
                     .foregroundStyle(.primary)
             }
             .padding(.bottom, 2)
+            .opacity(animateContent ? 1.0 : 0.0)
+            .offset(y: animateContent ? 0 : 8)
 
             // 1. Resume Workflow (Hero Action with App Icon Stack)
             if let thread = sessionStore.continueWorkflowThread, let session = sessionStore.continueSession {
@@ -41,6 +44,8 @@ struct WorkflowIdleDashboard: View {
                 ) {
                     Task { await sessionControl.continuePreviousSession(appStore: appStore) }
                 }
+                .opacity(animateContent ? 1.0 : 0.0)
+                .offset(y: animateContent ? 0 : 10)
             }
 
             // 2. Record Section (Grid of 2 upgraded gradient cards)
@@ -71,6 +76,9 @@ struct WorkflowIdleDashboard: View {
                     }
                 }
             }
+            .opacity(animateContent ? 1.0 : 0.0)
+            .offset(y: animateContent ? 0 : 12)
+            
             // Recent Sessions Section
             let recent = Array(sessionStore.recentSessions.prefix(3))
             if !recent.isEmpty {
@@ -86,9 +94,13 @@ struct WorkflowIdleDashboard: View {
                             RecentSessionRow(session: session) {
                                 appStore.openSessionDetail(session.id)
                             }
+                            .transition(.opacity.combined(with: .scale(scale: 0.97)))
                         }
                     }
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: recent)
                 }
+                .opacity(animateContent ? 1.0 : 0.0)
+                .offset(y: animateContent ? 0 : 14)
             }
 
             // 4. Quick Stats Footer
@@ -114,6 +126,8 @@ struct WorkflowIdleDashboard: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
                 .padding(.top, 4)
+                .opacity(animateContent ? 1.0 : 0.0)
+                .offset(y: animateContent ? 0 : 16)
             }
         }
         .padding(24)
@@ -122,6 +136,8 @@ struct WorkflowIdleDashboard: View {
             AmbientGlowView()
                 .offset(y: -20)
                 .allowsHitTesting(false)
+                .opacity(animateContent ? 0.75 : 0.0)
+                .animation(.easeOut(duration: 0.8), value: animateContent)
         }
         .sheet(isPresented: $showCreateSheet) {
             WorkflowCreateSheet(isPresented: $showCreateSheet)
@@ -135,6 +151,9 @@ struct WorkflowIdleDashboard: View {
                 .environmentObject(sessionStore)
         }
         .onAppear {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                animateContent = true
+            }
             Task {
                 await sessionStore.refreshContinuationThread()
             }
@@ -1000,7 +1019,15 @@ struct RecentSessionRow: View {
                 
                 // Show app icons used
                 let appItems = session.restorePlan?.items.filter { $0.kind == .application } ?? []
-                let bundleIds = Array(Set(appItems.compactMap { $0.bundleId }))
+                let bundleIds: [String] = {
+                    var ids: [String] = []
+                    for item in appItems {
+                        if let bid = item.bundleId, !ids.contains(bid) {
+                            ids.append(bid)
+                        }
+                    }
+                    return ids
+                }()
                 if !bundleIds.isEmpty {
                     HStack(spacing: -5) {
                         ForEach(Array(bundleIds.prefix(4).enumerated()), id: \.element) { index, bundleId in

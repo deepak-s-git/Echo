@@ -19,7 +19,7 @@ enum EchoPalette {
     )
     
     static let sidebar = adaptive(
-        dark: NSColor(red: 0.06, green: 0.06, blue: 0.065, alpha: 1.0),
+        dark: NSColor(red: 0.03, green: 0.03, blue: 0.035, alpha: 1.0),
         light: NSColor(red: 0.92, green: 0.92, blue: 0.93, alpha: 1.0)
     )
     
@@ -216,17 +216,40 @@ enum AppIconCache {
             return cached as? NSImage
         }
 
-        let appUrl = await MainActor.run {
+        guard let appUrl = await MainActor.run(body: {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId)
-        }
-        
-        guard let url = appUrl else {
+        }) else {
             cache.setObject(failureSentinel, forKey: key)
             return nil
         }
         
+        // Try background icns loading & decoding to avoid blocking main thread
+        if let image = await Task.detached(priority: .userInitiated, operation: { () -> NSImage? in
+            let infoPlistURL = appUrl.appendingPathComponent("Contents/Info.plist")
+            guard let dict = NSDictionary(contentsOf: infoPlistURL) else { return nil }
+            
+            var iconName = dict["CFBundleIconFile"] as? String ?? "AppIcon"
+            if !iconName.hasSuffix(".icns") {
+                iconName += ".icns"
+            }
+            
+            let iconURL = appUrl.appendingPathComponent("Contents/Resources").appendingPathComponent(iconName)
+            if FileManager.default.fileExists(atPath: iconURL.path) {
+                if let img = NSImage(contentsOf: iconURL) {
+                    // Force decode/rasterize in the background
+                    _ = img.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                    return img
+                }
+            }
+            return nil
+        }).value {
+            cache.setObject(image, forKey: key)
+            return image
+        }
+        
+        // Fallback to MainActor NSWorkspace icon lookup
         let image = await MainActor.run {
-            NSWorkspace.shared.icon(forFile: url.path)
+            NSWorkspace.shared.icon(forFile: appUrl.path)
         }
         
         cache.setObject(image, forKey: key)

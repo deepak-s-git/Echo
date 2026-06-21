@@ -177,6 +177,11 @@ final class ServiceContainer {
         await sessionStore.loadRecent()
     }
 
+    func unarchiveWorkflowThread(id: UUID) async {
+        await sessionEngine.unarchiveWorkflowThread(id: id)
+        await sessionStore.loadRecent()
+    }
+
     func renameWorkflowThread(id: UUID, title: String, tags: [String]) async {
         try? await sessionRepository.updateThreadMetadata(
             threadId: id,

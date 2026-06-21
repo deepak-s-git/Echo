@@ -76,8 +76,9 @@ struct SidebarView: View {
             } else {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(Color.primary.opacity(0.35))
-                        .frame(width: 5, height: 5)
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                        .shadow(color: Color.green.opacity(0.5), radius: 2)
                     Text("Ready")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -127,7 +128,7 @@ struct SidebarItem: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                        .fill(isSelected ? EchoPalette.indigo.opacity(0.12) : .clear)
+                        .fill(isSelected ? Color.primary.opacity(0.08) : .clear)
                     
                     RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                         .fill(isHovered && !isSelected ? Color.primary.opacity(0.04) : .clear)
@@ -136,18 +137,11 @@ struct SidebarItem: View {
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                     .strokeBorder(
-                        isSelected ? EchoPalette.strokeBright.opacity(0.5) : (isHovered ? EchoPalette.stroke.opacity(0.3) : .clear),
+                        !isSelected && isHovered ? EchoPalette.stroke.opacity(0.3) : .clear,
                         lineWidth: 0.5
                     )
             )
-            .overlay(alignment: .leading) {
-                Capsule()
-                    .fill(EchoPalette.accent)
-                    .frame(width: 3, height: isSelected ? 16 : 0)
-                    .offset(x: 4)
-                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isSelected)
-            }
-            .shadow(color: isSelected ? EchoPalette.indigo.opacity(0.08) : .clear, radius: 4, x: 0, y: 2)
+            .shadow(color: isSelected ? Color.black.opacity(0.08) : .clear, radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
         .onHover { hovering in

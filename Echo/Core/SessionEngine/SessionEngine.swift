@@ -191,6 +191,11 @@ actor SessionEngine {
         await sessionStore.loadRecent()
     }
 
+    func unarchiveWorkflowThread(id: UUID) async {
+        try? await repository.unarchiveWorkflowThread(id: id)
+        await sessionStore.loadRecent()
+    }
+
     private func handleIdleTimeout() async {
         guard isRecordingEnabled else { return }
 

@@ -104,6 +104,10 @@ final class SessionControlStore: ObservableObject {
         await container?.archiveWorkflowThread(id: id)
     }
 
+    func unarchiveWorkflowThread(id: UUID) async {
+        await container?.unarchiveWorkflowThread(id: id)
+    }
+
     func renameWorkflowThread(id: UUID, title: String, tags: [String]) async {
         await container?.renameWorkflowThread(id: id, title: title, tags: tags)
     }

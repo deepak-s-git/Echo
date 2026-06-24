@@ -320,7 +320,7 @@ struct SessionDetailView: View {
             sectionTitle("Continuity", icon: "point.topleft.down.to.point.bottomright.curvepath")
 
             HStack(alignment: .center, spacing: 24) {
-                FocusIndicatorView(score: memory.continuityScore, label: "", size: 72, animate: false)
+                FocusIndicatorView(score: memory.continuityScore, label: "", size: 72, animate: true)
                     .shadow(color: EchoPalette.indigo.opacity(0.1), radius: 6)
                 
                 VStack(alignment: .leading, spacing: 8) {

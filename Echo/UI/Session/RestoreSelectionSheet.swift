@@ -542,7 +542,7 @@ private struct AppGroupSection: View {
                     HStack(spacing: 12) {
                         Image(systemName: isAppSelected ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(isAppSelected ? EchoPalette.live : Color.primary.opacity(0.35))
+                            .foregroundStyle(isAppSelected ? EchoPalette.accent : Color.primary.opacity(0.35))
                             .scaleEffect(isAppSelected ? 1.05 : 1.0)
                         
                         Image(systemName: group.iconName)
@@ -602,7 +602,7 @@ private struct AppGroupSection: View {
                                     HStack(spacing: 8) {
                                         Image(systemName: isProfileSelected ? "checkmark.circle.fill" : "circle")
                                             .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(isProfileSelected ? EchoPalette.live : Color.primary.opacity(0.3))
+                                            .foregroundStyle(isProfileSelected ? EchoPalette.accent : Color.primary.opacity(0.3))
                                         
                                         Image(systemName: "person.crop.circle")
                                             .font(.system(size: 10))
@@ -691,7 +691,7 @@ private struct RestoreItemRow: View {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(isSelected ? EchoPalette.live : Color.primary.opacity(0.35))
+                    .foregroundStyle(isSelected ? EchoPalette.accent : Color.primary.opacity(0.35))
                     .scaleEffect(isSelected ? 1.05 : 1.0)
                     .animation(EchoDesign.subtle, value: isSelected)
                 

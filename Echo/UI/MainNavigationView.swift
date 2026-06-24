@@ -128,7 +128,7 @@ struct SidebarItem: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                        .fill(isSelected ? Color.primary.opacity(0.08) : .clear)
+                        .fill(isSelected ? EchoPalette.indigo.opacity(0.12) : .clear)
                     
                     RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                         .fill(isHovered && !isSelected ? Color.primary.opacity(0.04) : .clear)
@@ -137,11 +137,18 @@ struct SidebarItem: View {
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                     .strokeBorder(
-                        !isSelected && isHovered ? EchoPalette.stroke.opacity(0.3) : .clear,
+                        isSelected ? EchoPalette.strokeBright.opacity(0.5) : (isHovered ? EchoPalette.stroke.opacity(0.3) : .clear),
                         lineWidth: 0.5
                     )
             )
-            .shadow(color: isSelected ? Color.black.opacity(0.08) : .clear, radius: 4, x: 0, y: 2)
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(EchoPalette.accent)
+                    .frame(width: 3, height: isSelected ? 16 : 0)
+                    .offset(x: 4)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isSelected)
+            }
+            .shadow(color: isSelected ? EchoPalette.indigo.opacity(0.08) : .clear, radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
         .onHover { hovering in

@@ -83,7 +83,7 @@ struct WorkflowIdleDashboard: View {
             let recent = Array(sessionStore.recentSessions.prefix(3))
             if !recent.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Recent Workflows")
+                    Text("Recent Sessions")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                         .tracking(0.5)
@@ -107,17 +107,25 @@ struct WorkflowIdleDashboard: View {
             if !sessionStore.workflowThreads.isEmpty {
                 HStack(spacing: 16) {
                     let activeCount = sessionStore.workflowThreads.filter { $0.thread.statusRaw != "archived" }.count
-                    HStack(spacing: 4) {
-                        Image(systemName: "circle.grid.2x1")
-                            .font(.system(size: 9))
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 4, height: 4)
+                        Circle()
+                            .fill(Color(red: 0.95, green: 0.65, blue: 0.15))
+                            .frame(width: 4, height: 4)
                         Text("\(activeCount) active \(activeCount == 1 ? "workflow" : "workflows")")
+                            .padding(.leading, 2)
                     }
                     
                     let totalDuration = sessionStore.workflowThreads.map { $0.thread.totalAccumulatedDuration }.reduce(0, +)
                     if totalDuration > 0 {
+                        Spacer()
+                        
                         HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 9))
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color(red: 0.95, green: 0.65, blue: 0.15))
                             Text("Total tracked: \(totalDuration.sessionDurationFormatted)")
                         }
                     }

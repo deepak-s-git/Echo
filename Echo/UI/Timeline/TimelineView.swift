@@ -723,10 +723,10 @@ private struct WorkflowThreadCard: View {
 
             // Expanded Session History
             if logsExpanded && !summary.segments.isEmpty {
-                Divider().opacity(0.35)
-                    .padding(.horizontal, EchoDesign.cardPadding)
-
                 VStack(alignment: .leading, spacing: 0) {
+                    Divider().opacity(0.35)
+                        .padding(.horizontal, EchoDesign.cardPadding)
+
                     HStack(spacing: 6) {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 11, weight: .semibold))
@@ -779,11 +779,18 @@ private struct WorkflowThreadCard: View {
                                         )
                                     }
                                 )
+                                .padding(.trailing, EchoDesign.cardPadding)
+                                .padding(.vertical, 4)
                             }
                         }
                     }
                 }
                 .padding(.bottom, 10)
+                .compositingGroup()
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .move(edge: .top)).combined(with: .scale(scale: 0.98)),
+                    removal: .opacity.combined(with: .scale(scale: 0.98))
+                ))
             }
         }
         .background(
@@ -816,6 +823,7 @@ private struct WorkflowThreadCard: View {
         .onHover { hovering in
             self.hovering = hovering
         }
+        .clipShape(RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
         .opacity(isVisible ? 1.0 : 0.0)
         .offset(y: isVisible ? 0 : 8)
         .onAppear {
@@ -841,11 +849,22 @@ private struct SessionHistoryRow: View {
     
     var body: some View {
         Button(action: onTap) {
+            let appItems = segment.restorePlan?.items.filter { $0.kind == .application } ?? []
+            let bundleIds: [String] = {
+                var ids: [String] = []
+                for item in appItems {
+                    if let bid = item.bundleId, !ids.contains(bid) {
+                        ids.append(bid)
+                    }
+                }
+                return ids
+            }()
+            
             HStack(spacing: 12) {
                 if showCheckbox {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.red : Color.primary.opacity(0.35))
+                        .foregroundStyle(isSelected ? EchoPalette.accent : Color.primary.opacity(0.35))
                         .frame(width: 18, height: 18)
                 }
                 
@@ -873,7 +892,25 @@ private struct SessionHistoryRow: View {
                 
                 Spacer()
                 
-                if segment.appCount > 0 {
+                if !bundleIds.isEmpty {
+                    HStack(spacing: -4) {
+                        ForEach(Array(bundleIds.prefix(3).enumerated()), id: \.element) { idx, bundleId in
+                            AppIconView(bundleId: bundleId, size: 14)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
+                                .shadow(color: .black.opacity(0.08), radius: 0.5, y: 0.5)
+                                .zIndex(Double(bundleIds.count - idx))
+                        }
+                        
+                        if bundleIds.count > 3 {
+                            Text("+\(bundleIds.count - 3)")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 2)
+                        }
+                    }
+                    .padding(.trailing, 4)
+                } else if segment.appCount > 0 {
                     HStack(spacing: 3) {
                         Image(systemName: "square.grid.2x2")
                             .font(.system(size: 8))
@@ -886,16 +923,30 @@ private struct SessionHistoryRow: View {
                     .background(Color.primary.opacity(0.04), in: Capsule())
                 }
                 
-                Text("Duration: \(segment.duration.shortLabel)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "hourglass")
+                        .font(.system(size: 8))
+                    Text(segment.duration.shortLabel)
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .foregroundStyle(segment.isActive ? EchoPalette.live : EchoPalette.accent)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3.5)
+                .background((segment.isActive ? EchoPalette.live : EchoPalette.accent).opacity(0.08), in: Capsule())
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 9)
             .padding(.horizontal, 12)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(hovering ? Color.primary.opacity(0.03) : Color.clear)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(hovering ? Color.primary.opacity(0.06) : Color.primary.opacity(0.02))
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(hovering ? Color.primary.opacity(0.15) : Color.primary.opacity(0.05), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(hovering ? 0.04 : 0.01), radius: 1.5, y: 1)
+            .scaleEffect(hovering ? 1.008 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: hovering)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

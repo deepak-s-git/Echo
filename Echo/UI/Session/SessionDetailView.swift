@@ -323,12 +323,19 @@ struct SessionDetailView: View {
                 FocusIndicatorView(score: memory.continuityScore, label: "", size: 72, animate: true)
                     .shadow(color: EchoPalette.indigo.opacity(0.1), radius: 6)
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(continuityNarrative(memory))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SESSION SUMMARY")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .tracking(0.5)
+                        
+                        Text(SessionSummarizer.generateSummary(for: memory))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.primary)
+                            .lineSpacing(4.5)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     
                     HStack(spacing: 8) {
                         DetailBadge(label: "\(Int(memory.session.focusScore * 100))% focus", icon: "target", tintColor: EchoPalette.indigoSoft)
@@ -340,16 +347,6 @@ struct SessionDetailView: View {
         }
         .padding(EchoDesign.cardPadding)
         .echoCard(material: .ultraThinMaterial)
-    }
-
-    private func continuityNarrative(_ memory: WorkflowMemory) -> String {
-        if memory.continuityScore >= 0.75 {
-            return "This session held a clear thread of attention with few breaks."
-        }
-        if memory.interruptions.count >= 3 {
-            return "Your attention fragmented across several pauses — a scattered but honest record."
-        }
-        return "A working memory with natural shifts between contexts."
     }
 
 

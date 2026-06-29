@@ -95,7 +95,10 @@ enum EchoDesign {
     static let subtle = Animation.spring(response: 0.26, dampingFraction: 0.76)
 
     static var ambientBackground: some View {
-        EchoPalette.graphite.ignoresSafeArea()
+        ZStack {
+            EchoPalette.graphite.ignoresSafeArea()
+            DottedGridView()
+        }
     }
 
     static var heroWash: LinearGradient {
@@ -309,6 +312,28 @@ extension WorkflowCluster {
         case .mixed:
             return [Color(red: 0.45, green: 0.50, blue: 0.60), Color(red: 0.30, green: 0.35, blue: 0.45)]
         }
+    }
+}
+
+struct DottedGridView: View {
+    var body: some View {
+        Canvas { context, size in
+            let dotSize: CGFloat = 1.2
+            let spacing: CGFloat = 18.0
+            let color = EchoPalette.indigoSoft.opacity(0.04)
+            
+            var x: CGFloat = 0
+            while x < size.width {
+                var y: CGFloat = 0
+                while y < size.height {
+                    let rect = CGRect(x: x, y: y, width: dotSize, height: dotSize)
+                    context.fill(Path(ellipseIn: rect), with: .color(color))
+                    y += spacing
+                }
+                x += spacing
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 

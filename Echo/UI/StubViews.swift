@@ -350,7 +350,8 @@ private struct SearchResultCard: View {
 
                 // Overlapping App Icon Stack from restore plan
                 let appItems = result.session.restorePlan?.items.filter { $0.kind == .application } ?? []
-                let bundleIds = Array(Set(appItems.compactMap { $0.bundleId }))
+                var seen = Set<String>()
+                let bundleIds = appItems.compactMap { $0.bundleId }.filter { seen.insert($0).inserted }
                 if !bundleIds.isEmpty {
                     HStack(spacing: -6) {
                         ForEach(Array(bundleIds.prefix(5).enumerated()), id: \.element) { index, bundleId in

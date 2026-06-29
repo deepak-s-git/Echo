@@ -94,7 +94,7 @@ enum SessionSummarizer {
             return "No activity events captured to summarize."
         }
         
-        // 1. Calculate duration per app
+        // 1. Calculate duration per app to rank them
         var appDurations: [String: TimeInterval] = [:]
         var appNames: [String: String] = [:]
         for event in events {
@@ -125,6 +125,9 @@ enum SessionSummarizer {
         }
         
         // 4. Extract specific details per category
+        // Project name
+        let projectName = extractProjectName(for: memory, events: events)
+        
         // Coding files
         var codingFiles: [String] = []
         let codingEvents = events.filter { AppCategory.from(bundleId: $0.appBundleId) == .coding }
@@ -186,134 +189,207 @@ enum SessionSummarizer {
             }
         }
         
-        // 5. Construct narrative
+        // 5. Construct pure content narrative (no focus/pauses/durations)
         var sentences: [String] = []
         
-        // Time description helper
-        func formatDuration(_ duration: TimeInterval) -> String {
-            let mins = Int(ceil(duration / 60))
-            if mins == 1 { return "1 minute" }
-            return "\(mins) minutes"
-        }
-        
-        // Sentence 1: Dominant activity
-        let primaryCatDuration = categoryDurations[primaryCategory, default: 0]
         let primaryApps = appsByCategory[primaryCategory, default: []]
         let primaryAppName = primaryApps.first.map { AppMetadataResolver.displayName(bundleId: $0, rawName: appNames[$0]) } ?? "primary apps"
         
+        // Sentence 1: Primary action with project and files
         switch primaryCategory {
         case .coding:
-            var s = "You focused on coding in \(primaryAppName) for \(formatDuration(primaryCatDuration))"
+            var s = ""
+            if let project = projectName {
+                s += "You spent this session working on the **\(project)** project, coding in \(primaryAppName)"
+            } else {
+                s += "You spent this session coding in \(primaryAppName)"
+            }
+            
             if !codingFiles.isEmpty {
-                let fileList = codingFiles.prefix(3).map { "'\($0)'" }.joined(separator: ", ")
-                s += ", working on files like \(fileList)"
+                let fileList = codingFiles.prefix(3).map { "**\($0)**" }.joined(separator: ", ")
+                s += " and editing files like \(fileList)"
             }
             s += "."
             sentences.append(s)
             
         case .browser:
-            var s = "This session was spent researching in \(primaryAppName) for \(formatDuration(primaryCatDuration))"
+            var s = ""
+            if let project = projectName {
+                s += "You spent this session doing web research and browsing in \(primaryAppName) for the **\(project)** project"
+            } else {
+                s += "You spent this session doing web research and browsing in \(primaryAppName)"
+            }
+            
             if !browserDomains.isEmpty {
-                let domainList = browserDomains.prefix(3).joined(separator: ", ")
-                s += ", visiting websites like \(domainList)"
+                let domainList = browserDomains.prefix(3).map { "**\($0)**" }.joined(separator: ", ")
+                s += ", visiting sites like \(domainList)"
             }
             s += "."
             sentences.append(s)
             
         case .terminal:
-            var s = "You spent \(formatDuration(primaryCatDuration)) working in the terminal using \(primaryAppName)"
+            var s = ""
+            if let project = projectName {
+                s += "You spent this session working in the terminal using \(primaryAppName) on the **\(project)** project"
+            } else {
+                s += "You spent this session working in the terminal using \(primaryAppName)"
+            }
+            
             if !terminalDirs.isEmpty {
-                s += " in the '\(terminalDirs[0])' directory"
+                s += " inside the **\(terminalDirs[0])** directory"
             }
             if !terminalCommands.isEmpty {
-                let cmdList = terminalCommands.prefix(3).joined(separator: ", ")
-                s += ", interacting with processes like \(cmdList)"
+                let cmdList = terminalCommands.prefix(3).map { "`\($0)`" }.joined(separator: ", ")
+                s += ", running commands like \(cmdList)"
             }
             s += "."
             sentences.append(s)
             
         case .design:
-            var s = "You spent \(formatDuration(primaryCatDuration)) designing in \(primaryAppName)"
+            var s = ""
+            if let project = projectName {
+                s += "You spent this session designing in \(primaryAppName) for the **\(project)** project"
+            } else {
+                s += "You spent this session designing in \(primaryAppName)"
+            }
+            
             if !designDocs.isEmpty {
-                s += " on project '\(designDocs[0])'"
+                s += ", editing designs for **\(designDocs[0])**"
             }
             s += "."
             sentences.append(s)
             
         case .communication:
-            sentences.append("You dedicated \(formatDuration(primaryCatDuration)) to communication and checking messages in \(primaryAppName).")
+            sentences.append("You spent this session catching up on communications and checking messages in \(primaryAppName).")
             
         case .writing:
-            var s = "You focused on writing and documentation in \(primaryAppName) for \(formatDuration(primaryCatDuration))"
+            var s = ""
+            if let project = projectName {
+                s += "You spent this session writing and documenting in \(primaryAppName) for the **\(project)** project"
+            } else {
+                s += "You spent this session writing and documenting in \(primaryAppName)"
+            }
+            
             if !writingDocs.isEmpty {
-                s += ", editing document '\(writingDocs[0])'"
+                s += ", editing files like **\(writingDocs[0])**"
             }
             s += "."
             sentences.append(s)
             
         case .other:
-            sentences.append("You spent \(formatDuration(primaryCatDuration)) focused in \(primaryAppName).")
+            sentences.append("You spent this session focused in \(primaryAppName).")
         }
         
-        // Sentence 2: Secondary activity
+        // Sentence 2: Secondary Tool / Environment
         if rankedCategories.count > 1 {
             let secondary = rankedCategories[1]
-            if secondary.value >= 120 { // At least 2 minutes
+            if secondary.value >= 60 { // At least 1 minute of secondary activity
                 let secCat = secondary.key
                 let secApps = appsByCategory[secCat, default: []]
                 let secAppName = secApps.first.map { AppMetadataResolver.displayName(bundleId: $0, rawName: appNames[$0]) } ?? "secondary apps"
                 
                 switch secCat {
                 case .coding:
-                    var s = "Additionally, you spent \(formatDuration(secondary.value)) writing code in \(secAppName)"
+                    var s = "Additionally, you spent time writing code in \(secAppName)"
                     if !codingFiles.isEmpty {
-                        s += " on '\(codingFiles[0])'"
+                        s += " on files like **\(codingFiles[0])**"
                     }
                     s += "."
                     sentences.append(s)
                 case .browser:
-                    var s = "Additionally, you did some research in \(secAppName)"
+                    var s = "Additionally, you consulted browser resources in \(secAppName)"
                     if !browserDomains.isEmpty {
-                        s += " on \(browserDomains[0])"
+                        s += " on **\(browserDomains[0])**"
                     }
                     s += "."
                     sentences.append(s)
                 case .terminal:
-                    var s = "You also ran commands in \(secAppName)"
+                    var s = "You also ran command line tasks in \(secAppName)"
                     if !terminalDirs.isEmpty {
-                        s += " in '\(terminalDirs[0])'"
+                        s += " in the **\(terminalDirs[0])** folder"
                     }
                     s += "."
                     sentences.append(s)
                 case .design:
-                    sentences.append("You also did some design work in \(secAppName) for \(formatDuration(secondary.value)).")
+                    var s = "Additionally, you did design work in \(secAppName)"
+                    if !designDocs.isEmpty {
+                        s += " on **\(designDocs[0])**"
+                    }
+                    s += "."
+                    sentences.append(s)
                 case .communication:
-                    sentences.append("You also checked messages in \(secAppName).")
+                    sentences.append("You also referenced or checked messages in \(secAppName).")
                 case .writing:
-                    sentences.append("You also spent some time writing in \(secAppName).")
+                    sentences.append("You also spent some time writing documentation in \(secAppName).")
                 case .other:
                     break
                 }
             }
         }
         
-        // Sentence 3: Focus & Continuity
-        let focusPct = Int(memory.session.focusScore * 100)
-        let pauses = memory.interruptions.count
-        
-        if focusPct >= 85 {
-            if pauses == 0 {
-                sentences.append("You maintained an exceptionally deep flow state (focus rating \(focusPct)%) without any interruptions.")
-            } else {
-                sentences.append("You stayed highly focused (focus rating \(focusPct)%) with only \(pauses) brief \(pauses == 1 ? "pause" : "pauses").")
+        // Sentence 3: Web references (if browser was NOT primary or secondary, but was visited)
+        if primaryCategory != .browser && (rankedCategories.count <= 1 || rankedCategories[1].key != .browser) {
+            if !browserDomains.isEmpty {
+                let domainList = browserDomains.prefix(3).map { "**\($0)**" }.joined(separator: ", ")
+                sentences.append("To support your workflow, you visited reference and documentation sites including \(domainList).")
             }
-        } else if focusPct >= 65 {
-            sentences.append("Your focus was steady (focus rating \(focusPct)%) with a few natural transitions between apps.")
-        } else {
-            sentences.append("Your attention was divided (focus rating \(focusPct)%) as you frequently switched between tasks and applications.")
         }
         
         return sentences.joined(separator: " ")
+    }
+    
+    private static func extractProjectName(for memory: WorkflowMemory, events: [ActivityEvent]) -> String? {
+        if let title = memory.session.title {
+            if title.hasPrefix("Working in ") {
+                return String(title.dropFirst("Working in ".count))
+            }
+            if title.hasPrefix("Building in ") {
+                return String(title.dropFirst("Building in ".count))
+            }
+            if title.hasPrefix("Designing in ") {
+                return String(title.dropFirst("Designing in ".count))
+            }
+            if title.hasPrefix("Focused in ") {
+                return String(title.dropFirst("Focused in ".count))
+            }
+        }
+        
+        for event in events.reversed() {
+            guard let title = event.windowTitle, !title.isEmpty else { continue }
+            if let repo = extractRepoName(from: title) {
+                return repo
+            }
+        }
+        
+        if let tag = memory.session.projectTag, !tag.isEmpty, tag != memory.cluster.label {
+            return tag
+        }
+        
+        return nil
+    }
+    
+    private static func extractRepoName(from windowTitle: String) -> String? {
+        // Xcode: "MyApp — MyApp.xcodeproj"
+        if windowTitle.contains(".xcodeproj") || windowTitle.contains(" — ") {
+            let parts = windowTitle.components(separatedBy: " — ")
+            if let last = parts.last {
+                let name = last
+                    .replacingOccurrences(of: ".xcodeproj", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty, name.count <= 32 { return name }
+            }
+        }
+
+        // VS Code / Cursor: "file.swift — project"
+        if windowTitle.contains(" — ") {
+            let parts = windowTitle.components(separatedBy: " — ")
+            if let project = parts.last?.trimmingCharacters(in: .whitespaces),
+               !project.isEmpty, project.count <= 32 {
+                return project
+            }
+        }
+
+        return nil
     }
     
     private static func extractFileName(from windowTitle: String) -> String? {

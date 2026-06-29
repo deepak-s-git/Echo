@@ -122,11 +122,12 @@ private struct ThemeCard: View {
                     .fill(isSelected ? EchoPalette.indigo : Color.clear)
                     .frame(width: 5, height: 5)
             }
+            .scaleEffect(hovering ? 1.025 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(EchoDesign.subtle, value: isSelected)
-        .animation(EchoDesign.subtle, value: hovering)
     }
 
     private var themeBackground: Color {

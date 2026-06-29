@@ -282,9 +282,9 @@ struct SessionDetailView: View {
         let fromEvents = Set(memory.events.map(\.appBundleId)).count
         return max(fromEvents, memory.session.appCount)
     }
-
     private func header(_ memory: WorkflowMemory) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let colors = memory.cluster.colors
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Image(systemName: memory.cluster.icon)
                     .font(.system(size: 12, weight: .medium))
@@ -293,10 +293,10 @@ struct SessionDetailView: View {
                     .textCase(.uppercase)
                     .tracking(0.5)
             }
-            .foregroundStyle(EchoPalette.indigoSoft)
+            .foregroundStyle(colors.first ?? EchoPalette.indigoSoft)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(Capsule().fill(EchoPalette.indigo.opacity(0.1)))
+            .background(Capsule().fill((colors.first ?? EchoPalette.indigo).opacity(0.12)))
 
             Text(memory.session.title ?? "Untitled memory")
                 .font(.system(size: 28, weight: .bold))
@@ -330,7 +330,7 @@ struct SessionDetailView: View {
                             .foregroundStyle(.secondary)
                             .tracking(0.5)
                         
-                        Text(SessionSummarizer.generateSummary(for: memory))
+                        Text((try? AttributedString(markdown: SessionSummarizer.generateSummary(for: memory))) ?? AttributedString(SessionSummarizer.generateSummary(for: memory)))
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(.primary)
                             .lineSpacing(4.5)
@@ -402,8 +402,16 @@ struct SessionDetailView: View {
                         .frame(width: 10)
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(phase.title)
-                                .font(.system(size: 14, weight: .medium))
+                            HStack(spacing: 8) {
+                                AppIconView(bundleId: phase.bundleId, size: 16)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                            .stroke(Color.black.opacity(0.15), lineWidth: 0.5)
+                                    )
+                                Text(phase.title)
+                                    .font(.system(size: 14, weight: .medium))
+                            }
                             HStack(spacing: 8) {
                                 Text(phase.duration.shortLabel)
                                 Text("·")
@@ -774,6 +782,13 @@ private struct AppTransitionRow: View {
         .background(
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                 .fill(hovering ? Color.primary.opacity(0.04) : Color.primary.opacity(0.01))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                .strokeBorder(
+                    EchoPalette.strokeBright.opacity(hovering ? 0.35 : 0),
+                    lineWidth: 0.5
+                )
         )
         .onHover { hovering = $0 }
     }

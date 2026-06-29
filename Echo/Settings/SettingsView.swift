@@ -105,7 +105,8 @@ private struct SettingsSidebar: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(EchoPalette.sidebar)
+        .background(EchoPalette.sidebar.opacity(0.55))
+        .background(.ultraThinMaterial)
     }
 }
 
@@ -124,7 +125,7 @@ private struct SettingsSidebarRow: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(isSelected
-                              ? EchoPalette.indigo.opacity(0.16)
+                              ? EchoPalette.accent.opacity(0.16)
                               : Color.primary.opacity(0.04))
                         .frame(width: 24, height: 24)
                     Image(systemName: pane.icon)

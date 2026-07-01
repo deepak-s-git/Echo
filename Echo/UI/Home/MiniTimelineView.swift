@@ -4,10 +4,12 @@ struct MiniTimelineView: View, Equatable {
     let segments: [TimelineSegment]
     let focusIntensity: Double
     var isLive: Bool = false
+    let accentVibe: AccentVibe
 
     static func == (lhs: MiniTimelineView, rhs: MiniTimelineView) -> Bool {
         lhs.segments == rhs.segments
             && abs(lhs.focusIntensity - rhs.focusIntensity) < 0.01
+            && lhs.accentVibe == rhs.accentVibe
     }
 
     // Animation & Interaction States

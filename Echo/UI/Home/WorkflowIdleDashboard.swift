@@ -5,6 +5,7 @@ struct WorkflowIdleDashboard: View {
     @EnvironmentObject var sessionStore: SessionStore
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionControl: SessionControlStore
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var showCreateSheet = false
     @State private var showSelectWorkflowSheet = false
     @State private var animateContent = false
@@ -61,7 +62,7 @@ struct WorkflowIdleDashboard: View {
                         title: "Start New Workflow",
                         subtitle: "Begin a fresh topic context from scratch",
                         icon: "sparkles",
-                        gradientColors: [Color.orange, Color.pink]
+                        gradientColors: [EchoPalette.accent, EchoPalette.indigoSoft]
                     ) {
                         showCreateSheet = true
                     }
@@ -70,7 +71,7 @@ struct WorkflowIdleDashboard: View {
                         title: "Record in Existing",
                         subtitle: "Start a session under an active project",
                         icon: "folder.badge.plus",
-                        gradientColors: [EchoPalette.indigo, EchoPalette.warmHighlight]
+                        gradientColors: [EchoPalette.indigoSoft, EchoPalette.accent]
                     ) {
                         showSelectWorkflowSheet = true
                     }
@@ -109,10 +110,10 @@ struct WorkflowIdleDashboard: View {
                     let activeCount = sessionStore.workflowThreads.filter { $0.thread.statusRaw != "archived" }.count
                     HStack(spacing: 5) {
                         Circle()
-                            .fill(Color.orange)
+                            .fill(EchoPalette.accent)
                             .frame(width: 4, height: 4)
                         Circle()
-                            .fill(Color(red: 0.95, green: 0.65, blue: 0.15))
+                            .fill(EchoPalette.indigoSoft)
                             .frame(width: 4, height: 4)
                         Text("\(activeCount) active \(activeCount == 1 ? "workflow" : "workflows")")
                             .padding(.leading, 2)
@@ -125,7 +126,7 @@ struct WorkflowIdleDashboard: View {
                         HStack(spacing: 4) {
                             Image(systemName: "clock.fill")
                                 .font(.system(size: 10))
-                                .foregroundStyle(Color(red: 0.95, green: 0.65, blue: 0.15))
+                                .foregroundStyle(EchoPalette.accent)
                             Text("Total tracked: \(totalDuration.sessionDurationFormatted)")
                         }
                     }
@@ -237,6 +238,7 @@ struct WorkflowCreateSheet: View {
 }
 
 private struct HeroActionButton: View {
+    @ObservedObject private var settings = EchoSettings.shared
     let title: String
     let subtitle: String
     let icon: String
@@ -358,6 +360,7 @@ private struct HeroActionButton: View {
 }
 
 private struct GridActionButton: View {
+    @ObservedObject private var settings = EchoSettings.shared
     let title: String
     let subtitle: String
     let icon: String
@@ -427,6 +430,7 @@ private struct GridActionButton: View {
 }
 
 private struct SubtleActionButton: View {
+    @ObservedObject private var settings = EchoSettings.shared
     let title: String
     let subtitle: String
     let icon: String
@@ -991,6 +995,7 @@ struct AmbientGlowView: View {
 }
 
 struct RecentSessionRow: View {
+    @ObservedObject private var settings = EchoSettings.shared
     let session: Session
     let action: () -> Void
     

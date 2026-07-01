@@ -5,8 +5,8 @@ struct TimelineView: View {
     @EnvironmentObject var sessionStore: SessionStore
     @EnvironmentObject var activityStore: ActivityStore
     @EnvironmentObject var appStore: AppStore
-    @EnvironmentObject var continuityStore: ContinuityStore
     @EnvironmentObject var sessionControl: SessionControlStore
+    @ObservedObject private var settings = EchoSettings.shared
     
     @State private var expandedLogsThreadIds: Set<UUID> = []
     
@@ -76,12 +76,6 @@ struct TimelineView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
-            await continuityStore.refresh(
-                activeSession: sessionStore.activeSession,
-                recent: sessionStore.recentSessions
-            )
-        }
     }
 
     private var timelineList: some View {
@@ -570,6 +564,7 @@ private struct WorkflowThreadCard: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionControl: SessionControlStore
 
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var hovering = false
     @State private var hoveredSessionId: UUID? = nil
     @State private var isVisible = false
@@ -620,13 +615,13 @@ private struct WorkflowThreadCard: View {
                                 .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.12))
+                                .background(EchoPalette.accent.opacity(0.12))
                                 .cornerRadius(5)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 5)
-                                        .stroke(Color.orange.opacity(0.25), lineWidth: 0.5)
+                                        .stroke(EchoPalette.accent.opacity(0.25), lineWidth: 0.5)
                                 )
-                                .foregroundStyle(Color.orange)
+                                .foregroundStyle(EchoPalette.accent)
                         }
                     }
 
@@ -745,7 +740,7 @@ private struct WorkflowThreadCard: View {
                             let isLastItem = index == chronologicalSegments.count - 1
                             let isLatest = isLastItem && !segment.isActive
                             
-                            HStack(spacing: 0) {
+                            HStack(alignment: .top, spacing: 0) {
                                 TimelineNodeView(
                                     isFirst: index == 0,
                                     isLast: isLastItem,
@@ -854,6 +849,7 @@ private struct SessionHistoryRow: View {
     let onDelete: () -> Void
     let onRename: () -> Void
     
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var hovering = false
     
     var body: some View {
@@ -882,7 +878,7 @@ private struct SessionHistoryRow: View {
                     HStack(spacing: 6) {
                         Text(displayName)
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(segment.isActive ? EchoPalette.live : (isLatest ? EchoPalette.accent : (isHoveredFromParent ? EchoPalette.accent : .primary)))
+                            .foregroundStyle(segment.isActive ? EchoPalette.live : (isHoveredFromParent ? EchoPalette.accent : .primary))
                         
                         if segment.isActive {
                             Text("LIVE")
@@ -1051,18 +1047,35 @@ fileprivate struct TimelineNodeView: View {
     let isPathLatest: Bool
     var isHovered: Bool = false
     
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var animatePulse = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            if isFirst {
-                Spacer()
-            } else {
-                Rectangle()
-                    .fill(isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.40) : Color.primary.opacity(0.10)))
-                    .frame(width: 2)
+        ZStack(alignment: .top) {
+            // The vertical timeline line
+            VStack(spacing: 0) {
+                // Line from top to circle center (aligned at y = 25)
+                if isFirst {
+                    Color.clear
+                        .frame(width: 2, height: 25)
+                } else {
+                    Rectangle()
+                        .fill(isHovered ? EchoPalette.accent.opacity(0.85) : (isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.65) : Color.primary.opacity(0.10))))
+                        .frame(width: 2, height: 25)
+                }
+                
+                // Line from circle center to bottom of row
+                if isLast {
+                    Color.clear
+                        .frame(width: 2)
+                } else {
+                    Rectangle()
+                        .fill(isHovered ? EchoPalette.accent.opacity(0.85) : (isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.65) : Color.primary.opacity(0.10))))
+                        .frame(width: 2)
+                }
             }
             
+            // The Node circle centered at y = 25 (since the outer circle frame is 14x14, top padding is 18)
             ZStack {
                 if isActive {
                     // Active (Live) Concentric Glow Node
@@ -1076,16 +1089,23 @@ fileprivate struct TimelineNodeView: View {
                         .scaleEffect(animatePulse ? 1.2 : 0.8)
                         .shadow(color: EchoPalette.live.opacity(0.7), radius: animatePulse ? 4.5 : 2.0)
                 } else if isLatest {
-                    // Latest saved session (Amber/Orange) Concentric Glow Node
-                    Circle()
-                        .strokeBorder(EchoPalette.accent.opacity(0.35), lineWidth: 1.5)
-                        .frame(width: 14, height: 14)
-                    
-                    Circle()
-                        .fill(EchoPalette.accent)
-                        .frame(width: 6, height: 6)
-                        .scaleEffect(animatePulse ? 1.25 : 0.85)
-                        .shadow(color: EchoPalette.accent.opacity(0.8), radius: animatePulse ? 5.0 : 2.5)
+                    // Latest saved session (dynamic Accent Vibe) Concentric Glow Node
+                    ZStack {
+                        // Outer pulsating radar wave
+                        Circle()
+                            .stroke(EchoPalette.accent.opacity(animatePulse ? 0 : (isHovered ? 0.8 : 0.6)), lineWidth: isHovered ? 2.0 : 1.5)
+                            .frame(width: 14, height: 14)
+                            .scaleEffect(animatePulse ? (isHovered ? 1.9 : 1.7) : 1.0)
+                        
+                        Circle()
+                            .strokeBorder(EchoPalette.accent.opacity(isHovered ? 0.55 : 0.35), lineWidth: 1.5)
+                            .frame(width: 14, height: 14)
+                        
+                        Circle()
+                            .fill(EchoPalette.accent)
+                            .frame(width: 6, height: 6)
+                            .shadow(color: EchoPalette.accent.opacity(isHovered ? 0.95 : 0.8), radius: animatePulse ? (isHovered ? 6.0 : 4.0) : (isHovered ? 3.0 : 1.5))
+                    }
                 } else if isHovered {
                     // Hovered Accent Concentric Node
                     Circle()
@@ -1107,22 +1127,14 @@ fileprivate struct TimelineNodeView: View {
                         .frame(width: 5, height: 5)
                 }
             }
-            .padding(.vertical, 3)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.95).repeatForever(autoreverses: true)) {
-                    animatePulse = true
-                }
-            }
-            
-            if isLast {
-                Spacer()
-            } else {
-                Rectangle()
-                    .fill(isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.40) : Color.primary.opacity(0.10)))
-                    .frame(width: 2)
-            }
+            .padding(.top, 18)
         }
         .frame(width: 20)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                animatePulse = true
+            }
+        }
     }
 }
 

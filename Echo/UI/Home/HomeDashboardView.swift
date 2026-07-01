@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var activityStore: ActivityStore
     @EnvironmentObject var sessionStore: SessionStore
+    @ObservedObject private var settings = EchoSettings.shared
 
     var body: some View {
         ZStack {
@@ -52,12 +53,16 @@ struct HomeView: View {
                         MiniTimelineView(
                             segments: activityStore.timelineSegments,
                             focusIntensity: activityStore.focusIntensity,
-                            isLive: true
+                            isLive: true,
+                            accentVibe: settings.accentVibe
                         )
                         .equatable()
 
-                        ActivityFeedView(events: activityStore.recentEvents)
-                            .equatable()
+                        ActivityFeedView(
+                            events: activityStore.recentEvents,
+                            accentVibe: settings.accentVibe
+                        )
+                        .equatable()
                     }
                     .padding(28)
                     .padding(.bottom, 12)
@@ -69,6 +74,7 @@ struct HomeView: View {
 // MARK: - Hero
 
 private struct HomeHeroSection: View {
+    @ObservedObject private var settings = EchoSettings.shared
     let focusHeadline: String
     let workflowIdentity: String
     let threadTotal: TimeInterval
@@ -131,10 +137,6 @@ private struct HomeHeroSection: View {
                     }
                 }
             }
-
-            Spacer(minLength: 0)
-
-            FocusIndicatorView(score: focusScore, label: focusLabel, animate: isActive && !isPaused)
         }
         .padding(24)
         .background {
@@ -156,6 +158,7 @@ private struct HomeHeroSection: View {
 // MARK: - Current app
 
 private struct HomeCurrentAppSection: View {
+    @ObservedObject private var settings = EchoSettings.shared
     let appName: String?
     let bundleId: String?
     let focusLabel: String

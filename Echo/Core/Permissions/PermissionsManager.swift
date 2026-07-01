@@ -40,11 +40,8 @@ final class PermissionsManager: ObservableObject {
     }
 
     func requestAccessibility() {
-        // Open System Settings directly to the Accessibility pane
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
-
-        // Also trigger the system prompt as a fallback
+        // Trigger the standard macOS system prompt. 
+        // The prompt provides an "Open System Settings" button that macOS manages natively.
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let options = [key: true] as CFDictionary
         AXIsProcessTrustedWithOptions(options)

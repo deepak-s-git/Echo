@@ -341,6 +341,7 @@ actor ActivityTracker {
             if BrowserContextService.isBrowser(bundleId) {
                 // AppleScript: synchronous but fast (~5–20 ms). Run on main actor per existing API.
                 var tab: BrowserTab? = nil
+                var expectedTitle: String? = nil
                 for delayMs in [0, 300, 800, 1500] {
                     if delayMs > 0 {
                         try? await Task.sleep(for: .milliseconds(delayMs))
@@ -348,7 +349,7 @@ actor ActivityTracker {
                     guard !Task.isCancelled else { return }
                     guard await self?.currentBundleId == bundleId else { return }
                     
-                    let expectedTitle = await self?.lastVerifiedSnapshot?.windowTitle
+                    expectedTitle = await self?.lastVerifiedSnapshot?.windowTitle
                     tab = await MainActor.run {
                         BrowserContextService.captureActiveTab(for: bundleId, windowTitle: expectedTitle)
                     }
@@ -364,7 +365,7 @@ actor ActivityTracker {
                     windowTitle: title, url: url,
                     profileName: tab.profileName, duration: 0
                 ))
-                await self?.updateLastEmittedWindowFingerprint(url ?? title ?? "")
+                await self?.updateLastEmittedWindowFingerprint(expectedTitle ?? title ?? "")
             } else {
                 // AX: get window title + kAXDocument in one call.
                 guard let self = self else { return }
@@ -448,6 +449,112 @@ actor ActivityTracker {
     // MARK: - Emit
 
     private func emit(_ event: RawActivityEvent) {
-        eventContinuation?.yield(event)
+        var cleanEvent = event
+        let isTerminal = event.appBundleId.localizedCaseInsensitiveContains("terminal")
+            || event.appBundleId == "com.googlecode.iterm2"
+            || event.appBundleId == "dev.warp.Warp-Stable"
+            || event.appBundleId == "net.kovidgoyal.kitty"
+        
+        if isTerminal, let title = event.windowTitle {
+            cleanEvent = RawActivityEvent(
+                id: event.id,
+                timestamp: event.timestamp,
+                type: event.type,
+                appBundleId: event.appBundleId,
+                appName: event.appName,
+                windowTitle: Self.normalizeTerminalTitle(title, directoryURL: event.url),
+                url: event.url,
+                profileName: event.profileName,
+                duration: event.duration
+            )
+        }
+        eventContinuation?.yield(cleanEvent)
+    }
+
+    static func normalizeTerminalTitle(_ title: String, directoryURL: String?) -> String {
+        let clean = cleanTerminalTitle(title)
+        
+        guard let urlString = directoryURL,
+              urlString.hasPrefix("file://"),
+              let url = URL(string: urlString) else {
+            return clean
+        }
+        
+        let path = url.path
+        let projectRoot = findProjectRoot(for: path)
+        let projectFolderName = (projectRoot as NSString).lastPathComponent
+        guard !projectFolderName.isEmpty else { return clean }
+        
+        // Split the cleaned title into parts
+        let separator = clean.contains(" — ") ? " — " : " - "
+        var parts = clean.components(separatedBy: separator).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        
+        if !parts.isEmpty {
+            let dirCandidate = parts[0]
+            let shells: Set<String> = ["zsh", "-zsh", "bash", "-bash", "sh", "-sh", "login", "-login"]
+            if !shells.contains(dirCandidate.lowercased()) {
+                parts[0] = projectFolderName
+            }
+        }
+        
+        return parts.joined(separator: " — ")
+    }
+
+    static func findProjectRoot(for path: String) -> String {
+        let fileManager = FileManager.default
+        let homeDir = fileManager.homeDirectoryForCurrentUser.path
+        
+        var current = path
+        while current != "/" && !current.isEmpty {
+            if current == homeDir {
+                let gitPath = (current as NSString).appendingPathComponent(".git")
+                if fileManager.fileExists(atPath: gitPath) {
+                    return current
+                }
+                return path
+            }
+            
+            let gitPath = (current as NSString).appendingPathComponent(".git")
+            let packageJson = (current as NSString).appendingPathComponent("package.json")
+            let cargoToml = (current as NSString).appendingPathComponent("Cargo.toml")
+            let goMod = (current as NSString).appendingPathComponent("go.mod")
+            
+            var isDir: ObjCBool = false
+            if fileManager.fileExists(atPath: gitPath, isDirectory: &isDir), isDir.boolValue {
+                return current
+            }
+            if fileManager.fileExists(atPath: packageJson) ||
+               fileManager.fileExists(atPath: cargoToml) ||
+               fileManager.fileExists(atPath: goMod) {
+                return current
+            }
+            
+            if let files = try? fileManager.contentsOfDirectory(atPath: current) {
+                if files.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") || $0.hasSuffix(".code-workspace") }) {
+                    return current
+                }
+            }
+            
+            let parent = (current as NSString).deletingLastPathComponent
+            if parent == current {
+                break
+            }
+            current = parent
+        }
+        
+        return path
+    }
+
+    static func cleanTerminalTitle(_ title: String) -> String {
+        var clean = title
+        if let regex = try? NSRegularExpression(pattern: "\\s*[—\\-]\\s*\\d+\\s*[x×]\\s*\\d+\\s*$", options: .caseInsensitive) {
+            let range = NSRange(clean.startIndex..<clean.endIndex, in: clean)
+            clean = regex.stringByReplacingMatches(in: clean, options: [], range: range, withTemplate: "")
+        }
+        if let regex = try? NSRegularExpression(pattern: "\\s*[—\\-]\\s*(?:-?zsh|-?bash|login|sh)\\b", options: .caseInsensitive) {
+            let range = NSRange(clean.startIndex..<clean.endIndex, in: clean)
+            clean = regex.stringByReplacingMatches(in: clean, options: [], range: range, withTemplate: "")
+        }
+        return clean.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

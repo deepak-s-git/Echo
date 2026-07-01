@@ -43,7 +43,6 @@ nonisolated struct WorkflowMemory: Sendable {
     let appTransitions: [AppTransition]
     let browserContexts: [BrowserContextEntry]
     let interruptions: [WorkflowInterruption]
-    let continuityScore: Double
     let restorePlan: WorkflowRestorePlan
 }
 

@@ -6,6 +6,7 @@ struct SessionControlBar: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var activityStore: ActivityStore
     @EnvironmentObject var sessionStore: SessionStore
+    @ObservedObject private var settings = EchoSettings.shared
 
     private var hasSession: Bool {
         activityStore.isRecording

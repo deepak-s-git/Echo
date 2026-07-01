@@ -149,23 +149,36 @@ enum SessionSummarizer {
         }
         
         // Terminal commands / directory names
-        var terminalDirs: [String] = []
+        var dirDurations: [String: TimeInterval] = [:]
         var terminalCommands: [String] = []
         let terminalEvents = events.filter { AppCategory.from(bundleId: $0.appBundleId) == .terminal }
         for event in terminalEvents {
             if let url = event.url, url.hasPrefix("file://"), let path = URL(string: url)?.path {
-                let dirName = (path as NSString).lastPathComponent
-                if !dirName.isEmpty && !terminalDirs.contains(dirName) {
-                    terminalDirs.append(dirName)
+                let rootPath = Self.findProjectRoot(for: path)
+                let dirName = (rootPath as NSString).lastPathComponent
+                if !dirName.isEmpty {
+                    dirDurations[dirName, default: 0] += event.duration
                 }
             }
             if let title = event.windowTitle, !title.isEmpty {
-                let clean = cleanTerminalTitle(title)
-                if !clean.isEmpty && !terminalCommands.contains(clean) {
-                    terminalCommands.append(clean)
+                if let cmd = Self.extractTerminalCommand(from: title) {
+                    if !terminalCommands.contains(cmd) {
+                        terminalCommands.append(cmd)
+                    }
                 }
             }
         }
+        
+        let homeDirName = NSUserName()
+        let terminalDirs = dirDurations.sorted { a, b in
+            if a.key.lowercased() == homeDirName.lowercased() && b.key.lowercased() != homeDirName.lowercased() {
+                return false
+            }
+            if b.key.lowercased() == homeDirName.lowercased() && a.key.lowercased() != homeDirName.lowercased() {
+                return true
+            }
+            return a.value > b.value
+        }.map { $0.key }
         
         // Design documents
         var designDocs: [String] = []
@@ -439,13 +452,16 @@ enum SessionSummarizer {
     }
     
     private static func cleanTerminalTitle(_ title: String) -> String {
-        let clean = title
-            .replacingOccurrences(of: " — -zsh — 120×30", with: "")
-            .replacingOccurrences(of: " — login — 120×30", with: "")
-            .replacingOccurrences(of: " -zsh", with: "")
-            .replacingOccurrences(of: " -login", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return clean
+        var clean = title
+        if let regex = try? NSRegularExpression(pattern: "\\s*[—\\-]\\s*\\d+\\s*[x×]\\s*\\d+\\s*$", options: .caseInsensitive) {
+            let range = NSRange(clean.startIndex..<clean.endIndex, in: clean)
+            clean = regex.stringByReplacingMatches(in: clean, options: [], range: range, withTemplate: "")
+        }
+        if let regex = try? NSRegularExpression(pattern: "\\s*[—\\-]\\s*(?:-?zsh|-?bash|login|sh)\\b", options: .caseInsensitive) {
+            let range = NSRange(clean.startIndex..<clean.endIndex, in: clean)
+            clean = regex.stringByReplacingMatches(in: clean, options: [], range: range, withTemplate: "")
+        }
+        return clean.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private static func extractDocumentName(from windowTitle: String, appName: String) -> String? {
@@ -466,5 +482,71 @@ enum SessionSummarizer {
         }
         
         return clean
+    }
+    
+    private static func extractTerminalCommand(from title: String) -> String? {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separator = clean.contains(" — ") ? " — " : " - "
+        let parts = clean.components(separatedBy: separator).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        
+        let shells: Set<String> = ["zsh", "-zsh", "bash", "-bash", "sh", "-sh", "login", "-login"]
+        
+        if parts.count >= 2 {
+            let cmdCandidate = parts[1]
+            if let regex = try? NSRegularExpression(pattern: "^\\d+\\s*[x×]\\s*\\d+$", options: .caseInsensitive),
+               regex.firstMatch(in: cmdCandidate, options: [], range: NSRange(cmdCandidate.startIndex..<cmdCandidate.endIndex, in: cmdCandidate)) != nil {
+                return nil
+            }
+            if shells.contains(cmdCandidate.lowercased()) {
+                return nil
+            }
+            return cmdCandidate
+        }
+        return nil
+    }
+
+    private static func findProjectRoot(for path: String) -> String {
+        let fileManager = FileManager.default
+        let homeDir = fileManager.homeDirectoryForCurrentUser.path
+        
+        var current = path
+        while current != "/" && !current.isEmpty {
+            if current == homeDir {
+                let gitPath = (current as NSString).appendingPathComponent(".git")
+                if fileManager.fileExists(atPath: gitPath) {
+                    return current
+                }
+                return path
+            }
+            
+            let gitPath = (current as NSString).appendingPathComponent(".git")
+            let packageJson = (current as NSString).appendingPathComponent("package.json")
+            let cargoToml = (current as NSString).appendingPathComponent("Cargo.toml")
+            let goMod = (current as NSString).appendingPathComponent("go.mod")
+            
+            var isDir: ObjCBool = false
+            if fileManager.fileExists(atPath: gitPath, isDirectory: &isDir), isDir.boolValue {
+                return current
+            }
+            if fileManager.fileExists(atPath: packageJson) ||
+               fileManager.fileExists(atPath: cargoToml) ||
+               fileManager.fileExists(atPath: goMod) {
+                return current
+            }
+            
+            if let files = try? fileManager.contentsOfDirectory(atPath: current) {
+                if files.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") || $0.hasSuffix(".code-workspace") }) {
+                    return current
+                }
+            }
+            
+            let parent = (current as NSString).deletingLastPathComponent
+            if parent == current {
+                break
+            }
+            current = parent
+        }
+        
+        return path
     }
 }

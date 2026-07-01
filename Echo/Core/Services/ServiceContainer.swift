@@ -8,7 +8,6 @@ final class ServiceContainer {
     let activityStore: ActivityStore
     let permissionsManager: PermissionsManager
     let sessionDetailStore: SessionDetailStore
-    let continuityStore: ContinuityStore
     let sessionControl: SessionControlStore
 
     private let database: DatabaseManager
@@ -25,7 +24,6 @@ final class ServiceContainer {
         activityStore: ActivityStore,
         permissionsManager: PermissionsManager,
         sessionDetailStore: SessionDetailStore,
-        continuityStore: ContinuityStore,
         sessionControl: SessionControlStore
     ) throws {
         let db = try DatabaseManager()
@@ -39,7 +37,7 @@ final class ServiceContainer {
             sessionStore: sessionStore,
             activityStore: activityStore
         )
-        continuityStore.configure(repository: repo)
+
 
         let engine = SessionEngine(
             repository: repo,
@@ -57,7 +55,7 @@ final class ServiceContainer {
         self.sessionStore = sessionStore
         self.permissionsManager = permissionsManager
         self.sessionDetailStore = sessionDetailStore
-        self.continuityStore = continuityStore
+
         self.sessionControl = sessionControl
         self.sessionEngine = engine
         sessionControl.bind(container: self)
@@ -90,37 +88,21 @@ final class ServiceContainer {
     func startNewSession(workflowName: String) async {
         await sessionEngine.startNewSession(workflowName: workflowName)
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: sessionStore.activeSession,
-            recent: sessionStore.recentSessions
-        )
     }
 
     func continuePreviousSession() async {
         await sessionEngine.continuePreviousSession()
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: sessionStore.activeSession,
-            recent: sessionStore.recentSessions
-        )
     }
 
     func continueWorkflowThread(id: UUID) async {
         await sessionEngine.continueWorkflowThread(id: id)
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: sessionStore.activeSession,
-            recent: sessionStore.recentSessions
-        )
     }
 
     func restoreAndContinue(id: UUID, plan: WorkflowRestorePlan) async {
         await sessionEngine.restoreAndContinueWorkflowThread(id: id, plan: plan)
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: sessionStore.activeSession,
-            recent: sessionStore.recentSessions
-        )
     }
 
     func pauseCurrentSession() async {
@@ -138,19 +120,11 @@ final class ServiceContainer {
             tags: tags
         )
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: nil,
-            recent: sessionStore.recentSessions
-        )
     }
 
     func deleteSession(id: UUID) async {
         await sessionEngine.deleteSession(id: id)
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: nil,
-            recent: sessionStore.recentSessions
-        )
     }
 
     func renameSession(id: UUID, title: String, tags: [String]) async {
@@ -166,10 +140,6 @@ final class ServiceContainer {
         await MainActor.run { sessionStore.removeWorkflowThreadOptimistically(id: id) }
         await sessionEngine.deleteWorkflowThread(id: id)
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: nil,
-            recent: sessionStore.recentSessions
-        )
     }
 
     func archiveWorkflowThread(id: UUID) async {
@@ -197,10 +167,6 @@ final class ServiceContainer {
         await idleMonitor.start()
         await sessionEngine.start()
         await sessionStore.loadRecent()
-        await continuityStore.refresh(
-            activeSession: sessionStore.activeSession,
-            recent: sessionStore.recentSessions
-        )
         
         let repo = self.sessionRepository
         Task(priority: .utility) {
@@ -224,7 +190,6 @@ final class ServiceContainer {
         // Reset UI stores
         activityStore.enterIdleMode()
         await sessionStore.loadRecent()
-        await continuityStore.refresh(activeSession: nil, recent: [])
     }
 
     func repository() -> SessionRepository { sessionRepository }

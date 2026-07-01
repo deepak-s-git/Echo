@@ -48,7 +48,7 @@ final class WorkflowRestoreEngine {
                 EchoLog.restore("Failed \(item.label)", error: error)
             }
             if index + 1 < items.count {
-                try? await Task.sleep(for: .milliseconds(150))
+                try? await Task.sleep(for: .milliseconds(800))
             }
         }
         progress?(total, total)
@@ -204,13 +204,20 @@ struct DocumentRestorer: WorkflowRestoring {
 
     func restore(_ item: RestoreItem) async throws {
         guard let path = item.path else { throw RestoreError.targetUnavailable }
-        let url = URL(fileURLWithPath: path)
+        let fileURL = URL(fileURLWithPath: path)
         guard FileManager.default.fileExists(atPath: path) else {
             throw RestoreError.targetUnavailable
         }
-        NSWorkspace.shared.open(url)
+        // Open in the specific app that had the file open (e.g. Pages, Numbers, Keynote)
+        if let bundleId = item.bundleId,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            NSWorkspace.shared.open([fileURL], withApplicationAt: appURL, configuration: .init(), completionHandler: nil)
+        } else {
+            NSWorkspace.shared.open(fileURL)
+        }
     }
 }
+
 
 // MARK: - Workspace (Xcode / Cursor / VS Code)
 

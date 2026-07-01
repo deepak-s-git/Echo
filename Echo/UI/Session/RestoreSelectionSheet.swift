@@ -160,38 +160,7 @@ struct RestoreSelectionSheet: View {
     }
 
     private func setSelection(forIndex index: Int, isSelected: Bool) {
-        let targetItem = items[index].item
-        
-        // Find all items that match the target item physically
-        for i in 0..<items.count {
-            if i == index {
-                items[i].isSelected = isSelected
-                continue
-            }
-            
-            let other = items[i].item
-            var isMatch = false
-            
-            if targetItem.kind == .application && other.kind == .application {
-                isMatch = targetItem.bundleId == other.bundleId
-            } else if (targetItem.kind == .url || targetItem.kind == .browserPage) &&
-                      (other.kind == .url || other.kind == .browserPage) {
-                isMatch = targetItem.url == other.url && targetItem.url != nil
-            } else if (targetItem.kind == .document || targetItem.kind == .folder || targetItem.kind == .workspace) &&
-                      (other.kind == .document || other.kind == .folder || other.kind == .workspace) {
-                if targetItem.path != nil {
-                    isMatch = targetItem.path == other.path
-                } else if targetItem.url != nil {
-                    isMatch = targetItem.url == other.url
-                }
-            } else if targetItem.kind == .terminalDirectory && other.kind == .terminalDirectory {
-                isMatch = targetItem.workingDirectory == other.workingDirectory && targetItem.workingDirectory != nil
-            }
-            
-            if isMatch {
-                items[i].isSelected = isSelected
-            }
-        }
+        items[index].isSelected = isSelected
     }
 
     private func buildHierarchicalGroups() -> [HierarchicalGroup] {
@@ -278,6 +247,10 @@ struct RestoreSelectionSheet: View {
                 if b.id == "no-profile" { return false }
                 return a.id < b.id
             }
+            
+            // Don't create empty groups (no children and no application header item)
+            let hasChildren = profileGroups.contains { !$0.children.isEmpty }
+            guard hasChildren || appIndex != nil else { continue }
             
             groups.append(HierarchicalGroup(
                 id: "app:\(bundleId)",
@@ -411,6 +384,25 @@ struct RestoreSelectionSheet: View {
         if bundleId.contains("Brave") { return "Brave Browser" }
         if bundleId.contains("Finder") { return "Finder" }
         if bundleId.contains("Preview") { return "Preview" }
+        // Apple iWork
+        if bundleId == "com.apple.iWork.Pages" { return "Pages" }
+        if bundleId == "com.apple.iWork.Numbers" { return "Numbers" }
+        if bundleId == "com.apple.iWork.Keynote" { return "Keynote" }
+        if bundleId == "com.apple.TextEdit" { return "TextEdit" }
+        // Microsoft Office
+        if bundleId == "com.microsoft.Word" { return "Microsoft Word" }
+        if bundleId == "com.microsoft.Excel" { return "Microsoft Excel" }
+        if bundleId == "com.microsoft.Powerpoint" { return "Microsoft PowerPoint" }
+        if bundleId == "com.microsoft.onenote.mac" { return "Microsoft OneNote" }
+        if bundleId == "com.microsoft.Outlook" { return "Microsoft Outlook" }
+        // LibreOffice
+        if bundleId.contains("libreoffice") { return "LibreOffice" }
+        if bundleId.contains("openoffice") { return "OpenOffice" }
+        // Adobe
+        if bundleId == "com.adobe.Photoshop" { return "Adobe Photoshop" }
+        if bundleId == "com.adobe.Illustrator" { return "Adobe Illustrator" }
+        if bundleId == "com.adobe.InDesign" { return "Adobe InDesign" }
+        if bundleId.contains("adobe.Acrobat") || bundleId.contains("adobe.Reader") { return "Adobe Acrobat" }
         return bundleId.components(separatedBy: ".").last?.capitalized ?? bundleId
     }
 
@@ -422,6 +414,24 @@ struct RestoreSelectionSheet: View {
         if bundleId.contains("Edge") { return "globe" }
         if bundleId.contains("Finder") { return "folder.fill" }
         if bundleId.contains("Preview") { return "doc.text.fill" }
+        // Apple iWork
+        if bundleId == "com.apple.iWork.Pages" { return "doc.richtext" }
+        if bundleId == "com.apple.iWork.Numbers" { return "tablecells" }
+        if bundleId == "com.apple.iWork.Keynote" { return "rectangle.on.rectangle" }
+        if bundleId == "com.apple.TextEdit" { return "doc.text" }
+        // Microsoft Office
+        if bundleId == "com.microsoft.Word" { return "doc.richtext" }
+        if bundleId == "com.microsoft.Excel" { return "tablecells" }
+        if bundleId == "com.microsoft.Powerpoint" { return "rectangle.on.rectangle" }
+        if bundleId == "com.microsoft.onenote.mac" { return "note.text" }
+        if bundleId == "com.microsoft.Outlook" { return "envelope" }
+        // LibreOffice / OpenOffice
+        if bundleId.contains("libreoffice") || bundleId.contains("openoffice") { return "doc.on.doc" }
+        // Adobe
+        if bundleId == "com.adobe.Photoshop" { return "photo" }
+        if bundleId == "com.adobe.Illustrator" { return "pencil.and.outline" }
+        if bundleId == "com.adobe.InDesign" { return "doc.richtext" }
+        if bundleId.contains("adobe.Acrobat") || bundleId.contains("adobe.Reader") { return "doc.text.fill" }
         return "app.fill"
     }
 

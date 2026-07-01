@@ -6,6 +6,8 @@ struct RestoreSelectionSheet: View {
     let onRestoreAndContinue: () -> Void
     let onCancel: () -> Void
 
+    @ObservedObject private var settings = EchoSettings.shared
+
     var body: some View {
         ZStack {
             // Obsidian Elevated Slate Background
@@ -538,6 +540,7 @@ private struct AppGroupSection: View {
     let profileBinding: (RestoreSelectionSheet.ProfileGroup) -> Binding<Bool>
     @Binding var items: [RestoreWeighting.SelectableItem]
 
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var isExpanded = true
 
     var body: some View {
@@ -690,6 +693,7 @@ private struct RestoreItemRow: View {
     let label: String
     let iconName: String
     
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var hovering = false
     
     var body: some View {

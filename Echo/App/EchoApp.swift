@@ -28,7 +28,6 @@ struct EchoApp: App {
                 .environmentObject(appDelegate.activityStore)
                 .environmentObject(appDelegate.permissionsManager)
                 .environmentObject(appDelegate.sessionDetailStore)
-                .environmentObject(appDelegate.continuityStore)
                 .environmentObject(appDelegate.sessionControl)
                 .environmentObject(echoSettings)
         }

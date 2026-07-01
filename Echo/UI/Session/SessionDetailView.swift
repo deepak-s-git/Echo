@@ -7,6 +7,7 @@ struct SessionDetailView: View {
     @EnvironmentObject var sessionDetailStore: SessionDetailStore
     @EnvironmentObject var sessionControl: SessionControlStore
     @EnvironmentObject var sessionStore: SessionStore
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var showDiagnostics = false
 
     var body: some View {
@@ -33,7 +34,6 @@ struct SessionDetailView: View {
                             degradedBanner
                         }
                         header(memory)
-                        continuitySection(memory)
                         rhythmSection(memory)
                         workflowIntelligenceSection(memory)
                         if !memory.phases.isEmpty {
@@ -313,42 +313,6 @@ struct SessionDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Continuity
-
-    private func continuitySection(_ memory: WorkflowMemory) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("Continuity", icon: "point.topleft.down.to.point.bottomright.curvepath")
-
-            HStack(alignment: .center, spacing: 24) {
-                FocusIndicatorView(score: memory.continuityScore, label: "", size: 72, animate: true)
-                    .shadow(color: EchoPalette.indigo.opacity(0.1), radius: 6)
-                
-                VStack(alignment: .leading, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("SESSION SUMMARY")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .tracking(0.5)
-                        
-                        Text((try? AttributedString(markdown: SessionSummarizer.generateSummary(for: memory))) ?? AttributedString(SessionSummarizer.generateSummary(for: memory)))
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(.primary)
-                            .lineSpacing(4.5)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    
-                    HStack(spacing: 8) {
-                        DetailBadge(label: "\(Int(memory.session.focusScore * 100))% focus", icon: "target", tintColor: EchoPalette.indigoSoft)
-                        DetailBadge(label: "\(memory.interruptions.count) \(memory.interruptions.count == 1 ? "pause" : "pauses")", icon: "pause.circle", tintColor: .orange)
-                        DetailBadge(label: "Flow preserved", icon: "checkmark.shield", tintColor: EchoPalette.live)
-                    }
-                }
-            }
-        }
-        .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
-    }
-
 
     // MARK: - Rhythm
 
@@ -363,7 +327,8 @@ struct SessionDetailView: View {
                 MiniTimelineView(
                     segments: SessionTimelineBuilder.segments(from: memory.events, session: memory.session),
                     focusIntensity: SessionTimelineBuilder.focusIntensity(from: memory.events),
-                    isLive: false
+                    isLive: false,
+                    accentVibe: settings.accentVibe
                 )
             }
         }

@@ -53,7 +53,6 @@ struct EchoApp: App {
                 .environmentObject(appDelegate.activityStore)
                 .environmentObject(appDelegate.sessionControl)
                 .environmentObject(echoSettings)
-                .frame(width: 320, height: 450)
         } label: {
             MenuBarLabel()
         }

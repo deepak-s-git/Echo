@@ -8,9 +8,26 @@ struct ActivityFeedView: View, Equatable {
             && lhs.events.last?.id == rhs.events.last?.id
     }
 
-    private var displayEvents: [ActivityEvent] {
+    private var dedupedEvents: [ActivityEvent] {
         let focusedOnly = events.filter { $0.type == .appFocus }
-        return Array(focusedOnly.suffix(EchoConfig.maxFeedDisplayEvents).reversed())
+        
+        var deduped: [ActivityEvent] = []
+        for event in focusedOnly {
+            if let last = deduped.last {
+                let sameApp = last.appBundleId == event.appBundleId
+                let sameTitle = last.windowTitle == event.windowTitle
+                let sameUrl = last.url == event.url
+                if sameApp && sameTitle && sameUrl {
+                    continue
+                }
+            }
+            deduped.append(event)
+        }
+        return deduped
+    }
+
+    private var displayEvents: [ActivityEvent] {
+        Array(dedupedEvents.suffix(EchoConfig.maxFeedDisplayEvents).reversed())
     }
 
     var body: some View {
@@ -20,7 +37,7 @@ struct ActivityFeedView: View, Equatable {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(events.count) events")
+                Text("\(dedupedEvents.count) events")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(EchoPalette.indigoSoft)
                     .padding(.horizontal, 8)

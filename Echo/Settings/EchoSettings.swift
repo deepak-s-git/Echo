@@ -76,12 +76,8 @@ final class EchoSettings: ObservableObject {
         }
     }
 
-    @Published var showFocusScoreRing: Bool {
-        didSet { defaults.set(showFocusScoreRing, forKey: Keys.showFocusScoreRing) }
-    }
-
-    @Published var compactTimeline: Bool {
-        didSet { defaults.set(compactTimeline, forKey: Keys.compactTimeline) }
+    @Published var accentVibe: AccentVibe {
+        didSet { defaults.set(accentVibe.rawValue, forKey: Keys.accentVibe) }
     }
 
     // MARK: - Notifications
@@ -131,8 +127,8 @@ final class EchoSettings: ObservableObject {
         let rawTheme = defaults.string(forKey: Keys.appTheme) ?? AppTheme.system.rawValue
         appTheme = AppTheme(rawValue: rawTheme) ?? .system
 
-        showFocusScoreRing = defaults.object(forKey: Keys.showFocusScoreRing) as? Bool ?? true
-        compactTimeline = defaults.object(forKey: Keys.compactTimeline) as? Bool ?? false
+        let rawVibe = defaults.string(forKey: Keys.accentVibe) ?? AccentVibe.copper.rawValue
+        accentVibe = AccentVibe(rawValue: rawVibe) ?? .copper
 
         // Notifications
         notifyOnSessionSaved = defaults.object(forKey: Keys.notifyOnSessionSaved) as? Bool ?? false
@@ -215,8 +211,7 @@ final class EchoSettings: ObservableObject {
         static let appFocusEligibilitySeconds = "echo.settings.appFocusEligibilitySeconds"
         static let dataRetentionDays = "echo.settings.dataRetentionDays"
         static let appTheme = "echo.settings.appTheme"
-        static let showFocusScoreRing = "echo.settings.showFocusScoreRing"
-        static let compactTimeline = "echo.settings.compactTimeline"
+        static let accentVibe = "echo.settings.accentVibe"
         static let notifyOnSessionSaved = "echo.settings.notifyOnSessionSaved"
         static let notifyOnIdleWarning = "echo.settings.notifyOnIdleWarning"
         static let notifyDailySummary = "echo.settings.notifyDailySummary"
@@ -245,6 +240,68 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .system: return "circle.lefthalf.filled"
         case .light: return "sun.max"
         case .dark: return "moon"
+        }
+    }
+}
+
+// MARK: - AccentVibe
+
+enum AccentVibe: String, CaseIterable, Identifiable {
+    case copper = "copper"
+    case frost = "frost"
+    case sunset = "sunset"
+    case forest = "forest"
+    case neon = "neon"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .copper: return "Cybernetic Copper"
+        case .frost: return "Nordic Frost"
+        case .sunset: return "Sunset Rose"
+        case .forest: return "Forest Mint"
+        case .neon: return "Neon Noir"
+        }
+    }
+
+    var primaryColorDark: NSColor {
+        switch self {
+        case .copper: return NSColor(red: 0.85, green: 0.42, blue: 0.18, alpha: 1.0)
+        case .frost: return NSColor(red: 0.28, green: 0.58, blue: 0.88, alpha: 1.0)
+        case .sunset: return NSColor(red: 0.92, green: 0.32, blue: 0.48, alpha: 1.0)
+        case .forest: return NSColor(red: 0.18, green: 0.72, blue: 0.46, alpha: 1.0)
+        case .neon: return NSColor(red: 0.72, green: 0.28, blue: 0.95, alpha: 1.0)
+        }
+    }
+
+    var primaryColorLight: NSColor {
+        switch self {
+        case .copper: return NSColor(red: 0.75, green: 0.32, blue: 0.08, alpha: 1.0)
+        case .frost: return NSColor(red: 0.18, green: 0.48, blue: 0.78, alpha: 1.0)
+        case .sunset: return NSColor(red: 0.82, green: 0.22, blue: 0.38, alpha: 1.0)
+        case .forest: return NSColor(red: 0.08, green: 0.55, blue: 0.32, alpha: 1.0)
+        case .neon: return NSColor(red: 0.60, green: 0.15, blue: 0.85, alpha: 1.0)
+        }
+    }
+
+    var secondaryColorDark: NSColor {
+        switch self {
+        case .copper: return NSColor(red: 0.82, green: 0.74, blue: 0.55, alpha: 1.0)
+        case .frost: return NSColor(red: 0.52, green: 0.80, blue: 0.92, alpha: 1.0)
+        case .sunset: return NSColor(red: 0.96, green: 0.65, blue: 0.42, alpha: 1.0)
+        case .forest: return NSColor(red: 0.62, green: 0.88, blue: 0.74, alpha: 1.0)
+        case .neon: return NSColor(red: 0.22, green: 0.82, blue: 0.92, alpha: 1.0)
+        }
+    }
+
+    var secondaryColorLight: NSColor {
+        switch self {
+        case .copper: return NSColor(red: 0.65, green: 0.57, blue: 0.38, alpha: 1.0)
+        case .frost: return NSColor(red: 0.38, green: 0.62, blue: 0.75, alpha: 1.0)
+        case .sunset: return NSColor(red: 0.80, green: 0.50, blue: 0.30, alpha: 1.0)
+        case .forest: return NSColor(red: 0.42, green: 0.72, blue: 0.58, alpha: 1.0)
+        case .neon: return NSColor(red: 0.08, green: 0.62, blue: 0.72, alpha: 1.0)
         }
     }
 }

@@ -38,17 +38,28 @@ enum EchoPalette {
         light: NSColor(red: 0.76, green: 0.74, blue: 0.70, alpha: 1.0)
     )
     
-    static let accent = adaptive(
-        dark: NSColor(red: 0.85, green: 0.42, blue: 0.18, alpha: 1.0), // Cybernetic Copper
-        light: NSColor(red: 0.75, green: 0.32, blue: 0.08, alpha: 1.0)
-    )
+    @MainActor
+    static var accent: Color {
+        let vibe = EchoSettings.shared.accentVibe
+        return adaptive(
+            dark: vibe.primaryColorDark,
+            light: vibe.primaryColorLight
+        )
+    }
     
-    static let indigo = accent
+    @MainActor
+    static var indigo: Color {
+        accent
+    }
     
-    static let indigoSoft = adaptive(
-        dark: NSColor(red: 0.82, green: 0.74, blue: 0.55, alpha: 1.0), // Champagne Gold
-        light: NSColor(red: 0.65, green: 0.57, blue: 0.38, alpha: 1.0)
-    )
+    @MainActor
+    static var indigoSoft: Color {
+        let vibe = EchoSettings.shared.accentVibe
+        return adaptive(
+            dark: vibe.secondaryColorDark,
+            light: vibe.secondaryColorLight
+        )
+    }
     
     static let warmHighlight = adaptive(
         dark: NSColor(red: 0.95, green: 0.65, blue: 0.15, alpha: 1.0), // Warm Amber
@@ -70,10 +81,17 @@ enum EchoPalette {
         light: NSColor(red: 0.86, green: 0.15, blue: 0.15, alpha: 1.0)
     )
     
-    static let glowBlue = accent
+    @MainActor
+    static var glowBlue: Color {
+        accent
+    }
     
-    static let glowPurple = indigoSoft
+    @MainActor
+    static var glowPurple: Color {
+        indigoSoft
+    }
     
+    @MainActor
     static var premiumGradient: LinearGradient {
         LinearGradient(
             colors: [accent, indigoSoft],
@@ -94,6 +112,7 @@ enum EchoDesign {
     static let cardPadding: CGFloat = 18
     static let subtle = Animation.spring(response: 0.26, dampingFraction: 0.76)
 
+    @MainActor
     static var ambientBackground: some View {
         ZStack {
             EchoPalette.graphite.ignoresSafeArea()
@@ -315,6 +334,7 @@ extension WorkflowCluster {
     }
 }
 
+@MainActor
 struct DottedGridView: View {
     var body: some View {
         Canvas { context, size in

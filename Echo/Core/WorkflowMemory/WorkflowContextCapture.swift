@@ -166,6 +166,30 @@ nonisolated enum WorkflowContextCapture {
       return workspaceItems(event: event, seen: &seen)
     case "com.google.antigravity-ide", "com.google.antigravity":
       return workspaceItems(event: event, seen: &seen)
+    // Apple iWork suite
+    case "com.apple.iWork.Pages",
+         "com.apple.iWork.Numbers",
+         "com.apple.iWork.Keynote",
+         "com.apple.TextEdit":
+      return documentItems(event: event, seen: &seen)
+    // Microsoft Office suite
+    case "com.microsoft.Word",
+         "com.microsoft.Excel",
+         "com.microsoft.Powerpoint",
+         "com.microsoft.onenote.mac",
+         "com.microsoft.Outlook":
+      return documentItems(event: event, seen: &seen)
+    // LibreOffice / OpenOffice
+    case "org.libreoffice.script",
+         "org.openoffice.script":
+      return documentItems(event: event, seen: &seen)
+    // Adobe creative apps that work on local files
+    case "com.adobe.Photoshop",
+         "com.adobe.Illustrator",
+         "com.adobe.InDesign",
+         "com.adobe.Acrobat.Pro",
+         "com.adobe.Reader":
+      return documentItems(event: event, seen: &seen)
     default:
       if BrowserContextService.isBrowser(event.appBundleId) {
         return browserItems(event: event, duration: duration, urlDurations: urlDurations, tabEligibility: threshold, seen: &seen)
@@ -173,6 +197,16 @@ nonisolated enum WorkflowContextCapture {
       if isTerminal(event.appBundleId) {
         return terminalItems(event: event, seen: &seen)
       }
+      
+      // General document fallback: if AX gave us a valid file:// URL, treat as document
+      if let path = getFilePath(from: event) ?? extractFilePath(from: event.windowTitle),
+         FileManager.default.fileExists(atPath: path) {
+          if path.hasSuffix(".xcworkspace") || path.hasSuffix(".xcodeproj") || path.hasSuffix(".code-workspace") {
+              return workspaceItems(event: event, seen: &seen)
+          }
+          return documentItems(event: event, seen: &seen)
+      }
+      
       return pathItems(event: event, seen: &seen)
     }
   }
@@ -214,7 +248,7 @@ nonisolated enum WorkflowContextCapture {
       id: UUID(),
       kind: .document,
       label: (path as NSString).lastPathComponent,
-      bundleId: "com.apple.Preview",
+      bundleId: event.appBundleId,
       url: nil,
       path: path,
       workingDirectory: nil

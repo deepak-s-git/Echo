@@ -12,9 +12,6 @@ struct AppearancePane: View {
                 subtitle: "Theme, display options and visual preferences",
                 color: EchoPalette.indigo
             )
-
-            let purple = EchoPalette.indigo
-
             // MARK: Theme
             SettingsGroup(label: "Theme") {
                 HStack(alignment: .top, spacing: 16) {
@@ -32,25 +29,21 @@ struct AppearancePane: View {
                 .padding(.vertical, 18)
             }
 
-            // MARK: Session UI
-            SettingsGroup(label: "Session View") {
-                SettingsToggleRow(
-                    icon: "circle.dotted",
-                    iconColor: purple,
-                    label: "Show focus score ring",
-                    description: "Circular focus quality indicator on the home dashboard",
-                    isOn: $settings.showFocusScoreRing,
-                    showDivider: true
-                )
-
-                SettingsToggleRow(
-                    icon: "timeline.selection",
-                    iconColor: purple,
-                    label: "Compact timeline",
-                    description: "Denser timeline layout showing more entries",
-                    isOn: $settings.compactTimeline,
-                    showDivider: false
-                )
+            // MARK: Accent Palette
+            SettingsGroup(label: "Accent Palette") {
+                HStack(spacing: 20) {
+                    ForEach(AccentVibe.allCases) { vibe in
+                        AccentVibeCard(
+                            vibe: vibe,
+                            isSelected: settings.accentVibe == vibe
+                        ) {
+                            settings.accentVibe = vibe
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
 
             // MARK: Preview
@@ -162,15 +155,13 @@ private struct AppearancePreviewCard: View {
                     .foregroundStyle(.secondary)
             }
 
-            if settings.showFocusScoreRing {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(EchoPalette.live)
-                    Text("Focus score ring visible on dashboard")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
+            HStack(spacing: 8) {
+                Image(systemName: "paintpalette")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+                Text("Accent palette: **\(settings.accentVibe.label)**")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(14)
@@ -182,5 +173,55 @@ private struct AppearancePreviewCard: View {
             RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
                 .strokeBorder(EchoPalette.indigo.opacity(0.10), lineWidth: 0.5)
         )
+    }
+}
+
+// MARK: - Accent Vibe Card
+
+private struct AccentVibeCard: View {
+    let vibe: AccentVibe
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                // Color swatch
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(nsColor: vibe.primaryColorDark),
+                                    Color(nsColor: vibe.secondaryColorDark)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(
+                                    isSelected
+                                        ? Color.primary
+                                        : Color.clear,
+                                    lineWidth: 2
+                                )
+                        )
+                        .shadow(color: Color(nsColor: vibe.primaryColorDark).opacity(hovering ? 0.4 : 0.2), radius: 4, y: 2)
+                }
+                .scaleEffect(hovering ? 1.15 : 1.0)
+                .animation(.spring(response: 0.25, dampingFraction: 0.6), value: hovering)
+
+                Text(vibe.label)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }

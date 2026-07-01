@@ -277,7 +277,6 @@ final class SessionDetailStore: ObservableObject {
                 appTransitions: memory.appTransitions,
                 browserContexts: memory.browserContexts,
                 interruptions: memory.interruptions,
-                continuityScore: memory.continuityScore,
                 restorePlan: plan
             )
         }

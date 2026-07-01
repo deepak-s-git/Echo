@@ -83,11 +83,16 @@ actor SemanticSearchEngine {
             docParts.append("App: \(event.appName)")
 
             if !title.isEmpty {
-                let cleanTitle = title
-                    .replacingOccurrences(of: " — -zsh — 120×30", with: "")
-                    .replacingOccurrences(of: " — login — 120×30", with: "")
-                    .replacingOccurrences(of: " -zsh", with: "")
-                    .replacingOccurrences(of: " -login", with: "")
+                var cleanTitle = title
+                if let regex = try? NSRegularExpression(pattern: "\\s*[—\\-]\\s*\\d+\\s*[x×]\\s*\\d+\\s*$", options: .caseInsensitive) {
+                    let range = NSRange(cleanTitle.startIndex..<cleanTitle.endIndex, in: cleanTitle)
+                    cleanTitle = regex.stringByReplacingMatches(in: cleanTitle, options: [], range: range, withTemplate: "")
+                }
+                if let regex = try? NSRegularExpression(pattern: "\\s*[—\\-]\\s*(?:-?zsh|-?bash|login|sh)\\b", options: .caseInsensitive) {
+                    let range = NSRange(cleanTitle.startIndex..<cleanTitle.endIndex, in: cleanTitle)
+                    cleanTitle = regex.stringByReplacingMatches(in: cleanTitle, options: [], range: range, withTemplate: "")
+                }
+                cleanTitle = cleanTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 docParts.append("Terminal: \(cleanTitle)")
             }
 

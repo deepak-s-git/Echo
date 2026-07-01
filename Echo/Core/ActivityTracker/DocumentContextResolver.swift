@@ -50,7 +50,7 @@ enum DocumentContextResolver {
            !title.isEmpty {
             let parsed = stripAppSuffix(from: title, appName: appName)
             // Only meaningful if it actually differs and looks like a document name
-            if !parsed.isEmpty, parsed != appName, looksLikeDocument(parsed) {
+            if !parsed.isEmpty, parsed != appName, looksLikeDocument(parsed, appName: appName) {
                 return DocumentContext(name: parsed, fileURL: nil)
             }
         }
@@ -75,11 +75,19 @@ enum DocumentContextResolver {
         return title
     }
 
-    /// Heuristic: a string looks like a document if it has a file extension
-    /// or is not just a generic app label.
-    private static func looksLikeDocument(_ name: String) -> Bool {
+    /// Heuristic: a string looks like a document if it has a file extension,
+    /// or if it comes from a known document-centric app (Word, Excel, Pages, etc.)
+    /// where titles without extensions are still valid document names.
+    private static func looksLikeDocument(_ name: String, appName: String = "") -> Bool {
         let ext = (name as NSString).pathExtension
-        return !ext.isEmpty
+        if !ext.isEmpty { return true }
+        // Extensionless titles from known document-centric apps
+        let docApps = ["word", "excel", "powerpoint", "onenote",
+                       "pages", "numbers", "keynote", "textedit",
+                       "writer", "calc", "impress",  // LibreOffice
+                       "photoshop", "illustrator", "indesign", "acrobat"]
+        let lowerApp = appName.lowercased()
+        return docApps.contains { lowerApp.contains($0) }
     }
 
     private static func copyString(_ element: AXUIElement, _ attr: CFString) -> String? {

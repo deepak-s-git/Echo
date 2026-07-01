@@ -4,6 +4,7 @@ import SwiftUI
 
 // MARK: PaneHeader
 
+@MainActor
 struct SettingsPaneHeader: View {
     let icon: String
     let title: String
@@ -36,6 +37,7 @@ struct SettingsPaneHeader: View {
 
 // MARK: SettingsGroup
 
+@MainActor
 struct SettingsGroup<Content: View>: View {
     let label: String
     @ViewBuilder let content: () -> Content
@@ -65,6 +67,7 @@ struct SettingsGroup<Content: View>: View {
 
 // MARK: SettingsRow
 
+@MainActor
 struct SettingsRow<Content: View>: View {
     let icon: String?
     let iconColor: Color
@@ -75,14 +78,14 @@ struct SettingsRow<Content: View>: View {
 
     init(
         icon: String? = nil,
-        iconColor: Color = EchoPalette.indigoSoft,
+        iconColor: Color? = nil,
         label: String,
         description: String? = nil,
         showDivider: Bool = true,
         @ViewBuilder control: @escaping () -> Content
     ) {
         self.icon = icon
-        self.iconColor = iconColor
+        self.iconColor = iconColor ?? EchoPalette.indigoSoft
         self.label = label
         self.description = description
         self.showDivider = showDivider
@@ -132,6 +135,7 @@ struct SettingsRow<Content: View>: View {
 
 // MARK: SettingsToggleRow
 
+@MainActor
 struct SettingsToggleRow: View {
     let icon: String?
     let iconColor: Color
@@ -142,14 +146,14 @@ struct SettingsToggleRow: View {
 
     init(
         icon: String? = nil,
-        iconColor: Color = EchoPalette.indigoSoft,
+        iconColor: Color? = nil,
         label: String,
         description: String? = nil,
         isOn: Binding<Bool>,
         showDivider: Bool = true
     ) {
         self.icon = icon
-        self.iconColor = iconColor
+        self.iconColor = iconColor ?? EchoPalette.indigoSoft
         self.label = label
         self.description = description
         self._isOn = isOn
@@ -173,6 +177,7 @@ struct SettingsToggleRow: View {
 
 // MARK: SliderRow
 
+@MainActor
 struct SettingsSliderRow: View {
     let icon: String?
     let iconColor: Color
@@ -235,6 +240,7 @@ struct SettingsSliderRow: View {
 
 // MARK: StatusBadge
 
+@MainActor
 struct SettingsStatusBadge: View {
     let isActive: Bool
     let activeLabel: String
@@ -260,6 +266,7 @@ struct SettingsStatusBadge: View {
 
 // MARK: DestructiveButton
 
+@MainActor
 struct SettingsDestructiveButton: View {
     let label: String
     let icon: String

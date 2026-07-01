@@ -739,13 +739,20 @@ private struct WorkflowThreadCard: View {
                     .padding(.bottom, 6)
 
                     let chronologicalSegments = summary.segments.sorted(by: { $0.startedAt < $1.startedAt })
+                    let hasActive = chronologicalSegments.contains(where: { $0.isActive })
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(chronologicalSegments.enumerated()), id: \.element.id) { index, segment in
+                            let isLastItem = index == chronologicalSegments.count - 1
+                            let isLatest = isLastItem && !segment.isActive
+                            
                             HStack(spacing: 0) {
                                 TimelineNodeView(
                                     isFirst: index == 0,
-                                    isLast: index == chronologicalSegments.count - 1,
+                                    isLast: isLastItem,
                                     isActive: segment.isActive,
+                                    isLatest: isLatest,
+                                    isPathActive: hasActive,
+                                    isPathLatest: !hasActive,
                                     isHovered: hoveredSessionId == segment.id
                                 )
                                 .padding(.leading, EchoDesign.cardPadding)
@@ -755,6 +762,7 @@ private struct WorkflowThreadCard: View {
                                     segment: segment,
                                     showCheckbox: isSessionSelectMode && sessionSelectThreadId == summary.id,
                                     isSelected: selectedSessionIds.contains(segment.id),
+                                    isLatest: isLastItem, // Highlight the latest chronological session text
                                     isHoveredFromParent: hoveredSessionId == segment.id,
                                     onHoverChange: { isHovering in
                                         if isHovering {
@@ -839,6 +847,7 @@ private struct SessionHistoryRow: View {
     let segment: Session
     let showCheckbox: Bool
     let isSelected: Bool
+    var isLatest: Bool = false
     let isHoveredFromParent: Bool
     let onHoverChange: (Bool) -> Void
     let onTap: () -> Void
@@ -873,7 +882,7 @@ private struct SessionHistoryRow: View {
                     HStack(spacing: 6) {
                         Text(displayName)
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(segment.isActive ? EchoPalette.live : (isHoveredFromParent ? EchoPalette.accent : .primary))
+                            .foregroundStyle(segment.isActive ? EchoPalette.live : (isLatest ? EchoPalette.accent : (isHoveredFromParent ? EchoPalette.accent : .primary)))
                         
                         if segment.isActive {
                             Text("LIVE")
@@ -1037,7 +1046,12 @@ fileprivate struct TimelineNodeView: View {
     let isFirst: Bool
     let isLast: Bool
     let isActive: Bool
+    let isLatest: Bool
+    let isPathActive: Bool
+    let isPathLatest: Bool
     var isHovered: Bool = false
+    
+    @State private var animatePulse = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -1045,28 +1059,70 @@ fileprivate struct TimelineNodeView: View {
                 Spacer()
             } else {
                 Rectangle()
-                    .fill(isHovered ? EchoPalette.accent.opacity(0.3) : Color.primary.opacity(0.12))
-                    .frame(width: 1.5)
+                    .fill(isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.40) : Color.primary.opacity(0.10)))
+                    .frame(width: 2)
             }
             
-            Circle()
-                .fill(isActive ? EchoPalette.live : (isHovered ? EchoPalette.accent : Color.primary.opacity(0.25)))
-                .frame(width: 6, height: 6)
-                .padding(.vertical, 4)
-                .overlay(
+            ZStack {
+                if isActive {
+                    // Active (Live) Concentric Glow Node
                     Circle()
-                        .stroke(isActive ? EchoPalette.live.opacity(0.35) : (isHovered ? EchoPalette.accent.opacity(0.35) : Color.clear), lineWidth: 3)
-                )
+                        .strokeBorder(EchoPalette.live.opacity(0.3), lineWidth: 1.5)
+                        .frame(width: 14, height: 14)
+                    
+                    Circle()
+                        .fill(EchoPalette.live)
+                        .frame(width: 6, height: 6)
+                        .scaleEffect(animatePulse ? 1.2 : 0.8)
+                        .shadow(color: EchoPalette.live.opacity(0.7), radius: animatePulse ? 4.5 : 2.0)
+                } else if isLatest {
+                    // Latest saved session (Amber/Orange) Concentric Glow Node
+                    Circle()
+                        .strokeBorder(EchoPalette.accent.opacity(0.35), lineWidth: 1.5)
+                        .frame(width: 14, height: 14)
+                    
+                    Circle()
+                        .fill(EchoPalette.accent)
+                        .frame(width: 6, height: 6)
+                        .scaleEffect(animatePulse ? 1.25 : 0.85)
+                        .shadow(color: EchoPalette.accent.opacity(0.8), radius: animatePulse ? 5.0 : 2.5)
+                } else if isHovered {
+                    // Hovered Accent Concentric Node
+                    Circle()
+                        .strokeBorder(EchoPalette.accent.opacity(0.35), lineWidth: 1.5)
+                        .frame(width: 14, height: 14)
+                    
+                    Circle()
+                        .fill(EchoPalette.accent)
+                        .frame(width: 6, height: 6)
+                        .shadow(color: EchoPalette.accent.opacity(0.6), radius: 2.5)
+                } else {
+                    // Clean Modern Concentric Default Node
+                    Circle()
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1.2)
+                        .frame(width: 14, height: 14)
+                    
+                    Circle()
+                        .fill(Color.primary.opacity(0.35))
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .padding(.vertical, 3)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.95).repeatForever(autoreverses: true)) {
+                    animatePulse = true
+                }
+            }
             
             if isLast {
                 Spacer()
             } else {
                 Rectangle()
-                    .fill(isHovered ? EchoPalette.accent.opacity(0.3) : Color.primary.opacity(0.12))
-                    .frame(width: 1.5)
+                    .fill(isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.40) : Color.primary.opacity(0.10)))
+                    .frame(width: 2)
             }
         }
-        .frame(width: 16)
+        .frame(width: 20)
     }
 }
 

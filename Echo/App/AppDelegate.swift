@@ -20,7 +20,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let activityStore = ActivityStore()
     let permissionsManager = PermissionsManager()
     let sessionDetailStore = SessionDetailStore()
-    let continuityStore = ContinuityStore()
     let sessionControl = SessionControlStore()
 
     // MARK: - Container
@@ -43,7 +42,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 activityStore: activityStore,
                 permissionsManager: permissionsManager,
                 sessionDetailStore: sessionDetailStore,
-                continuityStore: continuityStore,
                 sessionControl: sessionControl
             )
         } catch {

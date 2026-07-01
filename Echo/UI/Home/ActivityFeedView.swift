@@ -2,10 +2,12 @@ import SwiftUI
 
 struct ActivityFeedView: View, Equatable {
     let events: [ActivityEvent]
+    let accentVibe: AccentVibe
 
     static func == (lhs: ActivityFeedView, rhs: ActivityFeedView) -> Bool {
         lhs.events.count == rhs.events.count
             && lhs.events.last?.id == rhs.events.last?.id
+            && lhs.accentVibe == rhs.accentVibe
     }
 
     private var dedupedEvents: [ActivityEvent] {

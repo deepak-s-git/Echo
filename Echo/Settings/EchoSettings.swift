@@ -103,9 +103,9 @@ final class EchoSettings: ObservableObject {
     init() {
         // General
         #if DEBUG
-        idleTimeoutMinutes = defaults.object(forKey: Keys.idleTimeoutMinutes) as? Double ?? 5.0
+        idleTimeoutMinutes = defaults.object(forKey: Keys.idleTimeoutMinutes) as? Double ?? 30.0
         #else
-        idleTimeoutMinutes = defaults.object(forKey: Keys.idleTimeoutMinutes) as? Double ?? 15.0
+        idleTimeoutMinutes = defaults.object(forKey: Keys.idleTimeoutMinutes) as? Double ?? 30.0
         #endif
         minimumSessionSeconds = defaults.object(forKey: Keys.minimumSessionSeconds) as? Double ?? 30.0
         showInMenuBar = defaults.object(forKey: Keys.showInMenuBar) as? Bool ?? true

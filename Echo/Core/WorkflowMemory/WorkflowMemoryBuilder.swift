@@ -10,11 +10,6 @@ nonisolated enum WorkflowMemoryBuilder {
         let transitions = buildTransitions(from: events)
         let browserContexts = buildBrowserContexts(from: events)
         let interruptions = detectInterruptions(in: events)
-        let continuity = computeContinuityScore(
-            events: events,
-            interruptions: interruptions,
-            session: session
-        )
         let plan = WorkflowRestorePlanBuilder.build(
             session: session,
             events: events,
@@ -29,7 +24,6 @@ nonisolated enum WorkflowMemoryBuilder {
             appTransitions: transitions,
             browserContexts: browserContexts,
             interruptions: interruptions,
-            continuityScore: continuity,
             restorePlan: plan
         )
     }
@@ -133,18 +127,6 @@ nonisolated enum WorkflowMemoryBuilder {
             }
         }
         return gaps
-    }
-
-  private static func computeContinuityScore(
-        events: [ActivityEvent],
-        interruptions: [WorkflowInterruption],
-        session: Session
-    ) -> Double {
-        let focus = session.focusScore
-        let interruptionPenalty = min(Double(interruptions.count) * 0.08, 0.35)
-        let switchCount = events.filter { $0.type == .appSwitch }.count
-        let switchPenalty = min(Double(switchCount) * 0.02, 0.25)
-        return min(max(focus - interruptionPenalty - switchPenalty, 0.15), 1)
     }
 }
 

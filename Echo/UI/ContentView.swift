@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var permissionsManager: PermissionsManager
+    @EnvironmentObject var settings: EchoSettings
 
     var body: some View {
         ZStack {

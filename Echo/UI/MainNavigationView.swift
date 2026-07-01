@@ -48,6 +48,7 @@ struct MainNavigationView: View {
 struct SidebarView: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var activityStore: ActivityStore
+    @ObservedObject private var settings = EchoSettings.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,6 +101,7 @@ struct SidebarItem: View {
     let icon: String
     let label: String
 
+    @ObservedObject private var settings = EchoSettings.shared
     @State private var isHovered = false
 
     private var isSelected: Bool { appStore.selectedTab == tab }

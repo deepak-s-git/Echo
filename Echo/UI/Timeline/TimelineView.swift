@@ -289,7 +289,7 @@ struct TimelineView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 10) {
+                        VStack(spacing: 10) {
                             if activityStore.isRecording && !isSelectMode {
                                 VStack(spacing: 0) {
                                     SessionControlBar(compact: false)
@@ -317,7 +317,7 @@ struct TimelineView: View {
                                         sessionSelectThreadId: sessionSelectThreadId,
                                         selectedSessionIds: selectedSessionIds,
                                         onToggleLogs: {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                                                 if expandedLogsThreadIds.contains(summary.id) {
                                                     expandedLogsThreadIds.remove(summary.id)
                                                 } else {
@@ -790,10 +790,7 @@ private struct WorkflowThreadCard: View {
                 }
                 .padding(.bottom, 10)
                 .compositingGroup()
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .top)).combined(with: .scale(scale: 0.98)),
-                    removal: .opacity.combined(with: .scale(scale: 0.98))
-                ))
+                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
             }
         }
         .background(

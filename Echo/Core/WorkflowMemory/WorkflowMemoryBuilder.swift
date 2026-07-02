@@ -9,7 +9,6 @@ nonisolated enum WorkflowMemoryBuilder {
         let phases = WorkflowPhaseAnalyzer.phases(from: events)
         let transitions = buildTransitions(from: events)
         let browserContexts = buildBrowserContexts(from: events)
-        let interruptions = detectInterruptions(in: events)
         let plan = WorkflowRestorePlanBuilder.build(
             session: session,
             events: events,
@@ -23,7 +22,6 @@ nonisolated enum WorkflowMemoryBuilder {
             phases: phases,
             appTransitions: transitions,
             browserContexts: browserContexts,
-            interruptions: interruptions,
             restorePlan: plan
         )
     }
@@ -36,26 +34,18 @@ nonisolated enum WorkflowMemoryBuilder {
         var previousAppName: String?
 
         for event in events.sorted(by: { $0.timestamp < $1.timestamp })
-            where event.type == .appFocus || event.type == .appSwitch {
-            switch event.type {
-            case .appFocus:
-                if let prev = previousBundleId, prev == event.appBundleId { continue }
-                result.append(AppTransition(
-                    id: event.id,
-                    fromApp: previousAppName,
-                    toApp: event.appName,
-                    toBundleId: event.appBundleId,
-                    timestamp: event.timestamp,
-                    duration: 0
-                ))
-                previousBundleId = event.appBundleId
-                previousAppName = event.appName
-            case .appSwitch:
-                previousBundleId = event.appBundleId
-                previousAppName = event.appName
-            default:
-                break
-            }
+            where event.type == .appFocus {
+            if let prev = previousBundleId, prev == event.appBundleId { continue }
+            result.append(AppTransition(
+                id: event.id,
+                fromApp: previousAppName,
+                toApp: event.appName,
+                toBundleId: event.appBundleId,
+                timestamp: event.timestamp,
+                duration: 0
+            ))
+            previousBundleId = event.appBundleId
+            previousAppName = event.appName
         }
         return collapseTransitions(result)
     }
@@ -109,25 +99,7 @@ nonisolated enum WorkflowMemoryBuilder {
         return host.replacingOccurrences(of: "www.", with: "")
     }
 
-    // MARK: - Interruptions
 
-    private static func detectInterruptions(in events: [ActivityEvent]) -> [WorkflowInterruption] {
-        guard events.count >= 2 else { return [] }
-        var gaps: [WorkflowInterruption] = []
-        let sorted = events.sorted { $0.timestamp < $1.timestamp }
-
-        for i in 1..<sorted.count {
-            let gap = sorted[i].timestamp.timeIntervalSince(sorted[i - 1].timestamp)
-            if gap >= EchoConfig.interruptionThreshold {
-                gaps.append(WorkflowInterruption(
-                    id: UUID(),
-                    startedAt: sorted[i - 1].timestamp,
-                    duration: gap
-                ))
-            }
-        }
-        return gaps
-    }
 }
 
 // MARK: - Phase analyzer

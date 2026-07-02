@@ -1,7 +1,7 @@
 # 🦋 Echo
 
 <p align="center">
-  <img src="Echo/Assets.xcassets/AppIcon.appiconset/AppIcon_128x128.png" width="128" height="128" alt="Echo Icon" />
+  <img src="Echo/Assets.xcassets/AppIcon.appiconset/appicon_128x128.png" width="128" height="128" alt="Echo Icon" />
 </p>
 
 <p align="center">

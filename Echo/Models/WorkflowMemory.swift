@@ -42,7 +42,6 @@ nonisolated struct WorkflowMemory: Sendable {
     let phases: [WorkflowPhase]
     let appTransitions: [AppTransition]
     let browserContexts: [BrowserContextEntry]
-    let interruptions: [WorkflowInterruption]
     let restorePlan: WorkflowRestorePlan
 }
 
@@ -76,11 +75,7 @@ nonisolated struct BrowserContextEntry: Identifiable, Sendable, Equatable {
     let capturedAt: Date
 }
 
-nonisolated struct WorkflowInterruption: Identifiable, Sendable, Equatable {
-    let id: UUID
-    let startedAt: Date
-    let duration: TimeInterval
-}
+
 
 // MARK: - Restore
 

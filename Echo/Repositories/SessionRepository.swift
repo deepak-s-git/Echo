@@ -538,7 +538,6 @@ final class SessionRepository: Sendable {
             phases: memory.phases,
             appTransitions: memory.appTransitions,
             browserContexts: memory.browserContexts,
-            interruptions: memory.interruptions,
             restorePlan: restorePlan
         )
     }

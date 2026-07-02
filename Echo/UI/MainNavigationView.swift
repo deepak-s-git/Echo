@@ -73,7 +73,7 @@ struct SidebarView: View {
 
                 SessionControlBar(compact: true)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 16)
             } else {
                 HStack(spacing: 6) {
                     Circle()
@@ -85,9 +85,18 @@ struct SidebarView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 24)
+                .padding(.bottom, 16)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            Divider()
+                .opacity(0.4)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            SidebarSettingsButton()
+                .padding(.horizontal, 12)
+                .padding(.bottom, 20)
         }
         .background(EchoPalette.sidebar)
     }
@@ -151,6 +160,51 @@ struct SidebarItem: View {
                     .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isSelected)
             }
             .shadow(color: isSelected ? EchoPalette.indigo.opacity(0.08) : .clear, radius: 4, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+// MARK: - Sidebar Settings Button
+
+struct SidebarSettingsButton: View {
+    @State private var isHovered = false
+
+    var body: some View {
+        SettingsLink {
+            HStack(spacing: 10) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 18)
+                    .foregroundStyle(isHovered ? Color.primary : Color.primary.opacity(0.65))
+                    .scaleEffect(isHovered ? 1.06 : 1.0)
+                    .offset(x: isHovered ? 1.5 : 0)
+                
+                Text("Settings")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isHovered ? Color.primary : Color.primary.opacity(0.75))
+                
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.04) : .clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
+                    .strokeBorder(
+                        isHovered ? EchoPalette.stroke.opacity(0.3) : .clear,
+                        lineWidth: 0.5
+                    )
+            )
         }
         .buttonStyle(.plain)
         .onHover { hovering in

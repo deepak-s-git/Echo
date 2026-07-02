@@ -57,7 +57,6 @@ struct SessionDetailView: View {
                         if !memory.browserContexts.isEmpty {
                             browserSection(memory)
                         }
-                        if !memory.interruptions.isEmpty { interruptionsSection(memory) }
                         restoreSection(memory)
                         if let diagnostics = sessionDetailStore.diagnostics, !diagnostics.issues.isEmpty {
                             developerDiagnosticsFooter(diagnostics)
@@ -428,25 +427,7 @@ struct SessionDetailView: View {
         .echoCard(material: .ultraThinMaterial)
     }
 
-    // MARK: - Interruptions
 
-    private func interruptionsSection(_ memory: WorkflowMemory) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Interruptions", icon: "pause.circle")
-            ForEach(memory.interruptions) { gap in
-                HStack {
-                    Text("Pause")
-                        .font(.system(size: 13))
-                    Spacer()
-                    Text(gap.duration.shortLabel)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
-    }
 
     // MARK: - Restore
 

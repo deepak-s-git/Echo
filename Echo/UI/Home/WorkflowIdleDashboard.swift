@@ -38,7 +38,7 @@ struct WorkflowIdleDashboard: View {
                 let bundleIds = appItems.compactMap { $0.bundleId }
                 
                 HeroActionButton(
-                    title: "Continue Previous Workflow",
+                    title: "Continue Previous Session",
                     subtitle: continueSubtitle(for: thread, session: session),
                     icon: "arrow.uturn.backward",
                     bundleIds: bundleIds
@@ -285,8 +285,8 @@ private struct HeroActionButton: View {
                     }
                     
                     Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary.opacity(0.85))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                     
                     if !bundleIds.isEmpty {

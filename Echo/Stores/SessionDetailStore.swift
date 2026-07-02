@@ -276,7 +276,6 @@ final class SessionDetailStore: ObservableObject {
                 phases: memory.phases,
                 appTransitions: memory.appTransitions,
                 browserContexts: memory.browserContexts,
-                interruptions: memory.interruptions,
                 restorePlan: plan
             )
         }

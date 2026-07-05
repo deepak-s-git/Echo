@@ -24,11 +24,11 @@ nonisolated enum WorkflowCluster: String, Codable, CaseIterable, Sendable {
     var icon: String {
         switch self {
         case .coding: return "chevron.left.forwardslash.chevron.right"
-        case .research: return "globe"
-        case .writing: return "doc.text"
-        case .design: return "paintbrush"
-        case .communication: return "bubble.left.and.bubble.right"
-        case .mixed: return "square.grid.2x2"
+        case .research: return "network"
+        case .writing: return "text.quote"
+        case .design: return "square.3.layers.3d"
+        case .communication: return "paperplane.fill"
+        case .mixed: return "square.grid.2x2.fill"
         }
     }
 }

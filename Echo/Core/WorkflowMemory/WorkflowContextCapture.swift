@@ -298,9 +298,10 @@ nonisolated enum WorkflowContextCapture {
     
     // Antigravity and Antigravity IDE share the same application support storage directory
     let supportDirName = "Antigravity IDE"
+    let homeDir = NSHomeDirectory()
     
     // 1. Read from state.vscdb (SQLite)
-    let vscdbPath = "/Users/DEvdev/Library/Application Support/\(supportDirName)/User/globalStorage/state.vscdb"
+    let vscdbPath = "\(homeDir)/Library/Application Support/\(supportDirName)/User/globalStorage/state.vscdb"
     let tempBase = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     if (try? FileManager.default.createDirectory(at: tempBase, withIntermediateDirectories: true)) != nil {
         let tempURL = tempBase.appendingPathComponent("state.vscdb")
@@ -358,7 +359,7 @@ nonisolated enum WorkflowContextCapture {
     }
     
     // 2. Read from storage.json as fallback
-    let storagePath = "/Users/DEvdev/Library/Application Support/\(supportDirName)/User/globalStorage/storage.json"
+    let storagePath = "\(homeDir)/Library/Application Support/\(supportDirName)/User/globalStorage/storage.json"
     
     if FileManager.default.fileExists(atPath: storagePath),
        let data = try? Data(contentsOf: URL(fileURLWithPath: storagePath)),
@@ -393,8 +394,8 @@ nonisolated enum WorkflowContextCapture {
     }
     
     let commonDirs = [
-        "/Users/DEvdev/Desktop",
-        "/Users/DEvdev/Documents"
+        "\(homeDir)/Desktop",
+        "\(homeDir)/Documents"
     ]
     for dir in commonDirs {
         if let subdirs = try? FileManager.default.contentsOfDirectory(atPath: dir) {
@@ -514,6 +515,9 @@ nonisolated enum WorkflowContextCapture {
   // MARK: - Browser
 
   private static func browserItems(event: ActivityEvent, duration: TimeInterval, urlDurations: [String: TimeInterval], tabEligibility: Double, seen: inout Set<String>) -> [RestoreItem] {
+    if let trackTabs = UserDefaults.standard.object(forKey: "echo.settings.trackBrowserTabs") as? Bool, !trackTabs {
+        return []
+    }
     let checkURLString = event.url ?? sanitizedURL(from: event.windowTitle)
     var totalDuration = duration
     if let checkURLString {

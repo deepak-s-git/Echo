@@ -53,7 +53,7 @@ struct HomeView: View {
                         MiniTimelineView(
                             segments: activityStore.timelineSegments,
                             focusIntensity: activityStore.focusIntensity,
-                            isLive: true,
+                            isLive: activityStore.isRecording,
                             accentVibe: settings.accentVibe
                         )
                         .equatable()

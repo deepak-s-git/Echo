@@ -86,7 +86,11 @@ struct MiniTimelineView: View, Equatable {
                     .frame(height: 2)
                     .padding(.horizontal, 4)
                     .overlay(
-                        PulsingTrackOverlay(isLive: isLive)
+                        Group {
+                            if isLive {
+                                PulsingTrackOverlay(isLive: isLive)
+                            }
+                        }
                     )
 
                 // Dynamic Time Ticks
@@ -191,7 +195,11 @@ struct MiniTimelineView: View, Equatable {
                         .fill(gradient)
                         .frame(width: max(0, geo.size.width * focusIntensity))
                         .overlay(
-                            ScanningLightOverlay(isLive: isLive)
+                            Group {
+                                if isLive {
+                                    ScanningLightOverlay(isLive: isLive)
+                                }
+                            }
                         )
                 }
             }

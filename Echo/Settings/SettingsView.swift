@@ -30,7 +30,7 @@ struct SettingsView: View {
         }
     }
 
-    @State private var selectedPane: Pane = .general
+    @AppStorage("SettingsSelectedPane") private var selectedPane: Pane = .general
     @EnvironmentObject var settings: EchoSettings
     @EnvironmentObject var permissionsManager: PermissionsManager
 

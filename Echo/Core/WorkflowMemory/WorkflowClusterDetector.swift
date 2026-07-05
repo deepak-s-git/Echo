@@ -15,11 +15,12 @@ nonisolated enum WorkflowClusterDetector {
         "com.apple.Notes", "com.apple.TextEdit", "com.notion.id", "com.apple.iWork.Pages"
     ]
     private static let design: Set<String> = [
-        "com.figma.Desktop", "com.bohemiancoding.sketch3", "com.adobe.Photoshop"
+        "com.figma.Desktop", "com.bohemiancoding.sketch3", "com.adobe.Photoshop", "com.apple.freeform", "com.framer.mac", "com.framer.electron"
     ]
     private static let communication: Set<String> = [
         "com.apple.mail", "com.microsoft.Outlook", "com.tinyspeck.slackmacgap",
-        "com.hnc.Discord", "com.apple.MobileSMS"
+        "com.hnc.Discord", "com.apple.MobileSMS", "com.apple.FaceTime", "net.whatsapp.WhatsApp",
+        "com.apple.mobilephone", "com.apple.ScreenContinuity"
     ]
 
     static func detect(from events: [ActivityEvent]) -> WorkflowCluster {
@@ -28,10 +29,13 @@ nonisolated enum WorkflowClusterDetector {
 
         for (bundleId, weight) in weights {
             if coding.contains(bundleId) { scores[.coding, default: 0] += weight }
-            if research.contains(bundleId) { scores[.research, default: 0] += weight }
-            if writing.contains(bundleId) { scores[.writing, default: 0] += weight }
-            if design.contains(bundleId) { scores[.design, default: 0] += weight }
-            if communication.contains(bundleId) { scores[.communication, default: 0] += weight }
+            else if research.contains(bundleId) { scores[.research, default: 0] += weight }
+            else if writing.contains(bundleId) { scores[.writing, default: 0] += weight }
+            else if design.contains(bundleId) { scores[.design, default: 0] += weight }
+            else if communication.contains(bundleId) { scores[.communication, default: 0] += weight }
+            else if let fallback = fallbackCluster(for: bundleId) {
+                scores[fallback, default: 0] += weight
+            }
         }
 
         guard let top = scores.max(by: { $0.value < $1.value }), top.value > 0 else {
@@ -58,5 +62,25 @@ nonisolated enum WorkflowClusterDetector {
             }
         }
         return weights
+    }
+    
+    private static func fallbackCluster(for bundleId: String) -> WorkflowCluster? {
+        let lower = bundleId.lowercased()
+        if lower.contains("code") || lower.contains("studio") || lower.contains("terminal") || lower.contains("ide") || lower.contains("developer") {
+            return .coding
+        }
+        if lower.contains("browser") || lower.contains("chrome") || lower.contains("safari") || lower.contains("firefox") || lower.contains("edge") || lower.contains("arc") || lower.contains("search") || lower.contains("web") || lower.contains("brave") {
+            return .research
+        }
+        if lower.contains("mail") || lower.contains("chat") || lower.contains("msg") || lower.contains("message") || lower.contains("slack") || lower.contains("discord") || lower.contains("teams") || lower.contains("zoom") || lower.contains("meet") || lower.contains("social") || lower.contains("skype") || lower.contains("whatsapp") || lower.contains("telegram") || lower.contains("signal") || lower.contains("phone") || lower.contains("call") || lower.contains("communication") {
+            return .communication
+        }
+        if lower.contains("design") || lower.contains("figma") || lower.contains("framer") || lower.contains("sketch") || lower.contains("photo") || lower.contains("draw") || lower.contains("paint") || lower.contains("cad") || lower.contains("illustrator") || lower.contains("creative") || lower.contains("video") || lower.contains("film") || lower.contains("media") {
+            return .design
+        }
+        if lower.contains("write") || lower.contains("note") || lower.contains("word") || lower.contains("page") || lower.contains("doc") || lower.contains("text") || lower.contains("office") || lower.contains("pdf") || lower.contains("editor") || lower.contains("journal") || lower.contains("blog") || lower.contains("draft") {
+            return .writing
+        }
+        return nil
     }
 }

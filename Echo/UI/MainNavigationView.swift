@@ -75,18 +75,19 @@ struct SidebarView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
             } else {
-                HStack(spacing: 6) {
+                HStack(spacing: 10) {
                     Circle()
-                        .fill(Color.green)
+                        .fill(EchoPalette.live)
                         .frame(width: 6, height: 6)
-                        .shadow(color: Color.green.opacity(0.5), radius: 2)
+                        .shadow(color: EchoPalette.live.opacity(0.5), radius: 2)
+                        .frame(width: 18)
                     Text("Ready")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
+                    Spacer()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
                 .padding(.bottom, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Divider()

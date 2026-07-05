@@ -36,7 +36,9 @@ final class PermissionsManager: ObservableObject {
                 accessibilityGranted = isTrusted
             }
         }
-        hasChecked = true
+        if !hasChecked {
+            hasChecked = true
+        }
     }
 
     func requestAccessibility() {
@@ -54,7 +56,8 @@ final class PermissionsManager: ObservableObject {
     private func startMonitoring() {
         monitorTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(0.5))
+                let delay = self?.accessibilityGranted == true ? 3.0 : 0.5
+                try? await Task.sleep(for: .seconds(delay))
                 self?.checkAll()
             }
         }

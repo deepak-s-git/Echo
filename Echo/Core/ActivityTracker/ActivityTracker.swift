@@ -338,7 +338,8 @@ actor ActivityTracker {
             guard !Task.isCancelled else { return }
             guard await self?.currentBundleId == bundleId else { return }
 
-            if BrowserContextService.isBrowser(bundleId) {
+            let trackTabs = UserDefaults.standard.object(forKey: EchoSettingsKeys.trackBrowserTabs) as? Bool ?? true
+            if BrowserContextService.isBrowser(bundleId) && trackTabs {
                 // AppleScript: synchronous but fast (~5–20 ms). Run on main actor per existing API.
                 var tab: BrowserTab? = nil
                 var expectedTitle: String? = nil
@@ -349,10 +350,11 @@ actor ActivityTracker {
                     guard !Task.isCancelled else { return }
                     guard await self?.currentBundleId == bundleId else { return }
                     
-                    expectedTitle = await self?.lastVerifiedSnapshot?.windowTitle
+                    let currentExpectedTitle = await self?.lastVerifiedSnapshot?.windowTitle
+                    expectedTitle = currentExpectedTitle
                     tab = await MainActor.run {
-                        BrowserContextService.captureActiveTab(for: bundleId, windowTitle: expectedTitle)
-                    }
+                        BrowserContextService.captureActiveTab(for: bundleId, windowTitle: currentExpectedTitle)
+                    } 
                     if tab != nil { break }
                 }
                 guard let tab else { return }
@@ -450,6 +452,26 @@ actor ActivityTracker {
 
     private func emit(_ event: RawActivityEvent) {
         var cleanEvent = event
+        
+        let trackTabs = UserDefaults.standard.object(forKey: EchoSettingsKeys.trackBrowserTabs) as? Bool ?? true
+        let recordTitles = UserDefaults.standard.object(forKey: EchoSettingsKeys.recordWindowTitles) as? Bool ?? true
+        
+        let isBrowser = BrowserContextService.isBrowser(event.appBundleId)
+        let shouldStrip = isBrowser ? !trackTabs : !recordTitles
+        
+        if shouldStrip {
+            cleanEvent = RawActivityEvent(
+                id: event.id,
+                timestamp: event.timestamp,
+                type: event.type,
+                appBundleId: event.appBundleId,
+                appName: event.appName,
+                windowTitle: nil,
+                url: nil,
+                profileName: nil,
+                duration: event.duration
+            )
+        }
         let isTerminal = event.appBundleId.localizedCaseInsensitiveContains("terminal")
             || event.appBundleId == "com.googlecode.iterm2"
             || event.appBundleId == "dev.warp.Warp-Stable"

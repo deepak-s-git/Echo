@@ -22,14 +22,20 @@ struct EchoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(appDelegate.appStore)
+            ZStack {
+                ContentView()
+                    .id(echoSettings.accentVibe.rawValue + echoSettings.appTheme.rawValue)
+                    .transition(.opacity)
+            }
+            .animation(.easeInOut(duration: 0.35), value: echoSettings.accentVibe.rawValue + echoSettings.appTheme.rawValue)
+            .environmentObject(appDelegate.appStore)
                 .environmentObject(appDelegate.sessionStore)
                 .environmentObject(appDelegate.activityStore)
                 .environmentObject(appDelegate.permissionsManager)
                 .environmentObject(appDelegate.sessionDetailStore)
                 .environmentObject(appDelegate.sessionControl)
                 .environmentObject(echoSettings)
+                .tint(EchoPalette.accent)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
@@ -39,10 +45,16 @@ struct EchoApp: App {
 
         // Settings window — opens with ⌘,
         Settings {
-            SettingsView()
-                .environmentObject(echoSettings)
+            ZStack {
+                SettingsView()
+                    .id(echoSettings.accentVibe.rawValue + echoSettings.appTheme.rawValue)
+                    .transition(.opacity)
+            }
+            .animation(.easeInOut(duration: 0.35), value: echoSettings.accentVibe.rawValue + echoSettings.appTheme.rawValue)
+            .environmentObject(echoSettings)
                 .environmentObject(appDelegate.permissionsManager)
                 .environmentObject(appDelegate.appStore)
+                .tint(EchoPalette.accent)
         }
 
         MenuBarExtra(isInserted: showInMenuBarBinding) {
@@ -52,6 +64,7 @@ struct EchoApp: App {
                 .environmentObject(appDelegate.activityStore)
                 .environmentObject(appDelegate.sessionControl)
                 .environmentObject(echoSettings)
+                .tint(EchoPalette.accent)
         } label: {
             MenuBarLabel()
         }

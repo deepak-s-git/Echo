@@ -529,11 +529,11 @@ nonisolated enum EchoConfig {
     /// Debounces timeline segment recomputation only (not live context).
     static let timelineRebuildInterval: TimeInterval = 0.12
     /// Hybrid focus verification poll (catches Spaces swipes, Mission Control, etc.).
-    static let trackerVerifyInterval: TimeInterval = 0.2
+    static let trackerVerifyInterval: TimeInterval = 0.5
     /// Ignores duplicate transitions to the same app within this window.
     static let trackerMinTransitionInterval: TimeInterval = 0.08
     /// How often to AX-check window title for same-app space/window changes.
-    static let trackerWindowRecheckInterval: TimeInterval = 0.5
+    static let trackerWindowRecheckInterval: TimeInterval = 2.5
     static let maxTimelineSegments: Int = 24
     static let maxFeedDisplayEvents: Int = 20
     static let titleUpdateEventThreshold: Int = 8

@@ -1,6 +1,27 @@
 import SwiftUI
 import Combine
 
+// MARK: - Keys
+
+enum EchoSettingsKeys {
+    static let idleTimeoutMinutes = "echo.settings.idleTimeoutMinutes"
+    static let minimumSessionSeconds = "echo.settings.minimumSessionSeconds"
+    static let showInMenuBar = "echo.settings.showInMenuBar"
+    static let launchAtLogin = "echo.settings.launchAtLogin"
+    static let ignoredBundleIds = "echo.settings.ignoredBundleIds"
+    static let trackBrowserTabs = "echo.settings.trackBrowserTabs"
+    static let recordWindowTitles = "echo.settings.recordWindowTitles"
+    static let browserCaptureDelaySeconds = "echo.settings.browserCaptureDelaySeconds"
+    static let tabEligibilitySeconds = "echo.settings.tabEligibilitySeconds"
+    static let appFocusEligibilitySeconds = "echo.settings.appFocusEligibilitySeconds"
+    static let dataRetentionDays = "echo.settings.dataRetentionDays"
+    static let appTheme = "echo.settings.appTheme"
+    static let accentVibe = "echo.settings.accentVibe"
+    static let notifyOnSessionSaved = "echo.settings.notifyOnSessionSaved"
+    static let notifyOnIdleWarning = "echo.settings.notifyOnIdleWarning"
+    static let notifyDailySummary = "echo.settings.notifyDailySummary"
+}
+
 // MARK: - EchoSettings
 
 @MainActor
@@ -9,6 +30,8 @@ final class EchoSettings: ObservableObject {
     static let shared = EchoSettings()
 
     private let defaults = UserDefaults.standard
+
+    typealias Keys = EchoSettingsKeys
 
     // MARK: - General
 
@@ -195,27 +218,6 @@ final class EchoSettings: ObservableObject {
         "com.apple.systempreferences",
         "com.apple.screensaver.engine"
     ]
-
-    // MARK: - Keys
-
-    private enum Keys {
-        static let idleTimeoutMinutes = "echo.settings.idleTimeoutMinutes"
-        static let minimumSessionSeconds = "echo.settings.minimumSessionSeconds"
-        static let showInMenuBar = "echo.settings.showInMenuBar"
-        static let launchAtLogin = "echo.settings.launchAtLogin"
-        static let ignoredBundleIds = "echo.settings.ignoredBundleIds"
-        static let trackBrowserTabs = "echo.settings.trackBrowserTabs"
-        static let recordWindowTitles = "echo.settings.recordWindowTitles"
-        static let browserCaptureDelaySeconds = "echo.settings.browserCaptureDelaySeconds"
-        static let tabEligibilitySeconds = "echo.settings.tabEligibilitySeconds"
-        static let appFocusEligibilitySeconds = "echo.settings.appFocusEligibilitySeconds"
-        static let dataRetentionDays = "echo.settings.dataRetentionDays"
-        static let appTheme = "echo.settings.appTheme"
-        static let accentVibe = "echo.settings.accentVibe"
-        static let notifyOnSessionSaved = "echo.settings.notifyOnSessionSaved"
-        static let notifyOnIdleWarning = "echo.settings.notifyOnIdleWarning"
-        static let notifyDailySummary = "echo.settings.notifyDailySummary"
-    }
 }
 
 // MARK: - AppTheme

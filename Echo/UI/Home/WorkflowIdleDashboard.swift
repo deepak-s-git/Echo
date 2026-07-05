@@ -1012,8 +1012,9 @@ struct RecentSessionRow: View {
                         .shadow(color: colors[0].opacity(0.25), radius: 3, y: 1.5)
                     
                     Image(systemName: session.cluster.icon)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
                 }
                 .frame(width: 24, height: 24)
                 

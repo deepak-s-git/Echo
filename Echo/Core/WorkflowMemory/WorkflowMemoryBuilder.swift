@@ -3,7 +3,7 @@ import AppKit
 
 nonisolated enum WorkflowMemoryBuilder {
 
-    static func build(session: Session, events: [ActivityEvent]) -> WorkflowMemory {
+    static func build(session: Session, events: [ActivityEvent], includeBackgroundIDEs: Bool = false) -> WorkflowMemory {
         let cluster = WorkflowCluster(rawValue: session.workflowCluster ?? "")
             ?? WorkflowClusterDetector.detect(from: events)
         let phases = WorkflowPhaseAnalyzer.phases(from: events)
@@ -12,7 +12,8 @@ nonisolated enum WorkflowMemoryBuilder {
         let plan = WorkflowRestorePlanBuilder.build(
             session: session,
             events: events,
-            browserContexts: browserContexts
+            browserContexts: browserContexts,
+            includeBackgroundIDEs: includeBackgroundIDEs
         )
 
         return WorkflowMemory(
@@ -72,6 +73,9 @@ nonisolated enum WorkflowMemoryBuilder {
     }
 
     private static func buildBrowserContexts(from events: [ActivityEvent]) -> [BrowserContextEntry] {
+        if let trackTabs = UserDefaults.standard.object(forKey: EchoSettingsKeys.trackBrowserTabs) as? Bool, !trackTabs {
+            return []
+        }
         var seen = Set<String>()
         return events.compactMap { event -> BrowserContextEntry? in
             guard event.type == .browserTab || (event.url != nil && BrowserContextService.isBrowser(event.appBundleId)) else { return nil }
@@ -179,7 +183,8 @@ nonisolated enum WorkflowRestorePlanBuilder {
     static func build(
         session: Session,
         events: [ActivityEvent],
-        browserContexts: [BrowserContextEntry]
+        browserContexts: [BrowserContextEntry],
+        includeBackgroundIDEs: Bool = false
     ) -> WorkflowRestorePlan {
         let threshold = {
             let delay = UserDefaults.standard.double(forKey: "echo.settings.browserCaptureDelaySeconds")
@@ -204,14 +209,16 @@ nonisolated enum WorkflowRestorePlanBuilder {
             items.append(item)
         }
 
-        // Query currently open workspaces/folders for running IDEs to ensure we don't miss open background windows
-        let ides = [
+        if includeBackgroundIDEs {
+            let recordTitles = UserDefaults.standard.object(forKey: EchoSettingsKeys.recordWindowTitles) as? Bool ?? true
+            // Query currently open workspaces/folders for running IDEs to ensure we don't miss open background windows
+            let ides = recordTitles ? [
             "com.apple.dt.Xcode",
             "com.microsoft.VSCode",
             "com.todesktop.230313mzl4w4u92",
             "com.google.antigravity-ide",
             "com.google.antigravity"
-        ]
+        ] : []
         
         for bundleId in ides {
             let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
@@ -249,6 +256,7 @@ nonisolated enum WorkflowRestorePlanBuilder {
                     ))
                 }
             }
+        }
         }
 
         let rankedBundles = bundleDurations(from: events)

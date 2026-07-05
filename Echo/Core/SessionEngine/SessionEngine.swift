@@ -794,7 +794,7 @@ actor SessionEngine {
         session.workflowCluster = cluster.rawValue
         session.projectTag = cluster.label
 
-        let memory = WorkflowMemoryBuilder.build(session: session, events: events)
+        let memory = WorkflowMemoryBuilder.build(session: session, events: events, includeBackgroundIDEs: true)
         session.tabCount = memory.browserContexts.count
 
         let tabEligibility = await MainActor.run {

@@ -116,7 +116,6 @@ enum EchoDesign {
     static var ambientBackground: some View {
         ZStack {
             EchoPalette.graphite.ignoresSafeArea()
-            DottedGridView()
         }
     }
 
@@ -138,23 +137,15 @@ struct EchoCard: ViewModifier {
     var material: Material? = nil
     
     func body(content: Content) -> some View {
-        if let material = material {
-            content
-                .background(material, in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                        .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-        } else {
-            content
-                .background(EchoPalette.graphiteElevated, in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                        .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-        }
+        // We use a highly performant solid/translucent color instead of `material`
+        // because dozens of NSVisualEffectViews (ultraThinMaterial) cause severe WindowServer drag lag.
+        content
+            .background(EchoPalette.graphiteElevated.opacity(0.95), in: RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
     }
 }
 
@@ -331,29 +322,6 @@ extension WorkflowCluster {
         case .mixed:
             return [Color(red: 0.45, green: 0.50, blue: 0.60), Color(red: 0.30, green: 0.35, blue: 0.45)]
         }
-    }
-}
-
-@MainActor
-struct DottedGridView: View {
-    var body: some View {
-        Canvas { context, size in
-            let dotSize: CGFloat = 1.2
-            let spacing: CGFloat = 18.0
-            let color = EchoPalette.indigoSoft.opacity(0.04)
-            
-            var x: CGFloat = 0
-            while x < size.width {
-                var y: CGFloat = 0
-                while y < size.height {
-                    let rect = CGRect(x: x, y: y, width: dotSize, height: dotSize)
-                    context.fill(Path(ellipseIn: rect), with: .color(color))
-                    y += spacing
-                }
-                x += spacing
-            }
-        }
-        .allowsHitTesting(false)
     }
 }
 

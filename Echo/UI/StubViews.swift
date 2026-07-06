@@ -91,8 +91,8 @@ struct SearchView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background {
-                    RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .fill(Color.black.opacity(0.3))
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: EchoDesign.pillRadius, style: .continuous)
@@ -257,7 +257,7 @@ struct CategoryPill: View {
                         .fill(color.opacity(0.18))
                 } else {
                     Capsule()
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.black.opacity(0.3))
                 }
             }
             .overlay {
@@ -413,7 +413,7 @@ private struct SearchResultCard: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
-            .echoCard(material: .ultraThinMaterial)
+            .echoCard()
             .scaleEffect(hovering ? 1.008 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
             .echoHoverHighlight()
@@ -626,7 +626,7 @@ struct PermissionsView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(Color.white.opacity(0.015))
-                        .background(.ultraThinMaterial)
+                        .background(Color.black.opacity(0.3))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -658,7 +658,6 @@ struct MenuBarView: View {
     @EnvironmentObject var sessionControl: SessionControlStore
 
     @State private var newWorkflowName: String = ""
-    @State private var isPulseAnimating = false
     @State private var restoringSessionId: UUID? = nil
 
     var body: some View {
@@ -679,16 +678,7 @@ struct MenuBarView: View {
                 // Live Status Indicator — fixed width so status text change doesn't resize the header
                 HStack(spacing: 5) {
                     if activityStore.isSessionActive && !activityStore.isSessionPaused {
-                        Circle()
-                            .fill(EchoPalette.live)
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(isPulseAnimating ? 1.3 : 0.85)
-                            .opacity(isPulseAnimating ? 0.6 : 1.0)
-                            .onAppear {
-                                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                                    isPulseAnimating = true
-                                }
-                            }
+                        EchoLiveDot(isActive: true)
                         Text("RECORDING")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(EchoPalette.live)
@@ -711,7 +701,7 @@ struct MenuBarView: View {
                 .frame(width: 82, alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
@@ -998,7 +988,7 @@ struct MenuBarView: View {
         .background {
             ZStack {
                 EchoPalette.graphite
-                DottedGridView()
+
             }
         }
     }

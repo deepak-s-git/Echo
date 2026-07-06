@@ -113,16 +113,16 @@ nonisolated enum SessionFinalizationRunner {
         }
     }
 
-    @MainActor
-    private static func captureBrowserTabs(events: [ActivityEvent]) -> [BrowserTab] {
-        guard EchoSettings.shared.trackBrowserTabs else { return [] }
-        var tabs = BrowserTabScraper.fetchAllBrowserTabsForRestore()
+    private static func captureBrowserTabs(events: [ActivityEvent]) async -> [BrowserTab] {
+        let trackTabs = await MainActor.run { EchoSettings.shared.trackBrowserTabs }
+        guard trackTabs else { return [] }
+        var tabs = await BrowserTabScraper.fetchAllBrowserTabsForRestore()
         if tabs.isEmpty {
             let bundles = Set(
                 events.filter { BrowserContextService.isBrowser($0.appBundleId) }.map(\.appBundleId)
             )
             for bundleId in bundles {
-                tabs.append(contentsOf: BrowserTabScraper.tabsForRestore(bundleId: bundleId))
+                tabs.append(contentsOf: await BrowserTabScraper.tabsForRestore(bundleId: bundleId))
             }
         }
         var seen = Set<String>()

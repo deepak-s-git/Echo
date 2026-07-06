@@ -73,7 +73,7 @@ nonisolated enum WorkflowMemoryBuilder {
     }
 
     private static func buildBrowserContexts(from events: [ActivityEvent]) -> [BrowserContextEntry] {
-        if let trackTabs = UserDefaults.standard.object(forKey: EchoSettingsKeys.trackBrowserTabs) as? Bool, !trackTabs {
+        if let trackTabs = UserDefaults.standard.object(forKey: "echo.settings.trackBrowserTabs") as? Bool, !trackTabs {
             return []
         }
         var seen = Set<String>()
@@ -210,7 +210,7 @@ nonisolated enum WorkflowRestorePlanBuilder {
         }
 
         if includeBackgroundIDEs {
-            let recordTitles = UserDefaults.standard.object(forKey: EchoSettingsKeys.recordWindowTitles) as? Bool ?? true
+            let recordTitles = UserDefaults.standard.object(forKey: "echo.settings.recordWindowTitles") as? Bool ?? true
             // Query currently open workspaces/folders for running IDEs to ensure we don't miss open background windows
             let ides = recordTitles ? [
             "com.apple.dt.Xcode",

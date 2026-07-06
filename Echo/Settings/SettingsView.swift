@@ -106,7 +106,7 @@ private struct SettingsSidebar: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(EchoPalette.sidebar.opacity(0.55))
-        .background(.ultraThinMaterial)
+        .background(Color.black.opacity(0.3))
     }
 }
 

@@ -35,7 +35,7 @@ final class WorkflowRestoreEngine {
                 failed.append((item, "No restorer available"))
                 continue
             }
-            if restorer.skipReasonIfAlreadyOpen(item) != nil {
+            if await restorer.skipReasonIfAlreadyOpen(item) != nil {
                 skipped.append(item)
                 continue
             }
@@ -61,12 +61,12 @@ final class WorkflowRestoreEngine {
 
 protocol WorkflowRestoring {
     func canRestore(_ item: RestoreItem) -> Bool
-    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String?
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) async -> String?
     func restore(_ item: RestoreItem) async throws
 }
 
 extension WorkflowRestoring {
-    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? { nil }
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) async -> String? { nil }
 }
 
 // MARK: - Browser page
@@ -76,7 +76,7 @@ struct BrowserPageRestorer: WorkflowRestoring {
         (item.kind == .browserPage || item.kind == .url) && item.url != nil
     }
 
-    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? {
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) async -> String? {
         guard let url = item.url, let bundleId = item.bundleId,
               BrowserContextService.isBrowser(bundleId)
         else { return nil }
@@ -254,7 +254,7 @@ struct ApplicationRestorer: WorkflowRestoring {
         item.kind == .application && item.bundleId != nil
     }
 
-    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? {
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) async -> String? {
         guard let bundleId = item.bundleId else { return nil }
         let running = NSWorkspace.shared.runningApplications.first {
             $0.bundleIdentifier == bundleId && !$0.isTerminated
@@ -303,7 +303,7 @@ struct FolderRestorer: WorkflowRestoring {
         item.kind == .folder && item.path != nil
     }
 
-    func skipReasonIfAlreadyOpen(_ item: RestoreItem) -> String? {
+    func skipReasonIfAlreadyOpen(_ item: RestoreItem) async -> String? {
         guard let path = item.path else { return nil }
         guard let finder = NSWorkspace.shared.runningApplications.first(where: {
             $0.bundleIdentifier == "com.apple.finder"

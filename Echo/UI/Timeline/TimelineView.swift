@@ -511,7 +511,7 @@ struct TimelineView: View {
             .padding(.horizontal, 16)
             .background(
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.black.opacity(0.3))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
@@ -795,7 +795,7 @@ private struct WorkflowThreadCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.black.opacity(0.3))
         )
         .overlay(
             RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
@@ -1045,7 +1045,6 @@ fileprivate struct TimelineNodeView: View {
     var isHovered: Bool = false
     
     @ObservedObject private var settings = EchoSettings.shared
-    @State private var animatePulse = false
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -1083,17 +1082,10 @@ fileprivate struct TimelineNodeView: View {
                     Circle()
                         .fill(EchoPalette.live)
                         .frame(width: 6, height: 6)
-                        .scaleEffect(animatePulse ? 1.2 : 0.8)
-                        .shadow(color: EchoPalette.live.opacity(0.7), radius: animatePulse ? 4.5 : 2.0)
+                        .shadow(color: EchoPalette.live.opacity(0.7), radius: 2.0)
                 } else if isLatest {
                     // Latest saved session (dynamic Accent Vibe) Concentric Glow Node
                     ZStack {
-                        // Outer pulsating radar wave
-                        Circle()
-                            .stroke(EchoPalette.accent.opacity(animatePulse ? 0 : (isHovered ? 0.8 : 0.6)), lineWidth: isHovered ? 2.0 : 1.5)
-                            .frame(width: 14, height: 14)
-                            .scaleEffect(animatePulse ? (isHovered ? 1.9 : 1.7) : 1.0)
-                        
                         Circle()
                             .strokeBorder(EchoPalette.accent.opacity(isHovered ? 0.55 : 0.35), lineWidth: 1.5)
                             .frame(width: 14, height: 14)
@@ -1101,7 +1093,7 @@ fileprivate struct TimelineNodeView: View {
                         Circle()
                             .fill(EchoPalette.accent)
                             .frame(width: 6, height: 6)
-                            .shadow(color: EchoPalette.accent.opacity(isHovered ? 0.95 : 0.8), radius: animatePulse ? (isHovered ? 6.0 : 4.0) : (isHovered ? 3.0 : 1.5))
+                            .shadow(color: EchoPalette.accent.opacity(isHovered ? 0.95 : 0.8), radius: isHovered ? 3.0 : 1.5)
                     }
                 } else if isHovered {
                     // Hovered Accent Concentric Node
@@ -1127,11 +1119,6 @@ fileprivate struct TimelineNodeView: View {
             .padding(.top, 18)
         }
         .frame(width: 20)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                animatePulse = true
-            }
-        }
     }
 }
 

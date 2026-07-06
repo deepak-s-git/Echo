@@ -761,9 +761,7 @@ actor SessionEngine {
         guard trackTabs else { return }
 
         // Capture only the active tab for privacy and focus accuracy
-        let tab = await MainActor.run {
-            BrowserContextService.captureActiveTab(for: bundleId, windowTitle: nil)
-        }
+        let tab = await BrowserContextService.captureActiveTab(for: bundleId, windowTitle: nil)
         guard let tab else { return }
 
         let urlKey = tab.url.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -936,16 +934,16 @@ actor SessionEngine {
     }
 
     private func captureBrowserTabsForSnapshot(events: [ActivityEvent]) async -> [BrowserTab] {
-        await MainActor.run {
-            guard EchoSettings.shared.trackBrowserTabs else { return [] }
-            var tabs = BrowserTabScraper.fetchAllBrowserTabsForRestore()
-            if tabs.isEmpty {
+        let trackTabs = await MainActor.run { EchoSettings.shared.trackBrowserTabs }
+        guard trackTabs else { return [] }
+        var tabs = await BrowserTabScraper.fetchAllBrowserTabsForRestore()
+        if tabs.isEmpty {
                 let browserBundles = Set(
                     events.filter { BrowserContextService.isBrowser($0.appBundleId) }
                         .map(\.appBundleId)
                 )
                 for bundleId in browserBundles {
-                    tabs.append(contentsOf: BrowserTabScraper.tabsForRestore(bundleId: bundleId))
+                    tabs.append(contentsOf: await BrowserTabScraper.tabsForRestore(bundleId: bundleId))
                 }
             }
             var seen = Set<String>()
@@ -953,7 +951,6 @@ actor SessionEngine {
                 let key = tab.url.lowercased()
                 return seen.insert(key).inserted
             }
-        }
     }
 
     private static func encodeTags(_ tags: [String]) -> String? {

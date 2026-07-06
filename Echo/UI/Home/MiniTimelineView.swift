@@ -85,13 +85,6 @@ struct MiniTimelineView: View, Equatable {
                     .fill(Color.primary.opacity(0.08))
                     .frame(height: 2)
                     .padding(.horizontal, 4)
-                    .overlay(
-                        Group {
-                            if isLive {
-                                PulsingTrackOverlay(isLive: isLive)
-                            }
-                        }
-                    )
 
                 // Dynamic Time Ticks
                 let totalMins = totalMinutes()
@@ -194,13 +187,6 @@ struct MiniTimelineView: View, Equatable {
                     Capsule()
                         .fill(gradient)
                         .frame(width: max(0, geo.size.width * focusIntensity))
-                        .overlay(
-                            Group {
-                                if isLive {
-                                    ScanningLightOverlay(isLive: isLive)
-                                }
-                            }
-                        )
                 }
             }
             .frame(height: 4.5)
@@ -390,61 +376,5 @@ private struct TimelineBeadVisualView: View {
             },
             alignment: .top
         )
-    }
-}
-
-private struct PulsingTrackOverlay: View {
-    let isLive: Bool
-    @State private var pulsePhase: Double = 0.0
-
-    var body: some View {
-        GeometryReader { trackGeo in
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, EchoPalette.accent.opacity(0.35), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(width: 45)
-                .offset(x: -45 + (trackGeo.size.width + 90) * pulsePhase)
-                .onAppear {
-                    if isLive {
-                        withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
-                            pulsePhase = 1.0
-                        }
-                    }
-                }
-        }
-        .clipped()
-    }
-}
-
-private struct ScanningLightOverlay: View {
-    let isLive: Bool
-    @State private var pulsePhase: Double = 0.0
-
-    var body: some View {
-        GeometryReader { innerGeo in
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, .white.opacity(0.4), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(width: 35)
-                .offset(x: -35 + (innerGeo.size.width + 70) * pulsePhase)
-                .onAppear {
-                    if isLive {
-                        withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
-                            pulsePhase = 1.0
-                        }
-                    }
-                }
-        }
-        .clipped()
     }
 }

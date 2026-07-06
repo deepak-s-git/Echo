@@ -2,7 +2,7 @@
   <img src="Echo/Assets.xcassets/AppIcon.appiconset/appicon_128x128.png" width="128" height="128" alt="Echo Icon" />
 </p>
 
-<h1 align="center">Echo</h1>
+<h1 align="center">ECHO</h1>
 
 <p align="center">
   <b>Recall and continue your working context instantly.</b>

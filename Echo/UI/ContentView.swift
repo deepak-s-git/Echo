@@ -65,7 +65,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 900, maxWidth: 900, minHeight: 620, maxHeight: 620)
-        .background(.clear)
+        .background(Color(red: 0.05, green: 0.05, blue: 0.055))
         .onReceive(NotificationCenter.default.publisher(for: .echoOpenSearch)) { _ in
             appStore.selectedTab = .search
             appStore.isSearchPresented = true

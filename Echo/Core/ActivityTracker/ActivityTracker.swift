@@ -1,4 +1,25 @@
 import AppKit
+import UniformTypeIdentifiers
+
+enum EchoSettingsKeys: Sendable {
+    static let idleTimeoutMinutes = "echo.settings.idleTimeoutMinutes"
+    static let minimumSessionSeconds = "echo.settings.minimumSessionSeconds"
+    static let showInMenuBar = "echo.settings.showInMenuBar"
+    static let launchAtLogin = "echo.settings.launchAtLogin"
+    static let ignoredBundleIds = "echo.settings.ignoredBundleIds"
+    static let trackBrowserTabs = "echo.settings.trackBrowserTabs"
+    static let recordWindowTitles = "echo.settings.recordWindowTitles"
+    static let browserCaptureDelaySeconds = "echo.settings.browserCaptureDelaySeconds"
+    static let tabEligibilitySeconds = "echo.settings.tabEligibilitySeconds"
+    static let appFocusEligibilitySeconds = "echo.settings.appFocusEligibilitySeconds"
+    static let dataRetentionDays = "echo.settings.dataRetentionDays"
+    static let appTheme = "echo.settings.appTheme"
+    static let accentVibe = "echo.settings.accentVibe"
+    static let notifyOnSessionSaved = "echo.settings.notifyOnSessionSaved"
+    static let notifyOnIdleWarning = "echo.settings.notifyOnIdleWarning"
+    static let notifyDailySummary = "echo.settings.notifyDailySummary"
+}
+
 import ApplicationServices
 
 /// Hybrid focus tracker: NSWorkspace notifications + fast frontmost-app verification.
@@ -338,7 +359,7 @@ actor ActivityTracker {
             guard !Task.isCancelled else { return }
             guard await self?.currentBundleId == bundleId else { return }
 
-            let trackTabs = UserDefaults.standard.object(forKey: EchoSettingsKeys.trackBrowserTabs) as? Bool ?? true
+            let trackTabs = UserDefaults.standard.object(forKey: "echo.settings.trackBrowserTabs") as? Bool ?? true
             if BrowserContextService.isBrowser(bundleId) && trackTabs {
                 // AppleScript: synchronous but fast (~5–20 ms). Run on main actor per existing API.
                 var tab: BrowserTab? = nil
@@ -352,9 +373,7 @@ actor ActivityTracker {
                     
                     let currentExpectedTitle = await self?.lastVerifiedSnapshot?.windowTitle
                     expectedTitle = currentExpectedTitle
-                    tab = await MainActor.run {
-                        BrowserContextService.captureActiveTab(for: bundleId, windowTitle: currentExpectedTitle)
-                    } 
+                    tab = await BrowserContextService.captureActiveTab(for: bundleId, windowTitle: currentExpectedTitle)
                     if tab != nil { break }
                 }
                 guard let tab else { return }
@@ -453,8 +472,8 @@ actor ActivityTracker {
     private func emit(_ event: RawActivityEvent) {
         var cleanEvent = event
         
-        let trackTabs = UserDefaults.standard.object(forKey: EchoSettingsKeys.trackBrowserTabs) as? Bool ?? true
-        let recordTitles = UserDefaults.standard.object(forKey: EchoSettingsKeys.recordWindowTitles) as? Bool ?? true
+        let trackTabs = UserDefaults.standard.object(forKey: "echo.settings.trackBrowserTabs") as? Bool ?? true
+        let recordTitles = UserDefaults.standard.object(forKey: "echo.settings.recordWindowTitles") as? Bool ?? true
         
         let isBrowser = BrowserContextService.isBrowser(event.appBundleId)
         let shouldStrip = isBrowser ? !trackTabs : !recordTitles

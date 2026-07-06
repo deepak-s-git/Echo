@@ -2,6 +2,7 @@ import AppKit
 import SQLite3
 
 /// Fetches browser tab metadata via AppleScript. Privacy: prefer active-tab-only APIs.
+@MainActor
 struct BrowserTabScraper {
 
     private static let bundleToAppName: [String: (BrowserTab.Browser, String)] = [
@@ -15,7 +16,6 @@ struct BrowserTabScraper {
 
     // MARK: - Active tab (privacy-first)
 
-    @MainActor
     static func activeTab(forBundleId bundleId: String, windowTitle: String? = nil) -> BrowserTab? {
         guard let (browser, appName) = bundleToAppName[bundleId],
               isRunning(bundleId: bundleId) || isRunning(appName: appName)
@@ -156,13 +156,11 @@ struct BrowserTabScraper {
 
     // MARK: - Full scrape (session end snapshot only)
 
-    @MainActor
     static func fetchActiveBrowserTabs() -> [BrowserTab] {
         fetchAllBrowserTabsForRestore()
     }
 
     /// All tabs from front windows of running browsers (restore + snapshots).
-    @MainActor
     static func fetchAllBrowserTabsForRestore() -> [BrowserTab] {
         bundleToAppName.flatMap { bundleId, entry -> [BrowserTab] in
             guard isRunning(bundleId: bundleId) || isRunning(appName: entry.1) else { return [] }
@@ -171,7 +169,6 @@ struct BrowserTabScraper {
     }
 
     /// Tabs from the front window of a browser (active tab; list scrape when available).
-    @MainActor
     static func tabsForRestore(bundleId: String) -> [BrowserTab] {
         guard let (browser, appName) = bundleToAppName[bundleId],
               isRunning(bundleId: bundleId) || isRunning(appName: appName)
@@ -186,7 +183,6 @@ struct BrowserTabScraper {
         return []
     }
 
-    @MainActor
     private static func runChromeStyleTabList(appName: String, browser: BrowserTab.Browser) -> [BrowserTab]? {
         let script: String
         if browser == .arc {
@@ -707,12 +703,10 @@ struct BrowserTabScraper {
         }
     }
 
-    @MainActor
     private static func isRunning(appName: String) -> Bool {
         NSWorkspace.shared.runningApplications.contains { $0.localizedName == appName }
     }
 
-    @MainActor
     private static func isRunning(bundleId: String) -> Bool {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == bundleId }
     }

@@ -1,7 +1,8 @@
-
 <p align="center">
   <img src="Echo/Assets.xcassets/AppIcon.appiconset/appicon_128x128.png" width="128" height="128" alt="Echo Icon" />
 </p>
+
+<h1 align="center">Echo</h1>
 
 <p align="center">
   <b>Recall and continue your working context instantly.</b>
@@ -16,24 +17,24 @@
 
 ---
 
-Say hello to **Echo**, a lightweight and privacy-first workflow memory assistant for macOS. Echo runs silently in your menu bar, automatically recording the apps, browser tabs, and windows you focus on. When you're ready to switch back to a task, Echo lets you restore your entire workspace state with a single click.
+Say hello to **Echo**, a lightweight and privacy-first workflow memory assistant for macOS. Echo automatically records the apps, browser tabs, and windows you focus on. When you're ready to switch back to a task, Echo lets you restore your entire workspace state with a single click.
 
 *No cloud syncing, no accounts, and no data tracking. Everything stays local on your Mac.*
 
 ---
 
-## ✨ Features
+## Features
 
-- 🕒 **Workflow Timeline**: Track your active sessions and view a chronological map of what you worked on.
-- 🌐 **Browser Tab Scraper**: Captures active URLs from Google Chrome, Safari, Arc, and more.
-- ⚙️ **Smart Timing Rules**: Custom thresholds for app stay duration, tab focus delay, and tab eligibility to prevent noise.
-- 🎨 **Accent Vibes**: Customize the aesthetic with premium visual styles (Cybernetic Copper, Nordic Frost, Sunset Rose, Forest Mint, Neon Noir).
-- 🛡️ **Privacy Controls**: Exclude specific apps (like Spotify or System Preferences) and customize automatic data retention limits.
-- 🔄 **Sparkle Auto-Updates**: Seamless, automatic update downloads directly in the background.
+- **Workflow Timeline**: Track your active sessions and view a chronological map of what you worked on.
+- **Browser Tab Scraper**: Captures active URLs from Google Chrome, Safari, Arc, and more.
+- **Smart Timing Rules**: Custom thresholds for app stay duration, tab focus delay, and tab eligibility to prevent noise.
+- **Accent Vibes**: Customize the aesthetic with premium visual styles (Cybernetic Copper, Nordic Frost, Sunset Rose, Forest Mint, Neon Noir).
+- **Privacy Controls**: Exclude specific apps (like Spotify or System Preferences) and customize automatic data retention limits.
+- **Sparkle Auto-Updates**: Seamless, automatic update downloads directly in the background.
 
 ---
 
-## 🚀 Installation & Bypass Gatekeeper
+## Installation & Bypass Gatekeeper
 
 ### Option 1: Direct Download (Recommended)
 
@@ -59,7 +60,7 @@ Now, you can open the app normally!
 
 ---
 
-## 🛠️ Building from Source
+## Building from Source
 
 ### Prerequisites
 - macOS 14.0 or later
@@ -80,12 +81,12 @@ Now, you can open the app normally!
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📈 Star History
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=deepak-s-git/Echo&type=Date)](https://star-history.com/#deepak-s-git/Echo&Date)

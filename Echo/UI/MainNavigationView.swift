@@ -33,7 +33,7 @@ struct MainNavigationView: View {
                     .font(.system(size: 12, weight: .medium))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .background(Color.black.opacity(0.3), in: Capsule())
                     .overlay(Capsule().strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
                     .padding(.top, 12)
                     .transition(.move(edge: .top).combined(with: .opacity))

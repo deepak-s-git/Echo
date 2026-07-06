@@ -250,7 +250,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard(material: .thinMaterial)
+        .echoCard()
     }
 
     private func diagnosticStat(_ label: String, value: String) -> some View {
@@ -272,7 +272,7 @@ struct SessionDetailView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
+        .echoCard()
     }
 
     // MARK: - Header
@@ -332,7 +332,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
+        .echoCard()
     }
 
     // MARK: - Phases
@@ -391,7 +391,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
+        .echoCard()
     }
 
     // MARK: - Transitions
@@ -405,7 +405,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
+        .echoCard()
     }
 
     // MARK: - Browser
@@ -424,7 +424,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
+        .echoCard()
     }
 
 
@@ -503,7 +503,7 @@ struct SessionDetailView: View {
             }
         }
         .padding(EchoDesign.cardPadding)
-        .echoCard(material: .ultraThinMaterial)
+        .echoCard()
     }
 
     private func restoreGroupTitle(_ kind: RestoreItem.RestoreKind) -> String {
@@ -662,7 +662,7 @@ struct SessionDetailView: View {
                 }
             }
             .padding(EchoDesign.cardPadding)
-            .echoCard(material: .ultraThinMaterial)
+            .echoCard()
         }
     }
     

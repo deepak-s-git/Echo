@@ -142,7 +142,7 @@ private struct HomeHeroSection: View {
         .background {
             ZStack {
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.black.opacity(0.3))
                 EchoDesign.heroWash
                     .clipShape(RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
             }

@@ -140,7 +140,7 @@ struct WorkflowIdleDashboard: View {
             }
         }
         .padding(24)
-        .echoCard(material: .ultraThinMaterial)
+        .echoCard()
         .background {
             AmbientGlowView()
                 .offset(y: -20)

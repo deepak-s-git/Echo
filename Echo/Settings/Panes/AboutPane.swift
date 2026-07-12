@@ -129,7 +129,7 @@ struct AboutPane: View {
                 Spacer()
                 Text("© \(currentYear()) Echo. All rights reserved.")
                     .font(.system(size: 11))
-                    .foregroundStyle(.quaternary)
+                    .foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.top, 8)
@@ -275,7 +275,7 @@ private struct AcknowledgementRow: View {
 
                     Text(license)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.quaternary)
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(Color.primary.opacity(0.05)))

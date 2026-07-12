@@ -192,14 +192,17 @@ struct SearchView: View {
             var mapped: [SemanticSearchResult] = []
             for res in rawResults {
                 if let session = sessionStore.recentSessions.first(where: { $0.id == res.sessionId }) {
-                    let chunks = res.matchedChunks.map { chunk in
-                        MatchedChunk(document: chunk.document, kind: chunk.kind, score: chunk.score)
-                    }
+                    let chunks = res.matchedChunks
+                        .filter { $0.kind != "summary" }
+                        .map { chunk in
+                            MatchedChunk(document: chunk.document, kind: chunk.kind, score: chunk.score)
+                        }
+                    let isRootSummary = res.matchedKind == "summary"
                     mapped.append(SemanticSearchResult(
                         session: session,
                         score: res.score,
-                        matchedDocument: res.matchedDocument,
-                        matchedKind: res.matchedKind,
+                        matchedDocument: isRootSummary ? nil : res.matchedDocument,
+                        matchedKind: isRootSummary ? nil : res.matchedKind,
                         matchedChunks: chunks
                     ))
                 }
@@ -213,7 +216,7 @@ struct SearchView: View {
                             session: sess,
                             score: 0.5,
                             matchedDocument: nil,
-                            matchedKind: "summary",
+                            matchedKind: nil,
                             matchedChunks: []
                         ))
                     }
@@ -411,12 +414,22 @@ private struct SearchResultCard: View {
                         .animation(.spring(response: 0.2, dampingFraction: 0.5), value: hovering)
                 }
             }
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
             .padding(.horizontal, 16)
-            .echoCard()
-            .scaleEffect(hovering ? 1.008 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
-            .echoHoverHighlight()
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                        .fill(EchoPalette.graphiteElevated.opacity(0.95))
+                    RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                        .fill(Color.primary.opacity(hovering ? 0.03 : 0))
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
+            )
+            .shadow(color: hovering ? Color.black.opacity(0.1) : .clear, radius: 4, y: 2)
+            .animation(EchoDesign.subtle, value: hovering)
             .onHover { hovering = $0 }
         }
         .buttonStyle(.plain)
@@ -468,7 +481,7 @@ private struct SearchResultCard: View {
             return termLine.isEmpty ? (lines.first ?? document) : termLine
         } else if kind == "summary" {
             let titleLine = lines.first(where: { $0.hasPrefix("Session Title: ") }) ?? ""
-            return titleLine.isEmpty ? (lines.first ?? document) : titleLine.replacingOccurrences(of: "Session Title: ", with: "Summary: ")
+            return titleLine.isEmpty ? (lines.first ?? document) : titleLine.replacingOccurrences(of: "Session Title: ", with: "Title match: ")
         }
         return lines.first ?? document
     }

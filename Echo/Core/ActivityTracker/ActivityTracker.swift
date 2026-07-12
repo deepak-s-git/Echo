@@ -43,6 +43,8 @@ actor ActivityTracker {
     private var lastEmittedWindowFingerprint: String = ""
     private var lastTransitionTime: Date = .distantPast
     private var lastWindowRecheckTime: Date = .distantPast
+    private var spaceTransitionPauseUntil: Date?
+    private var lastNotificationTime: Date = .distantPast
 
     private var pendingFocusEvent: RawActivityEvent?
     private var pendingFocusEmitTask: Task<Void, Never>?
@@ -102,7 +104,8 @@ actor ActivityTracker {
             NSWorkspace.didDeactivateApplicationNotification,
             NSWorkspace.didTerminateApplicationNotification,
             NSWorkspace.didHideApplicationNotification,
-            NSWorkspace.didUnhideApplicationNotification
+            NSWorkspace.didUnhideApplicationNotification,
+            NSWorkspace.activeSpaceDidChangeNotification
         ]
 
         var tokens: [NSObjectProtocol] = []
@@ -129,6 +132,10 @@ actor ActivityTracker {
         _ notification: Notification
     ) async {
         switch name {
+        case NSWorkspace.activeSpaceDidChangeNotification:
+            spaceTransitionPauseUntil = Date().addingTimeInterval(1.5)
+            return
+            
         case NSWorkspace.didTerminateApplicationNotification:
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
                     as? NSRunningApplication,
@@ -136,8 +143,10 @@ actor ActivityTracker {
             else { return }
             handleAppTermination(bundleId: bundleId)
 
-        case NSWorkspace.didDeactivateApplicationNotification:
-            // Prompt verification — Spaces swipes often skip activate on the outgoing app.
+        case NSWorkspace.didDeactivateApplicationNotification, NSWorkspace.didActivateApplicationNotification:
+            let now = Date()
+            guard now.timeIntervalSince(lastNotificationTime) > 0.2 else { return }
+            lastNotificationTime = now
             await verifyFrontmostFocus(includeWindow: false)
 
         default:
@@ -169,6 +178,8 @@ actor ActivityTracker {
     /// Single reconciliation entry point for notifications and polling.
     private func verifyFrontmostFocus(includeWindow: Bool) async {
         guard isRunning, !capturePaused else { return }
+
+        if let pauseUntil = spaceTransitionPauseUntil, Date() < pauseUntil { return }
 
         guard let baseSnapshot = await MainActor.run(resultType: FrontmostSnapshot?.self, body: {
             FrontmostSnapshot.captureAppOnly()

@@ -288,7 +288,7 @@ private struct TimelineBeadVisualView: View {
                     }
                 )
                 .frame(width: beadWidth, height: beadHeight)
-                .shadow(color: Color.black.opacity(isHovered ? 0.22 : 0.05), radius: isHovered ? 4 : 1, y: isHovered ? 1.5 : 0.5)
+
         }
         .frame(width: beadWidth, height: 40)
         .opacity(beadOpacity)
@@ -301,7 +301,7 @@ private struct TimelineBeadVisualView: View {
                             HStack(spacing: 8) {
                                 AppIconView(bundleId: segment.bundleId, size: 22)
                                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                                    .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
+
                                 
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(segment.appName)
@@ -353,13 +353,13 @@ private struct TimelineBeadVisualView: View {
                         .frame(width: 195)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(.ultraThinMaterial)
+                                .fill(EchoPalette.graphiteElevated.opacity(0.95))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
                         )
-                        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+
                         .offset(x: cardXOffset)
                         
                         // Downward Pointer

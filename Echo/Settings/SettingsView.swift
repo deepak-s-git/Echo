@@ -30,7 +30,7 @@ struct SettingsView: View {
         }
     }
 
-    @AppStorage("SettingsSelectedPane") private var selectedPane: Pane = .general
+    @State private var selectedPane: Pane = .general
     @EnvironmentObject var settings: EchoSettings
     @EnvironmentObject var permissionsManager: PermissionsManager
 
@@ -50,6 +50,9 @@ struct SettingsView: View {
         }
         .frame(minWidth: 700, minHeight: 460)
         .background(EchoPalette.graphite)
+        .onAppear {
+            selectedPane = .general
+        }
     }
 }
 

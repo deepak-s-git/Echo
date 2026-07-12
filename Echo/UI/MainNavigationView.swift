@@ -122,14 +122,14 @@ struct SidebarItem: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .frame(width: 18)
                     .foregroundStyle(isSelected ? Color.primary : (isHovered ? Color.primary : Color.primary.opacity(0.65)))
-                    .scaleEffect(isHovered ? 1.06 : 1.0)
-                    .offset(x: isHovered && !isSelected ? 1.5 : 0)
+                    .scaleEffect(isHovered && !isSelected ? 1.04 : 1.0)
+                    .offset(x: isHovered && !isSelected ? 1.0 : 0)
                 
                 Text(label)
-                    .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(isSelected ? Color.primary : (isHovered ? Color.primary : Color.primary.opacity(0.75)))
                 
                 Spacer()

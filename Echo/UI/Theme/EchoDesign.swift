@@ -145,7 +145,6 @@ struct EchoCard: ViewModifier {
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
                     .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
     }
 }
 

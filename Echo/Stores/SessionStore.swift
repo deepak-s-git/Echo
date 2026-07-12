@@ -95,7 +95,7 @@ final class SessionStore: ObservableObject {
     }
 
     private func startContinuationTimer() {
-        refreshTimer = Timer.publish(every: 15, on: .main, in: .common)
+        refreshTimer = Timer.publish(every: 15, on: .main, in: .default)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self = self else { return }

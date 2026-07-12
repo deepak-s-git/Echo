@@ -1,15 +1,11 @@
 # Security Policy
 
-## Supported Versions
-
-Only the latest release of Echo is supported with security updates.
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Echo, please do not open a public issue. Instead, report it privately by contacting the maintainer via email or opening a private draft security advisory on GitHub.
+We take security bugs in Echo seriously. We appreciate your efforts to responsibly disclose your findings, and will make every effort to acknowledge your contributions.
 
-We will acknowledge your report and work to address the issue as quickly as possible.
+To report a security issue, please contact the maintainer directly via email or open a private draft security advisory on GitHub. 
+
+We will send a response indicating the next steps in handling your report. After the initial reply to your report, we will keep you informed of the progress towards a fix and full announcement, and may ask for additional information or guidance.
+
+Report security bugs in third-party dependencies to the person or team maintaining the package or dependency.

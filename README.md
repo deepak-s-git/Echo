@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/deepak-s-git/Echo/actions"><img src="https://img.shields.io/badge/Build-passing-success?style=flat-square&logo=github" alt="Build Status" /></a>
   <a href="https://echo-macos.vercel.app/appcast.xml"><img src="https://img.shields.io/badge/Sparkle_Feed-active-orange?style=flat-square&logo=rss" alt="Sparkle Feed" /></a>
-  <a href="https://github.com/deepak-s-git/Echo/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
+  <a href="https://github.com/deepak-s-git/Echo/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Platform-macOS_14.0+-black?style=flat-square&logo=apple" alt="Platform Support" />
 </p>
 
@@ -83,7 +83,7 @@ Now, you can open the app normally!
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0). See the [LICENSE](LICENSE) file for details.
 
 ---
 

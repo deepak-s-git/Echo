@@ -10,7 +10,7 @@ struct WorkflowIdleDashboard: View {
     @State private var showSelectWorkflowSheet = false
     @State private var animateContent = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 16) {
             // Header with Ambient Glow & Modern Typography
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
@@ -81,7 +81,8 @@ struct WorkflowIdleDashboard: View {
             .offset(y: animateContent ? 0 : 12)
             
             // Recent Sessions Section
-            let recent = Array(sessionStore.recentSessions.prefix(3))
+            let hasResume = sessionStore.continueWorkflowThread != nil && sessionStore.continueSession != nil
+            let recent = Array(sessionStore.recentSessions.prefix(hasResume ? 2 : 3))
             if !recent.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Recent Sessions")
@@ -139,15 +140,7 @@ struct WorkflowIdleDashboard: View {
                 .offset(y: animateContent ? 0 : 16)
             }
         }
-        .padding(24)
-        .echoCard()
-        .background {
-            AmbientGlowView()
-                .offset(y: -20)
-                .allowsHitTesting(false)
-                .opacity(animateContent ? 0.75 : 0.0)
-                .animation(.easeOut(duration: 0.8), value: animateContent)
-        }
+        .padding(20)
         .sheet(isPresented: $showCreateSheet) {
             WorkflowCreateSheet(isPresented: $showCreateSheet)
                 .environmentObject(appStore)
@@ -323,7 +316,7 @@ private struct HeroActionButton: View {
                     .offset(x: hovering ? 3 : 0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
             }
-            .padding(.vertical, 16)
+            .padding(.vertical, 12)
             .padding(.horizontal, 20)
             .background {
                 ZStack {
@@ -368,21 +361,33 @@ private struct GridActionButton: View {
     let action: () -> Void
     
     @State private var hovering = false
+    @State private var isAnimatingBorder = false
     
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(LinearGradient(
-                            colors: [gradientColors[0].opacity(hovering ? 0.2 : 0.1), gradientColors[1].opacity(hovering ? 0.08 : 0.04)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 44, height: 44)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [gradientColors[0].opacity(hovering ? 0.6 : 0.4), gradientColors[1].opacity(hovering ? 0.4 : 0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                        .background(
+                            Circle()
+                                .fill(LinearGradient(
+                                    colors: [gradientColors[0].opacity(hovering ? 0.08 : 0.03), gradientColors[1].opacity(hovering ? 0.04 : 0.01)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ))
+                        )
+                        .frame(width: 40, height: 40)
                     
                     Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(LinearGradient(
                             colors: [gradientColors[0], gradientColors[1]],
                             startPoint: .topLeading,
@@ -405,7 +410,7 @@ private struct GridActionButton: View {
                 Spacer(minLength: 0)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 144, maxHeight: 144)
+            .frame(maxWidth: .infinity, minHeight: 118, maxHeight: 118)
             .background {
                 ZStack {
                     RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
@@ -414,11 +419,41 @@ private struct GridActionButton: View {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        hovering ? LinearGradient(colors: [gradientColors[0].opacity(0.5), gradientColors[1].opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                        LinearGradient(colors: [EchoPalette.stroke, EchoPalette.stroke.opacity(0.5)], startPoint: .top, endPoint: .bottom),
-                        lineWidth: 0.5
-                    )
+                    .strokeBorder(LinearGradient(colors: [EchoPalette.stroke, EchoPalette.stroke.opacity(0.5)], startPoint: .top, endPoint: .bottom), lineWidth: 0.5)
+            )
+            .overlay(
+                Group {
+                    if hovering {
+                        GeometryReader { geo in
+                            let size = max(geo.size.width, geo.size.height) * 1.5
+                            ZStack {
+                                AngularGradient(
+                                    gradient: Gradient(colors: [
+                                        gradientColors[0].opacity(0.0),
+                                        gradientColors[0].opacity(0.8),
+                                        gradientColors[0].opacity(0.0),
+                                        gradientColors[0].opacity(0.0)
+                                    ]),
+                                    center: .center
+                                )
+                                .frame(width: size, height: size)
+                                .rotationEffect(.degrees(isAnimatingBorder ? 360 : 0))
+                            }
+                            .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+                            .mask(
+                                RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                                    .strokeBorder(lineWidth: 1.5)
+                            )
+                        }
+                        .onAppear {
+                            isAnimatingBorder = false
+                            withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
+                                isAnimatingBorder = true
+                            }
+                        }
+                    }
+                }
+                .allowsHitTesting(false)
             )
             .shadow(color: hovering ? gradientColors[0].opacity(0.04) : Color.clear, radius: 8, y: 3)
             .scaleEffect(hovering ? 1.008 : 1.0)
@@ -518,6 +553,8 @@ struct SelectWorkflowSheet: View {
         }
         .padding(24)
         .frame(width: 440, height: 440)
+        .background(EchoPalette.graphite)
+        .colorScheme(.dark)
         .onAppear {
             isLoadingThreads = true
             Task {
@@ -547,10 +584,10 @@ struct SelectWorkflowSheet: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
             
             // Workflow List
             VStack {
@@ -593,9 +630,18 @@ struct SelectWorkflowSheet: View {
             .frame(maxHeight: .infinity)
             
             HStack {
-                Button("Cancel") {
+                Button {
                     isPresented = false
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
                 }
+                .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
                 .disabled(isWorking)
                 
@@ -664,10 +710,10 @@ struct SelectWorkflowSheet: View {
                     }
                     Spacer()
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
                 .padding(.horizontal, 12)
-                .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5))
+                .background(Color.primary.opacity(0.015), in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(EchoPalette.stroke, lineWidth: 0.5))
             }
             .buttonStyle(.plain)
             .padding(.vertical, 4)
@@ -729,10 +775,10 @@ struct SelectWorkflowSheet: View {
                                     .font(.system(size: 8, weight: .bold))
                                     .foregroundStyle(.quaternary)
                             }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(Color.primary.opacity(0.01), in: RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5))
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(Color.primary.opacity(0.01), in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(EchoPalette.stroke.opacity(0.6), lineWidth: 0.5))
                         }
                         .buttonStyle(.plain)
                     }
@@ -971,14 +1017,13 @@ struct WorkflowSelectionCard: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(hovering ? Color.primary.opacity(0.015) : Color.clear)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.02 : 0.005))
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(hovering ? EchoPalette.stroke : Color.clear, lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke.opacity(0.5), lineWidth: 0.5)
             )
-            .scaleEffect(hovering ? 1.005 : 1.0)
             .animation(EchoDesign.subtle, value: hovering)
             .onHover { hovering = $0 }
         }
@@ -1064,14 +1109,14 @@ struct RecentSessionRow: View {
                     .offset(x: hovering ? 2 : 0)
                     .animation(.spring(response: 0.2, dampingFraction: 0.5), value: hovering)
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
             .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.primary.opacity(hovering ? 0.03 : 0.01))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(hovering ? EchoPalette.strokeBright : EchoPalette.stroke, lineWidth: 0.5)
             }
             .scaleEffect(hovering ? 1.005 : 1.0)

@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import ServiceManagement
 
 // MARK: - EchoSettings
 
@@ -107,7 +108,11 @@ final class EchoSettings: ObservableObject {
         #endif
         minimumSessionSeconds = defaults.object(forKey: Keys.minimumSessionSeconds) as? Double ?? 30.0
         showInMenuBar = defaults.object(forKey: Keys.showInMenuBar) as? Bool ?? true
-        launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
+        if #available(macOS 13.0, *) {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+        } else {
+            launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
+        }
 
         // Tracking
         if let data = defaults.data(forKey: Keys.ignoredBundleIds),

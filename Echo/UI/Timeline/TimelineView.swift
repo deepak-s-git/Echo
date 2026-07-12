@@ -289,7 +289,7 @@ struct TimelineView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        VStack(spacing: 10) {
+                        VStack(spacing: 14) {
                             if activityStore.isRecording && !isSelectMode {
                                 VStack(spacing: 0) {
                                     SessionControlBar(compact: false)
@@ -321,6 +321,7 @@ struct TimelineView: View {
                                                 if expandedLogsThreadIds.contains(summary.id) {
                                                     expandedLogsThreadIds.remove(summary.id)
                                                 } else {
+                                                    expandedLogsThreadIds.removeAll()
                                                     expandedLogsThreadIds.insert(summary.id)
                                                 }
                                             }
@@ -522,7 +523,7 @@ struct TimelineView: View {
                         lineWidth: 0.5
                     )
             )
-            .shadow(color: (activityStore.isSessionPaused ? Color.orange : EchoPalette.live).opacity(0.04), radius: 6, y: 2)
+
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
@@ -568,11 +569,13 @@ private struct WorkflowThreadCard: View {
     @State private var hovering = false
     @State private var hoveredSessionId: UUID? = nil
     @State private var isVisible = false
+    @State private var isAnimatingBorder = false
+    @State private var hoverTask: Task<Void, Never>? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header Row (Clickable to Expand/Collapse)
-            HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .center, spacing: 16) {
                 // Dynamic Icon based on category cluster of latest segment
                 let cluster = summary.segments.first?.cluster ?? .mixed
                 ClusterIconView(cluster: cluster)
@@ -645,7 +648,7 @@ private struct WorkflowThreadCard: View {
                                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                                             .stroke(Color.black.opacity(0.2), lineWidth: 0.5)
                                     )
-                                    .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
+
                                     .zIndex(Double(bundleIds.count - index))
                             }
                             if bundleIds.count > 5 {
@@ -710,7 +713,8 @@ private struct WorkflowThreadCard: View {
                         .frame(width: 24, height: 24)
                 }
             }
-            .padding(EchoDesign.cardPadding)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 20)
             .contentShape(Rectangle())
             .onTapGesture {
                 onToggleLogs()
@@ -735,7 +739,7 @@ private struct WorkflowThreadCard: View {
 
                     let chronologicalSegments = summary.segments.sorted(by: { $0.startedAt < $1.startedAt })
                     let hasActive = chronologicalSegments.contains(where: { $0.isActive })
-                    VStack(alignment: .leading, spacing: 0) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(chronologicalSegments.enumerated()), id: \.element.id) { index, segment in
                             let isLastItem = index == chronologicalSegments.count - 1
                             let isLatest = isLastItem && !segment.isActive
@@ -789,39 +793,71 @@ private struct WorkflowThreadCard: View {
                     }
                 }
                 .padding(.bottom, 10)
-                .compositingGroup()
+
                 .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
             }
         }
         .background(
             RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                .fill(Color.black.opacity(0.3))
+                .fill(Color.primary.opacity(0.015))
+                .allowsHitTesting(false)
         )
         .overlay(
             RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                .strokeBorder(
-                    EchoPalette.stroke,
-                    lineWidth: 0.5
-                )
-                .opacity(hovering ? 0 : 1)
+                .strokeBorder(EchoPalette.stroke, lineWidth: 0.5)
+                .allowsHitTesting(false)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [EchoPalette.indigo.opacity(0.6), Color.purple.opacity(0.3)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
-                .opacity(hovering ? 1 : 0)
+            Group {
+                if hovering {
+                    GeometryReader { geo in
+                        let size = max(geo.size.width, geo.size.height) * 1.5
+                        ZStack {
+                            AngularGradient(
+                                gradient: Gradient(colors: [
+                                    EchoPalette.accent.opacity(0.0),
+                                    EchoPalette.accent.opacity(0.8),
+                                    EchoPalette.accent.opacity(0.0),
+                                    EchoPalette.accent.opacity(0.0)
+                                ]),
+                                center: .center
+                            )
+                            .frame(width: size, height: size)
+                            .rotationEffect(.degrees(isAnimatingBorder ? 360 : 0))
+                        }
+                        .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+                        .mask(
+                            RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous)
+                                .strokeBorder(lineWidth: 1.5)
+                        )
+                    }
+                    .onAppear {
+                        isAnimatingBorder = false
+                        withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
+                            isAnimatingBorder = true
+                        }
+                    }
+                }
+            }
+            .allowsHitTesting(false)
         )
-        .shadow(color: .black.opacity(hovering ? 0.08 : 0.03), radius: hovering ? 12 : 5, y: 2)
+        .shadow(color: hovering ? EchoPalette.accent.opacity(0.08) : Color.clear, radius: 8, y: 2)
+
         .scaleEffect(hovering ? 1.004 : 1)
         .animation(.easeOut(duration: 0.2), value: hovering)
-        .onHover { hovering in
-            self.hovering = hovering
+        .onHover { isHovering in
+            hoverTask?.cancel()
+            if isHovering && !logsExpanded {
+                hoverTask = Task {
+                    try? await Task.sleep(nanoseconds: 150_000_000) // 0.15s intent delay
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        self.hovering = true
+                    }
+                }
+            } else {
+                self.hovering = false
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: EchoDesign.cardCornerRadius, style: .continuous))
         .opacity(isVisible ? 1.0 : 0.0)
@@ -829,6 +865,12 @@ private struct WorkflowThreadCard: View {
         .onAppear {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                 isVisible = true
+            }
+        }
+        .onChange(of: logsExpanded) { _, expanded in
+            if expanded {
+                self.hovering = false
+                self.hoverTask?.cancel()
             }
         }
     }
@@ -900,7 +942,7 @@ private struct SessionHistoryRow: View {
                             AppIconView(bundleId: bundleId, size: 14)
                                 .clipShape(Circle())
                                 .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
-                                .shadow(color: .black.opacity(0.08), radius: 0.5, y: 0.5)
+
                                 .zIndex(Double(bundleIds.count - idx))
                         }
                         
@@ -936,19 +978,14 @@ private struct SessionHistoryRow: View {
                 .padding(.vertical, 3.5)
                 .background((segment.isActive ? EchoPalette.live : EchoPalette.accent).opacity(0.08), in: Capsule())
             }
-            .padding(.vertical, 9)
-            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(hovering ? Color.primary.opacity(0.06) : Color.primary.opacity(0.02))
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(hovering ? Color.primary.opacity(0.04) : Color.clear)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(hovering ? Color.primary.opacity(0.15) : Color.primary.opacity(0.05), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(hovering ? 0.04 : 0.01), radius: 1.5, y: 1)
-            .scaleEffect(hovering ? 1.008 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: hovering)
+            .scaleEffect(hovering ? 1.004 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: hovering)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1025,7 +1062,7 @@ fileprivate struct ClusterIconView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                .shadow(color: colors[0].opacity(0.25), radius: 4, y: 2)
+
             
             Image(systemName: cluster.icon)
                 .font(.system(size: 14, weight: .bold))
@@ -1082,7 +1119,7 @@ fileprivate struct TimelineNodeView: View {
                     Circle()
                         .fill(EchoPalette.live)
                         .frame(width: 6, height: 6)
-                        .shadow(color: EchoPalette.live.opacity(0.7), radius: 2.0)
+
                 } else if isLatest {
                     // Latest saved session (dynamic Accent Vibe) Concentric Glow Node
                     ZStack {
@@ -1093,7 +1130,7 @@ fileprivate struct TimelineNodeView: View {
                         Circle()
                             .fill(EchoPalette.accent)
                             .frame(width: 6, height: 6)
-                            .shadow(color: EchoPalette.accent.opacity(isHovered ? 0.95 : 0.8), radius: isHovered ? 3.0 : 1.5)
+
                     }
                 } else if isHovered {
                     // Hovered Accent Concentric Node
@@ -1104,7 +1141,7 @@ fileprivate struct TimelineNodeView: View {
                     Circle()
                         .fill(EchoPalette.accent)
                         .frame(width: 6, height: 6)
-                        .shadow(color: EchoPalette.accent.opacity(0.6), radius: 2.5)
+
                 } else {
                     // Clean Modern Concentric Default Node
                     Circle()

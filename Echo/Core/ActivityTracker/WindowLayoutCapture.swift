@@ -29,7 +29,7 @@ struct WindowLayoutCapture {
                 bundleId: bundleId,
                 frame: frame,
                 isMainWindow: dict[kCGWindowIsOnscreen as String] as? Bool ?? false,
-                spaceIndex: 0
+                spaceIndex: SpaceTracker.activeSpaceID()
             )
         }
 

@@ -248,6 +248,7 @@ actor ActivityTracker {
         
         guard let bundleId = currentBundleId, let name = currentAppName else { return }
         
+        let spaceInfo = SpaceTracker.activeSpaceInfo()
         let focusEvent = RawActivityEvent(
             id: UUID(),
             timestamp: now,
@@ -257,6 +258,8 @@ actor ActivityTracker {
             windowTitle: snapshot.windowTitle,
             url: snapshot.documentURL,
             profileName: nil,
+            spaceIndex: spaceInfo.index,
+            isFullScreen: spaceInfo.isFullScreen,
             duration: 0
         )
         
@@ -316,6 +319,7 @@ actor ActivityTracker {
         appFocusStart = now
         lastEmittedWindowFingerprint = initialDocumentURL ?? initialWindowTitle ?? ""
 
+        let spaceInfo = SpaceTracker.activeSpaceInfo()
         let focusEvent = RawActivityEvent(
             id: UUID(),
             timestamp: now,
@@ -325,6 +329,8 @@ actor ActivityTracker {
             windowTitle: initialWindowTitle,
             url: initialDocumentURL,
             profileName: nil,
+            spaceIndex: spaceInfo.index,
+            isFullScreen: spaceInfo.isFullScreen,
             duration: 0
         )
 
@@ -391,11 +397,12 @@ actor ActivityTracker {
                 guard await self?.currentBundleId == bundleId else { return }
                 let title = tab.title.isEmpty ? nil : tab.title
                 let url   = tab.url.isEmpty   ? nil : tab.url
+                let spaceInfo = SpaceTracker.activeSpaceInfo()
                 await self?.emit(RawActivityEvent(
                     id: UUID(), timestamp: timestamp, type: .appFocus,
                     appBundleId: bundleId, appName: name,
                     windowTitle: title, url: url,
-                    profileName: tab.profileName, duration: 0
+                    profileName: tab.profileName, spaceIndex: spaceInfo.index, isFullScreen: spaceInfo.isFullScreen, duration: 0
                 ))
                 await self?.updateLastEmittedWindowFingerprint(expectedTitle ?? title ?? "")
             } else {
@@ -407,11 +414,12 @@ actor ActivityTracker {
                 let docURL = ctx.documentURL
                 guard title != nil || docURL != nil else { return }
                 guard await self.currentBundleId == bundleId else { return }
+                let spaceInfo = SpaceTracker.activeSpaceInfo()
                 await self.emit(RawActivityEvent(
                     id: UUID(), timestamp: timestamp, type: .appFocus,
                     appBundleId: bundleId, appName: name,
                     windowTitle: title, url: docURL,
-                    profileName: nil, duration: 0
+                    profileName: nil, spaceIndex: spaceInfo.index, isFullScreen: spaceInfo.isFullScreen, duration: 0
                 ))
                 await self.updateLastEmittedWindowFingerprint(docURL ?? title ?? "")
             }
@@ -461,6 +469,7 @@ actor ActivityTracker {
         guard duration > 0.5 else { return }
 
         let name = currentAppName ?? AppMetadataResolver.humanizedBundleId(bundleId)
+        let spaceInfo = SpaceTracker.activeSpaceInfo()
 
         emit(RawActivityEvent(
             id: UUID(),
@@ -471,6 +480,8 @@ actor ActivityTracker {
             windowTitle: nil,
             url: nil,
             profileName: nil,
+            spaceIndex: spaceInfo.index,
+            isFullScreen: spaceInfo.isFullScreen,
             duration: duration
         ))
 
@@ -490,6 +501,7 @@ actor ActivityTracker {
         let shouldStrip = isBrowser ? !trackTabs : !recordTitles
         
         if shouldStrip {
+            let spaceInfo = SpaceTracker.activeSpaceInfo()
             cleanEvent = RawActivityEvent(
                 id: event.id,
                 timestamp: event.timestamp,
@@ -499,6 +511,8 @@ actor ActivityTracker {
                 windowTitle: nil,
                 url: nil,
                 profileName: nil,
+                spaceIndex: spaceInfo.index,
+                isFullScreen: spaceInfo.isFullScreen,
                 duration: event.duration
             )
         }
@@ -517,6 +531,8 @@ actor ActivityTracker {
                 windowTitle: Self.normalizeTerminalTitle(title, directoryURL: event.url),
                 url: event.url,
                 profileName: event.profileName,
+                spaceIndex: event.spaceIndex,
+                isFullScreen: event.isFullScreen,
                 duration: event.duration
             )
         }

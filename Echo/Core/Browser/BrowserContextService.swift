@@ -30,6 +30,7 @@ nonisolated enum BrowserContextService {
         appName: String
     ) -> ActivityEvent {
         let urlStr = tab.url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let spaceInfo = SpaceTracker.activeSpaceInfo()
         return ActivityEvent(
             id: UUID(),
             sessionId: sessionId,
@@ -40,6 +41,8 @@ nonisolated enum BrowserContextService {
             windowTitle: tab.title,
             url: urlStr,
             profileName: tab.profileName,
+            spaceIndex: spaceInfo.index,
+            isFullScreen: spaceInfo.isFullScreen,
             duration: 0
         )
     }

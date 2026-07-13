@@ -15,12 +15,12 @@ enum EchoPalette {
     
     static let graphite = adaptive(
         dark: NSColor(red: 0.045, green: 0.045, blue: 0.05, alpha: 1.0),
-        light: NSColor(red: 0.96, green: 0.96, blue: 0.97, alpha: 1.0)
+        light: NSColor(red: 0.94, green: 0.94, blue: 0.95, alpha: 1.0)
     )
     
     static let sidebar = adaptive(
         dark: NSColor(red: 0.03, green: 0.03, blue: 0.035, alpha: 1.0),
-        light: NSColor(red: 0.92, green: 0.92, blue: 0.93, alpha: 1.0)
+        light: NSColor(red: 0.91, green: 0.91, blue: 0.92, alpha: 1.0)
     )
     
     static let graphiteElevated = adaptive(
@@ -30,12 +30,12 @@ enum EchoPalette {
     
     static let stroke = adaptive(
         dark: NSColor(red: 0.18, green: 0.15, blue: 0.13, alpha: 1.0),
-        light: NSColor(red: 0.86, green: 0.85, blue: 0.83, alpha: 1.0)
+        light: NSColor(white: 0.86, alpha: 1.0)
     )
     
     static let strokeBright = adaptive(
         dark: NSColor(red: 0.28, green: 0.23, blue: 0.19, alpha: 1.0),
-        light: NSColor(red: 0.76, green: 0.74, blue: 0.70, alpha: 1.0)
+        light: NSColor(white: 0.72, alpha: 1.0)
     )
     
     @MainActor
@@ -63,22 +63,22 @@ enum EchoPalette {
     
     static let warmHighlight = adaptive(
         dark: NSColor(red: 0.95, green: 0.65, blue: 0.15, alpha: 1.0), // Warm Amber
-        light: NSColor(red: 0.80, green: 0.50, blue: 0.05, alpha: 1.0)
+        light: NSColor(red: 0.90, green: 0.45, blue: 0.0, alpha: 1.0)
     )
     
     static let live = adaptive(
         dark: NSColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1.0),
-        light: NSColor(red: 0.08, green: 0.50, blue: 0.24, alpha: 1.0)
+        light: NSColor(red: 0.05, green: 0.65, blue: 0.25, alpha: 1.0)
     )
     
     static let warning = adaptive(
         dark: NSColor(red: 0.96, green: 0.62, blue: 0.04, alpha: 1.0),
-        light: NSColor(red: 0.70, green: 0.32, blue: 0.04, alpha: 1.0)
+        light: NSColor(red: 0.85, green: 0.40, blue: 0.0, alpha: 1.0)
     )
     
     static let destructive = adaptive(
         dark: NSColor(red: 0.94, green: 0.27, blue: 0.27, alpha: 1.0),
-        light: NSColor(red: 0.86, green: 0.15, blue: 0.15, alpha: 1.0)
+        light: NSColor(red: 0.88, green: 0.12, blue: 0.12, alpha: 1.0)
     )
     
     @MainActor

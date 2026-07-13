@@ -263,11 +263,11 @@ enum AccentVibe: String, CaseIterable, Identifiable {
 
     var primaryColorLight: NSColor {
         switch self {
-        case .copper: return NSColor(red: 0.75, green: 0.32, blue: 0.08, alpha: 1.0)
-        case .frost: return NSColor(red: 0.18, green: 0.48, blue: 0.78, alpha: 1.0)
-        case .sunset: return NSColor(red: 0.82, green: 0.22, blue: 0.38, alpha: 1.0)
-        case .forest: return NSColor(red: 0.08, green: 0.55, blue: 0.32, alpha: 1.0)
-        case .neon: return NSColor(red: 0.60, green: 0.15, blue: 0.85, alpha: 1.0)
+        case .copper: return NSColor(red: 0.85, green: 0.35, blue: 0.05, alpha: 1.0)
+        case .frost: return NSColor(red: 0.0, green: 0.45, blue: 0.85, alpha: 1.0)
+        case .sunset: return NSColor(red: 0.90, green: 0.15, blue: 0.35, alpha: 1.0)
+        case .forest: return NSColor(red: 0.0, green: 0.55, blue: 0.25, alpha: 1.0)
+        case .neon: return NSColor(red: 0.65, green: 0.05, blue: 0.95, alpha: 1.0)
         }
     }
 
@@ -283,11 +283,11 @@ enum AccentVibe: String, CaseIterable, Identifiable {
 
     var secondaryColorLight: NSColor {
         switch self {
-        case .copper: return NSColor(red: 0.65, green: 0.57, blue: 0.38, alpha: 1.0)
-        case .frost: return NSColor(red: 0.38, green: 0.62, blue: 0.75, alpha: 1.0)
-        case .sunset: return NSColor(red: 0.80, green: 0.50, blue: 0.30, alpha: 1.0)
-        case .forest: return NSColor(red: 0.42, green: 0.72, blue: 0.58, alpha: 1.0)
-        case .neon: return NSColor(red: 0.08, green: 0.62, blue: 0.72, alpha: 1.0)
+        case .copper: return NSColor(red: 0.60, green: 0.25, blue: 0.0, alpha: 1.0)
+        case .frost: return NSColor(red: 0.0, green: 0.30, blue: 0.65, alpha: 1.0)
+        case .sunset: return NSColor(red: 0.70, green: 0.05, blue: 0.25, alpha: 1.0)
+        case .forest: return NSColor(red: 0.0, green: 0.40, blue: 0.15, alpha: 1.0)
+        case .neon: return NSColor(red: 0.45, green: 0.0, blue: 0.75, alpha: 1.0)
         }
     }
 }

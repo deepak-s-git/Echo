@@ -1087,24 +1087,29 @@ fileprivate struct TimelineNodeView: View {
         ZStack(alignment: .top) {
             // The vertical timeline line
             VStack(spacing: 0) {
+                let lineColor = EchoPalette.accent.opacity(0.7)
+                let lineGlow = EchoPalette.accent.opacity(0.25)
+                
                 // Line from top to circle center (aligned at y = 25)
                 if isFirst {
                     Color.clear
-                        .frame(width: 2, height: 25)
+                        .frame(width: 1.5, height: 25)
                 } else {
-                    Rectangle()
-                        .fill(isHovered ? EchoPalette.accent.opacity(0.85) : (isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.65) : Color.primary.opacity(0.10))))
-                        .frame(width: 2, height: 25)
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(lineColor)
+                        .frame(width: 1.5, height: 25)
+                        .shadow(color: lineGlow, radius: 2, x: 0, y: 0)
                 }
                 
                 // Line from circle center to bottom of row
                 if isLast {
                     Color.clear
-                        .frame(width: 2)
+                        .frame(width: 1.5)
                 } else {
-                    Rectangle()
-                        .fill(isHovered ? EchoPalette.accent.opacity(0.85) : (isPathActive ? EchoPalette.live.opacity(0.35) : (isPathLatest ? EchoPalette.accent.opacity(0.65) : Color.primary.opacity(0.10))))
-                        .frame(width: 2)
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(lineColor)
+                        .frame(width: 1.5)
+                        .shadow(color: lineGlow, radius: 2, x: 0, y: 0)
                 }
             }
             

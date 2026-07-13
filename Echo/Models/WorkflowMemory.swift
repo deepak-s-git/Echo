@@ -100,6 +100,8 @@ nonisolated struct RestoreItem: Codable, Sendable, Equatable, Identifiable {
     var path: String?
     var workingDirectory: String?
     var profileName: String?
+    var spaceIndex: Int?
+    var isFullScreen: Bool?
 
     nonisolated enum RestoreKind: String, Codable, Sendable, CaseIterable {
         case application

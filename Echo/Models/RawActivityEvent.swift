@@ -11,10 +11,12 @@ nonisolated struct RawActivityEvent: Sendable {
     let windowTitle: String?
     let url: String?
     let profileName: String?
+    let spaceIndex: Int?
+    let isFullScreen: Bool?
     let duration: TimeInterval
 
     func stamped(sessionId: UUID) -> ActivityEvent {
-        ActivityEvent(
+        return ActivityEvent(
             id: id,
             sessionId: sessionId,
             timestamp: timestamp,
@@ -24,6 +26,8 @@ nonisolated struct RawActivityEvent: Sendable {
             windowTitle: windowTitle,
             url: url,
             profileName: profileName,
+            spaceIndex: spaceIndex,
+            isFullScreen: isFullScreen,
             duration: duration
         )
     }

@@ -293,6 +293,8 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
     var windowTitle: String?
     var url: String?
     var profileName: String?
+    var spaceIndex: Int?
+    var isFullScreen: Bool?
     var duration: TimeInterval
 
     static let databaseTableName = "activities"
@@ -316,6 +318,8 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         windowTitle: String? = nil,
         url: String? = nil,
         profileName: String? = nil,
+        spaceIndex: Int? = nil,
+        isFullScreen: Bool? = nil,
         duration: TimeInterval = 0
     ) {
         self.id = id
@@ -327,6 +331,8 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         self.windowTitle = windowTitle
         self.url = url
         self.profileName = profileName
+        self.spaceIndex = spaceIndex
+        self.isFullScreen = isFullScreen
         self.duration = duration
     }
 
@@ -340,6 +346,8 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         container["windowTitle"] = windowTitle
         container["url"] = url
         container["profileName"] = profileName
+        container["spaceIndex"] = spaceIndex
+        container["isFullScreen"] = isFullScreen
         container["duration"] = duration
     }
 
@@ -353,6 +361,8 @@ nonisolated struct ActivityEvent: Identifiable, Codable, FetchableRecord, Persis
         windowTitle = row["windowTitle"]
         url = row["url"]
         profileName = row["profileName"]
+        spaceIndex = row["spaceIndex"]
+        isFullScreen = row["isFullScreen"]
         duration = row["duration"]
     }
 }

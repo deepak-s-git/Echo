@@ -181,6 +181,32 @@ nonisolated final class DatabaseManager: Sendable {
             try db.execute(sql: "DELETE FROM session_embeddings")
         }
 
+        migrator.registerMigration("v8_activity_space_index") { db in
+            let tableInfo = try Row.fetchAll(db, sql: "PRAGMA table_info(activities)")
+            let columnExists = tableInfo.contains { $0["name"] == "spaceIndex" }
+            if !columnExists {
+                try db.alter(table: ActivityEvent.databaseTableName) { t in
+                    t.add(column: "spaceIndex", .integer)
+                }
+            }
+        }
+
+        // v9: Reset stale volatile ManagedSpaceIDs — we now store ordinal positions (0, 1, 2...) instead
+        migrator.registerMigration("v9_reset_volatile_space_ids") { db in
+            try db.execute(sql: "UPDATE activities SET spaceIndex = NULL WHERE spaceIndex IS NOT NULL")
+        }
+
+        // v10: Add isFullScreen to activities table
+        migrator.registerMigration("v10_activity_is_fullscreen") { db in
+            let tableInfo = try Row.fetchAll(db, sql: "PRAGMA table_info(activities)")
+            let columnExists = tableInfo.contains { $0["name"] == "isFullScreen" }
+            if !columnExists {
+                try db.alter(table: ActivityEvent.databaseTableName) { t in
+                    t.add(column: "isFullScreen", .boolean)
+                }
+            }
+        }
+
         try migrator.migrate(pool)
     }
 

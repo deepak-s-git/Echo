@@ -232,7 +232,9 @@ nonisolated enum WorkflowContextCapture {
       bundleId: "com.apple.finder",
       url: nil,
       path: path,
-      workingDirectory: nil
+      workingDirectory: nil,
+      spaceIndex: event.spaceIndex,
+      isFullScreen: event.isFullScreen
     )]
   }
 
@@ -251,7 +253,9 @@ nonisolated enum WorkflowContextCapture {
       bundleId: event.appBundleId,
       url: nil,
       path: path,
-      workingDirectory: nil
+      workingDirectory: nil,
+      spaceIndex: event.spaceIndex,
+      isFullScreen: event.isFullScreen
     )]
   }
 
@@ -287,7 +291,9 @@ nonisolated enum WorkflowContextCapture {
       bundleId: event.appBundleId,
       url: nil,
       path: resolvedPath,
-      workingDirectory: nil
+      workingDirectory: nil,
+      spaceIndex: event.spaceIndex,
+      isFullScreen: event.isFullScreen
     )]
   }
 
@@ -564,7 +570,9 @@ nonisolated enum WorkflowContextCapture {
           bundleId: nil, // Group under Files & Documents!
           url: event.url,
           path: path,
-          workingDirectory: nil
+          workingDirectory: nil,
+          spaceIndex: event.spaceIndex,
+          isFullScreen: event.isFullScreen
         )]
     }
 
@@ -589,7 +597,9 @@ nonisolated enum WorkflowContextCapture {
           bundleId: nil, // set to nil so it groups under Files & Documents!
           url: nil,
           path: path,
-          workingDirectory: nil
+          workingDirectory: nil,
+          spaceIndex: event.spaceIndex,
+          isFullScreen: event.isFullScreen
         )]
     }
     
@@ -621,7 +631,9 @@ nonisolated enum WorkflowContextCapture {
       url: url.absoluteString,
       path: nil,
       workingDirectory: nil,
-      profileName: event.profileName
+      profileName: event.profileName,
+      spaceIndex: event.spaceIndex,
+      isFullScreen: event.isFullScreen
     )]
   }
 
@@ -655,7 +667,9 @@ nonisolated enum WorkflowContextCapture {
       bundleId: event.appBundleId,
       url: nil,
       path: nil,
-      workingDirectory: cwd
+      workingDirectory: cwd,
+      spaceIndex: event.spaceIndex,
+      isFullScreen: event.isFullScreen
     )]
   }
 
@@ -675,7 +689,9 @@ nonisolated enum WorkflowContextCapture {
         bundleId: event.appBundleId,
         url: nil,
         path: path,
-        workingDirectory: nil
+        workingDirectory: nil,
+        spaceIndex: event.spaceIndex,
+        isFullScreen: event.isFullScreen
       )]
     }
     return []

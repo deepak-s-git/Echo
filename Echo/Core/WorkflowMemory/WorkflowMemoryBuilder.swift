@@ -252,7 +252,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
                         bundleId: bundleId,
                         url: nil,
                         path: resolvedPath,
-                        workingDirectory: nil
+                        workingDirectory: nil,
+                        spaceIndex: events.last(where: { $0.appBundleId == bundleId && $0.spaceIndex != nil })?.spaceIndex,
+                        isFullScreen: events.last(where: { $0.appBundleId == bundleId && $0.spaceIndex != nil })?.isFullScreen
                     ))
                 }
             }
@@ -274,7 +276,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
                 bundleId: bundleId,
                 url: nil,
                 path: nil,
-                workingDirectory: nil
+                workingDirectory: nil,
+                spaceIndex: events.last(where: { $0.appBundleId == bundleId && $0.spaceIndex != nil })?.spaceIndex,
+                isFullScreen: events.last(where: { $0.appBundleId == bundleId && $0.spaceIndex != nil })?.isFullScreen
             ))
         }
 
@@ -358,7 +362,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
                     bundleId: nil, // set to nil to group under Files & Documents!
                     url: url,
                     path: path,
-                    workingDirectory: nil
+                    workingDirectory: nil,
+                    spaceIndex: sorted.last(where: { ($0.url == url || $0.windowTitle?.contains(cleanLabel) == true) && $0.spaceIndex != nil })?.spaceIndex,
+                    isFullScreen: sorted.last(where: { ($0.url == url || $0.windowTitle?.contains(cleanLabel) == true) && $0.spaceIndex != nil })?.isFullScreen
                 ))
                 continue
             }
@@ -379,7 +385,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
                 url: url,
                 path: nil,
                 workingDirectory: nil,
-                profileName: ctx.profileName
+                profileName: ctx.profileName,
+                spaceIndex: sorted.last(where: { $0.url == url && $0.spaceIndex != nil })?.spaceIndex,
+                isFullScreen: sorted.last(where: { $0.url == url && $0.spaceIndex != nil })?.isFullScreen
             ))
         }
 
@@ -393,7 +401,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
                     bundleId: nil,
                     url: nil,
                     path: folder,
-                    workingDirectory: nil
+                    workingDirectory: nil,
+                    spaceIndex: sorted.last(where: { $0.windowTitle?.contains(folder) == true && $0.spaceIndex != nil })?.spaceIndex,
+                    isFullScreen: sorted.last(where: { $0.windowTitle?.contains(folder) == true && $0.spaceIndex != nil })?.isFullScreen
                 ))
             }
         }
@@ -408,7 +418,9 @@ nonisolated enum WorkflowRestorePlanBuilder {
                     bundleId: "com.apple.Terminal",
                     url: nil,
                     path: nil,
-                    workingDirectory: cwd
+                    workingDirectory: cwd,
+                    spaceIndex: sorted.last(where: { $0.appBundleId == "com.apple.Terminal" && $0.spaceIndex != nil })?.spaceIndex,
+                    isFullScreen: sorted.last(where: { $0.appBundleId == "com.apple.Terminal" && $0.spaceIndex != nil })?.isFullScreen
                 ))
             }
         }

@@ -26,34 +26,130 @@ final class WorkflowRestoreEngine {
         var succeeded: [RestoreItem] = []
         var skipped: [RestoreItem] = []
         var failed: [(RestoreItem, String)] = []
-        let items = plan.items
-        let total = items.count
+        let allItems = plan.items
+        let total = allItems.count
+        var currentIndex = 0
 
-        for (index, item) in items.enumerated() {
-            progress?(index, total)
+
+
+        // Hide all apps that we're about to restore so macOS doesn't fight us
+        let allBundleIDs = Set(allItems.compactMap { $0.bundleId })
+        for bundleId in allBundleIDs {
+            for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleId) {
+                app.hide()
+            }
+        }
+
+        // --- Phase 1: Open ALL apps on the current desktop space ---
+        var itemsToFullScreen: [RestoreItem] = []
+        for item in allItems {
+            progress?(currentIndex, total)
             guard let restorer = restorers.first(where: { $0.canRestore(item) }) else {
                 failed.append((item, "No restorer available"))
+                currentIndex += 1
                 continue
             }
-            if await restorer.skipReasonIfAlreadyOpen(item) != nil {
+            if let reason = await restorer.skipReasonIfAlreadyOpen(item) {
                 skipped.append(item)
+                EchoLog.restore("Skipped \(item.label): \(reason)")
+                
+                // Track items that need to be fullscreened even if skipped (e.g. app already running but not fullscreen)
+                if item.isFullScreen == true {
+                    itemsToFullScreen.append(item)
+                }
+                
+                currentIndex += 1
                 continue
             }
             do {
                 try await restorer.restore(item)
                 succeeded.append(item)
                 EchoLog.restore("Restored \(item.label)")
+
+                // Track items that need to be fullscreened
+                if item.isFullScreen == true {
+                    itemsToFullScreen.append(item)
+                }
             } catch {
                 failed.append((item, error.localizedDescription))
                 EchoLog.restore("Failed \(item.label)", error: error)
             }
-            if index + 1 < items.count {
-                try? await Task.sleep(for: .milliseconds(800))
+            currentIndex += 1
+            try? await Task.sleep(for: .milliseconds(800))
+        }
+
+        // --- Phase 2: Make windows fullscreen ---
+        if !itemsToFullScreen.isEmpty {
+            // Wait a moment for all windows to finish appearing
+            try? await Task.sleep(for: .milliseconds(2000))
+
+            var targetWindowsToMaximize: [AXUIElement] = []
+            var maximizedWindows: [AXUIElement] = []
+
+            // For each item, find its window FIRST before we trigger any space transitions
+            for item in itemsToFullScreen {
+                guard let bundleId = item.bundleId else { continue }
+
+                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
+                    let axApp = AXUIElementCreateApplication(app.processIdentifier)
+                    var value: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &value) == .success,
+                       let windows = value as? [AXUIElement] {
+                        
+                        var targetWindow: AXUIElement?
+                        for window in windows {
+                            // Skip if we already marked this window to be maximized
+                            if targetWindowsToMaximize.contains(where: { CFEqual($0, window) }) ||
+                               maximizedWindows.contains(where: { CFEqual($0, window) }) {
+                                continue
+                            }
+                            
+                            var subrole: CFTypeRef?
+                            AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subrole)
+                            if subrole as? String != "AXStandardWindow" {
+                                continue
+                            }
+                            
+                            var currentFs: CFTypeRef?
+                            AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &currentFs)
+                            if currentFs as? Bool == true {
+                                maximizedWindows.append(window)
+                                continue
+                            }
+                            
+                            targetWindow = window
+                            break
+                        }
+                        
+                        if let window = targetWindow {
+                            targetWindowsToMaximize.append(window)
+                        }
+                    }
+                }
+            }
+            
+            for window in targetWindowsToMaximize {
+                AXUIElementSetAttributeValue(window, "AXFullScreen" as CFString, kCFBooleanTrue)
+                try? await Task.sleep(for: .milliseconds(1500))
             }
         }
+
         progress?(total, total)
 
         return RestoreResult(succeeded: succeeded, skipped: skipped, failed: failed)
+    }
+
+    /// Returns all on-screen window IDs (layer 0 only).
+    private static func allOnScreenWindowIDs() -> Set<UInt32> {
+        let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        var ids = Set<UInt32>()
+        for w in windowList {
+            guard let layer = w[kCGWindowLayer as String] as? Int, layer == 0,
+                  let wid = w[kCGWindowNumber as String] as? UInt32
+            else { continue }
+            ids.insert(wid)
+        }
+        return ids
     }
 }
 

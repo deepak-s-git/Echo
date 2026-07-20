@@ -38,7 +38,7 @@ Say hello to **Echo**, a lightweight and privacy-first workflow memory assistant
 
 ### Option 1: Direct Download (Recommended)
 
-[![Download Echo](https://img.shields.io/badge/Download_app_for-macOS-black?style=for-the-badge&logo=apple)](https://echo-macos.vercel.app/Echo.dmg)
+[![Download Echo](https://img.shields.io/badge/Download_app_for-macOS-black?style=for-the-badge&logo=apple)](https://echo-macos.vercel.app)
 
 > [!IMPORTANT]
 > Because Echo is distributed independently without App Store notarization, macOS will show a warning saying **"Echo cannot be opened because the developer cannot be verified"** on the first launch. 
@@ -79,14 +79,5 @@ Now, you can open the app normally!
 3. Set your signing team in **Signing & Capabilities** to your own developer account.
 4. Press `Cmd + R` to build and run!
 
----
 
-## License
 
-This project is licensed under the GNU General Public License v3.0 (GPL-3.0). See the [LICENSE](LICENSE) file for details.
-
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=deepak-s-git/Echo&type=Date)](https://star-history.com/#deepak-s-git/Echo&Date)

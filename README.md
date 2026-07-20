@@ -59,25 +59,3 @@ Now, you can open the app normally!
 5. Enter your Mac credentials and click **Open**.
 
 ---
-
-## Building from Source
-
-### Prerequisites
-- macOS 14.0 or later
-- Xcode 15.0 or later
-
-### Build Instructions
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/deepak-s-git/Echo.git
-   cd Echo
-   ```
-2. Open the project in Xcode:
-   ```bash
-   open Echo.xcodeproj
-   ```
-3. Set your signing team in **Signing & Capabilities** to your own developer account.
-4. Press `Cmd + R` to build and run!
-
-
-

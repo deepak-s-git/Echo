@@ -711,7 +711,6 @@ struct MenuBarView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(width: 82, alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
@@ -846,30 +845,27 @@ struct MenuBarView: View {
                         .buttonStyle(.plain)
                     }
                     
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach([
-                                ("Coding", "Coding"),
-                                ("Research", "Research"),
-                                ("Design", "Design"),
-                                ("Writing", "Writing")
-                            ], id: \.1) { label, name in
-                                Button {
-                                    Task {
-                                        await sessionControl.startNewSession(workflowName: name, appStore: appStore)
-                                    }
-                                } label: {
-                                    Text(label)
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.primary.opacity(0.04), in: Capsule())
-                                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ForEach([
+                            ("Coding", "Coding"),
+                            ("Research", "Research"),
+                            ("Design", "Design"),
+                            ("Writing", "Writing")
+                        ], id: \.1) { label, name in
+                            Button {
+                                Task {
+                                    await sessionControl.startNewSession(workflowName: name, appStore: appStore)
                                 }
-                                .buttonStyle(.plain)
+                            } label: {
+                                Text(label)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
                             }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
                 .opacity(activityStore.isSessionActive ? 0 : 1)

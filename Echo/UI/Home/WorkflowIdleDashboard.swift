@@ -82,7 +82,11 @@ struct WorkflowIdleDashboard: View {
             
             // Recent Sessions Section
             let hasResume = sessionStore.continueWorkflowThread != nil && sessionStore.continueSession != nil
-            let recent = Array(sessionStore.recentSessions.prefix(hasResume ? 2 : 3))
+            
+            let continueId = sessionStore.continueSession?.id
+            let filteredRecent = continueId != nil ? sessionStore.recentSessions.filter { $0.id != continueId } : sessionStore.recentSessions
+            
+            let recent = Array(filteredRecent.prefix(hasResume ? 2 : 3))
             if !recent.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Recent Sessions")

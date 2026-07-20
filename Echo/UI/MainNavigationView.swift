@@ -7,7 +7,8 @@ struct MainNavigationView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
+                .frame(width: 220)
+                .navigationSplitViewColumnWidth(220)
         } detail: {
             Group {
                 switch appStore.selectedTab {
@@ -21,7 +22,6 @@ struct MainNavigationView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationSplitViewStyle(.balanced)
         .sheet(item: $appStore.pendingSessionEnd) { request in
             SessionEndSheet(request: request)
                 .environmentObject(appStore)

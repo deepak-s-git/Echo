@@ -95,7 +95,7 @@ struct AboutPane: View {
                 AboutLinkRow(
                     icon: "lock.doc",
                     label: "Privacy Policy",
-                    action: { openURL("https://echo-macos.vercel.app") },
+                    action: { openURL("https://echo-macos.vercel.app/privacy") },
                     showDivider: true
                 )
 

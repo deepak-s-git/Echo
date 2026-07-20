@@ -548,7 +548,7 @@ struct TimelineView: View {
 
 // MARK: - Workflow thread card
 
-private struct WorkflowThreadCard: View {
+struct WorkflowThreadCard: View {
     let summary: WorkflowThreadSummary
     let logsExpanded: Bool
     let isSelectMode: Bool

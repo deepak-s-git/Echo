@@ -95,14 +95,14 @@ struct AboutPane: View {
                 AboutLinkRow(
                     icon: "lock.doc",
                     label: "Privacy Policy",
-                    action: { openURL("https://github.com") },
+                    action: { openURL("https://echo-macos.vercel.app") },
                     showDivider: true
                 )
 
                 AboutLinkRow(
                     icon: "ant",
                     label: "Report a Bug",
-                    action: { openURL("https://github.com/deepak-s-git/Echo/issues") },
+                    action: { openURL("https://github.com/deepak-s-git/Echo/security/advisories/new") },
                     showDivider: false
                 )
             }

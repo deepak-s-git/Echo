@@ -9,9 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/deepak-s-git/Echo/actions"><img src="https://img.shields.io/badge/Build-passing-success?style=flat-square&logo=github" alt="Build Status" /></a>
+  <img src="https://img.shields.io/badge/License-Proprietary-red?style=flat-square" alt="License" />
   <a href="https://echo-macos.vercel.app/appcast.xml"><img src="https://img.shields.io/badge/Sparkle_Feed-active-orange?style=flat-square&logo=rss" alt="Sparkle Feed" /></a>
-  <a href="https://github.com/deepak-s-git/Echo/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Platform-macOS_14.0+-black?style=flat-square&logo=apple" alt="Platform Support" />
 </p>
 

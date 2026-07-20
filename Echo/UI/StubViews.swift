@@ -28,9 +28,20 @@ struct SearchView: View {
     @FocusState private var isFocused: Bool
     
     @State private var searchResults: [SemanticSearchResult] = []
+    @State private var matchedWorkflows: [WorkflowThreadSummary] = []
+    @State private var expandedLogsThreadIds: Set<UUID> = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedCluster: WorkflowCluster? = nil
+
+    private var filteredWorkflows: [WorkflowThreadSummary] {
+        if let selectedCluster {
+            return matchedWorkflows.filter { summary in
+                (summary.segments.first?.cluster ?? .mixed) == selectedCluster
+            }
+        }
+        return matchedWorkflows
+    }
 
     private var filteredResults: [SemanticSearchResult] {
         if let selectedCluster {
@@ -69,7 +80,7 @@ struct SearchView: View {
                     .frame(width: 14, height: 14)
                     .animation(EchoDesign.subtle, value: isFocused)
 
-                    TextField("Search your workflows…", text: $query)
+                    TextField("Search workflows, sessions, or context…", text: $query)
                         .textFieldStyle(.plain)
                         .font(.system(size: 14, weight: .medium))
                         .focused($isFocused)
@@ -142,13 +153,13 @@ struct SearchView: View {
                     .padding(.vertical, 4)
                 }
 
-                if filteredResults.isEmpty {
+                if filteredResults.isEmpty && filteredWorkflows.isEmpty {
                     Spacer()
                     VStack(spacing: 12) {
                         Image(systemName: "sparkle.magnifyingglass")
                             .font(.system(size: 32, weight: .thin))
                             .foregroundStyle(EchoPalette.indigo.opacity(0.35))
-                        Text(selectedCluster != nil ? "No workflows in this category" : "No sessions match")
+                        Text(selectedCluster != nil ? "No workflows in this category" : "No matches found")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.secondary)
                         Text(selectedCluster != nil ? "Try clearing the filter or searching something else." : "Try searching for tags, app names, or titles.")
@@ -160,9 +171,59 @@ struct SearchView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
-                            ForEach(filteredResults) { result in
-                                SearchResultCard(result: result) {
-                                    appStore.openSessionDetail(result.session.id)
+                            if !filteredWorkflows.isEmpty {
+                                VStack(alignment: .leading) {
+                                    Text("Workflows")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.leading, 4)
+                                        .padding(.bottom, 2)
+                                    
+                                    ForEach(filteredWorkflows) { summary in
+                                        WorkflowThreadCard(
+                                            summary: summary,
+                                            logsExpanded: expandedLogsThreadIds.contains(summary.id),
+                                            isSelectMode: false,
+                                            isSessionSelectMode: false,
+                                            sessionSelectThreadId: nil as UUID?,
+                                            selectedSessionIds: Set<UUID>(),
+                                            onToggleLogs: {
+                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                                                    if expandedLogsThreadIds.contains(summary.id) {
+                                                        expandedLogsThreadIds.remove(summary.id)
+                                                    } else {
+                                                        expandedLogsThreadIds.removeAll()
+                                                        expandedLogsThreadIds.insert(summary.id)
+                                                    }
+                                                }
+                                            },
+                                            onSelectSegment: { appStore.openSessionDetail($0) },
+                                            onDeleteWorkflow: {},
+                                            onDeleteSession: { _, _ in },
+                                            onStartSessionSelect: {},
+                                            onToggleSessionSelect: { _ in }
+                                        )
+                                    }
+                                }
+                                .padding(.bottom, 8)
+                            }
+                            
+                            if !filteredResults.isEmpty {
+                                VStack(alignment: .leading) {
+                                    if !filteredWorkflows.isEmpty {
+                                        Text("Sessions & Context matches")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.secondary)
+                                            .padding(.leading, 4)
+                                            .padding(.bottom, 2)
+                                            .padding(.top, 8)
+                                    }
+                                    
+                                    ForEach(filteredResults) { result in
+                                        SearchResultCard(result: result) {
+                                            appStore.openSessionDetail(result.session.id)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -187,11 +248,25 @@ struct SearchView: View {
         
         self.isSearching = true
         searchTask = Task {
+            // 1. Semantic search
             let rawResults = await sessionStore.performSemanticSearch(query: trimmed)
+            let semanticSessionIds = rawResults.map { $0.sessionId }
+            
+            // 2. Text search for workflow/session titles
+            let textMatchedSessions = await sessionStore.searchSessions(query: trimmed, limit: 30)
+            
+            // 3. Search workflow threads directly
+            let workflowMatches = await sessionStore.searchWorkflowThreads(query: trimmed, limit: 15)
+            
+            // 4. Fetch full sessions for semantic results
+            let semanticSessions = await sessionStore.fetchSessions(ids: semanticSessionIds)
+            let semanticSessionsDict = Dictionary(uniqueKeysWithValues: semanticSessions.map { ($0.id, $0) })
             
             var mapped: [SemanticSearchResult] = []
+            
+            // Map semantic results
             for res in rawResults {
-                if let session = sessionStore.recentSessions.first(where: { $0.id == res.sessionId }) {
+                if let session = semanticSessionsDict[res.sessionId] {
                     let chunks = res.matchedChunks
                         .filter { $0.kind != "summary" }
                         .map { chunk in
@@ -208,18 +283,16 @@ struct SearchView: View {
                 }
             }
             
-            let lowerQ = trimmed.lowercased()
-            for sess in sessionStore.recentSessions {
-                if (sess.title ?? "").lowercased().contains(lowerQ) {
-                    if !mapped.contains(where: { $0.session.id == sess.id }) {
-                        mapped.append(SemanticSearchResult(
-                            session: sess,
-                            score: 0.5,
-                            matchedDocument: nil,
-                            matchedKind: nil,
-                            matchedChunks: []
-                        ))
-                    }
+            // Append text matches if not already present
+            for sess in textMatchedSessions {
+                if !mapped.contains(where: { $0.session.id == sess.id }) {
+                    mapped.append(SemanticSearchResult(
+                        session: sess,
+                        score: 1.0, // High score for direct text match
+                        matchedDocument: "Direct title match",
+                        matchedKind: "summary",
+                        matchedChunks: []
+                    ))
                 }
             }
             
@@ -228,6 +301,7 @@ struct SearchView: View {
             guard !Task.isCancelled else { return }
             
             await MainActor.run {
+                self.matchedWorkflows = workflowMatches
                 self.searchResults = mapped
                 self.isSearching = false
             }
@@ -303,10 +377,21 @@ private struct SearchResultCard: View {
                 .frame(width: 32, height: 32)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(result.session.title ?? "Untitled segment")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    HStack {
+                        Text(result.session.title ?? "Untitled segment")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        
+                        if let score = result.score, score > 0.15, result.matchedDocument != "Direct title match" {
+                            Text("\(Int(score * 100))% match")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(EchoPalette.glowBlue)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(EchoPalette.glowBlue.opacity(0.15), in: Capsule())
+                        }
+                    }
                     
                     if !result.matchedChunks.isEmpty {
                         // Show up to 2 distinct chunk type snippets

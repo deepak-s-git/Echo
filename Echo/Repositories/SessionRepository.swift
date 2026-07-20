@@ -43,6 +43,28 @@ final class SessionRepository: Sendable {
         }
     }
 
+    func fetchSessions(ids: [UUID]) async throws -> [Session] {
+        let idStrings = ids.map(\.uuidString)
+        return try await database.readAsync { db in
+            try Session
+                .filter(idStrings.contains(Column("id")))
+                .fetchAll(db)
+        }
+    }
+
+    func searchSessions(query: String, limit: Int = 30) async throws -> [Session] {
+        let likeQuery = "%\(query)%"
+        return try await database.readAsync { db in
+            let matchingThreadIds = try String.fetchAll(db, sql: "SELECT id FROM workflow_threads WHERE title LIKE ?", arguments: [likeQuery])
+            
+            return try Session
+                .filter(Column("title").like(likeQuery) || matchingThreadIds.contains(Column("workflowThreadId")))
+                .order(Column("startedAt").desc)
+                .limit(limit)
+                .fetchAll(db)
+        }
+    }
+
     func fetchInterrupted(limit: Int = 5) async throws -> [Session] {
         let cutoff = Date().addingTimeInterval(-EchoConfig.interruptedSessionWindow)
         return try await database.readAsync { db in
@@ -330,6 +352,26 @@ final class SessionRepository: Sendable {
                 .order(Column("lastActiveAt").desc)
                 .limit(limit)
                 .fetchAll(db)
+            return try threads.compactMap { thread in
+                let segments = try Session
+                    .filter(Column("workflowThreadId") == thread.id.uuidString)
+                    .order(Column("startedAt").desc)
+                    .fetchAll(db)
+                guard !segments.isEmpty else { return nil }
+                return WorkflowThreadSummary(thread: thread, segments: segments)
+            }
+        }
+    }
+
+    func searchWorkflowThreads(query: String, limit: Int = 30) async throws -> [WorkflowThreadSummary] {
+        let likeQuery = "%\(query)%"
+        return try await database.readAsync { db in
+            let threads = try WorkflowThread
+                .filter(Column("title").like(likeQuery))
+                .order(Column("lastActiveAt").desc)
+                .limit(limit)
+                .fetchAll(db)
+            
             return try threads.compactMap { thread in
                 let segments = try Session
                     .filter(Column("workflowThreadId") == thread.id.uuidString)

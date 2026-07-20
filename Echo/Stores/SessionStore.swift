@@ -152,6 +152,21 @@ final class SessionStore: ObservableObject {
         return await SemanticSearchEngine.shared.search(query: query, repository: repository)
     }
 
+    func searchSessions(query: String, limit: Int = 30) async -> [Session] {
+        guard let repository else { return [] }
+        return (try? await repository.searchSessions(query: query, limit: limit)) ?? []
+    }
+
+    func searchWorkflowThreads(query: String, limit: Int = 30) async -> [WorkflowThreadSummary] {
+        guard let repository else { return [] }
+        return (try? await repository.searchWorkflowThreads(query: query, limit: limit)) ?? []
+    }
+
+    func fetchSessions(ids: [UUID]) async -> [Session] {
+        guard let repository else { return [] }
+        return (try? await repository.fetchSessions(ids: ids)) ?? []
+    }
+
     func sessionDidStart(_ session: Session) {
         recentSessions.removeAll { $0.id == session.id }
         recentSessions.insert(session, at: 0)

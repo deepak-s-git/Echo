@@ -102,7 +102,7 @@ struct AboutPane: View {
                 AboutLinkRow(
                     icon: "ant",
                     label: "Report a Bug",
-                    action: { openURL("https://github.com/deepak-s-git/Echo/security/advisories/new") },
+                    action: { openURL("mailto:deepak.s.workdesk@gmail.com?subject=Echo%20Bug%20Report%20(v0.1)&body=Please%20describe%20the%20bug%3A") },
                     showDivider: false
                 )
             }

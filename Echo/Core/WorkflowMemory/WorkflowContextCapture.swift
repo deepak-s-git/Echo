@@ -207,7 +207,24 @@ nonisolated enum WorkflowContextCapture {
           return documentItems(event: event, seen: &seen)
       }
       
-      return pathItems(event: event, seen: &seen)
+      let pItems = pathItems(event: event, seen: &seen)
+      if !pItems.isEmpty {
+          return pItems
+      }
+      
+      let key = "app:\(event.appBundleId)"
+      guard seen.insert(key).inserted else { return [] }
+      return [RestoreItem(
+        id: UUID(),
+        kind: .application,
+        label: event.appName,
+        bundleId: event.appBundleId,
+        url: nil,
+        path: nil,
+        workingDirectory: nil,
+        spaceIndex: event.spaceIndex,
+        isFullScreen: event.isFullScreen
+      )]
     }
   }
 

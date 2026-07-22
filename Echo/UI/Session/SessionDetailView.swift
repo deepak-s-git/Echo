@@ -469,37 +469,76 @@ struct SessionDetailView: View {
                 }
 
                 if sessionDetailStore.isRestoring {
-                    ProgressView(value: sessionDetailStore.restoreProgress)
-                        .tint(EchoPalette.indigo)
-                }
-
-                Button {
-                    sessionDetailStore.prepareRestoreSelection()
-                } label: {
-                    HStack(spacing: 6) {
-                        if sessionDetailStore.isRestoring {
-                            ProgressView().controlSize(.small)
-                        } else {
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: "wand.and.stars.inverse")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(EchoPalette.indigo)
+                                .symbolEffect(.pulse, options: .repeating)
+                            
+                            Text(sessionDetailStore.restoreProgressText ?? "Restoring Workspace...")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Color.primary.opacity(0.85))
+                            
+                            Spacer()
+                            
+                            Text("\(Int(sessionDetailStore.restoreProgress * 100))%")
+                                .font(.system(size: 11, weight: .black, design: .monospaced))
+                                .foregroundStyle(EchoPalette.indigoSoft)
+                        }
+                        
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(Color.primary.opacity(0.06))
+                                    .frame(height: 6)
+                                
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [EchoPalette.indigo, EchoPalette.accent],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(0, geo.size.width * sessionDetailStore.restoreProgress), height: 6)
+                                    .shadow(color: EchoPalette.indigo.opacity(0.5), radius: 5, x: 0, y: 0)
+                            }
+                        }
+                        .frame(height: 6)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: sessionDetailStore.restoreProgress)
+                    }
+                    .padding(14)
+                    .background(Color.primary.opacity(0.03))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                } else {
+                    Button {
+                        sessionDetailStore.prepareRestoreSelection()
+                    } label: {
+                        HStack(spacing: 6) {
                             Image(systemName: "arrow.clockwise.circle.fill")
                                 .font(.system(size: 13, weight: .semibold))
+                            Text("Resume Workflow")
+                                .font(.system(size: 12, weight: .bold))
                         }
-                        Text("Resume Workflow")
-                            .font(.system(size: 12, weight: .bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(EchoPalette.indigo.opacity(0.12))
+                        .foregroundStyle(EchoPalette.indigoSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(EchoPalette.indigo.opacity(0.25), lineWidth: 0.5)
+                        )
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(
-                        EchoPalette.indigo.opacity(0.12)
-                    )
-                    .foregroundStyle(EchoPalette.indigoSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(EchoPalette.indigo.opacity(0.25), lineWidth: 0.5)
-                    )
+                    .buttonStyle(.plain)
+                    .echoHoverHighlight()
                 }
-                .buttonStyle(.plain)
-                .disabled(sessionDetailStore.isRestoring)
             }
         }
         .padding(EchoDesign.cardPadding)

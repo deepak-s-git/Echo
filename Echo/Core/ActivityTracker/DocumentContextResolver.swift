@@ -37,12 +37,20 @@ enum DocumentContextResolver {
 
     /// Reads document context for a specific AX window element.
     static func resolve(windowElement: AXUIElement, appName: String) -> DocumentContext? {
+        var docURLResult: String? = nil
+        var docNameResult: String? = nil
+
         // 1. Try kAXDocument — gives a full "file:///…" string (most reliable)
         if let docURL = copyString(windowElement, "AXDocument" as CFString),
            !docURL.isEmpty {
+            docURLResult = docURL
             let name = URL(string: docURL)?.lastPathComponent
                     ?? URL(fileURLWithPath: docURL).lastPathComponent
-            if !name.isEmpty { return DocumentContext(name: name, fileURL: docURL) }
+            
+            let lowerName = name.lowercased()
+            if !name.isEmpty && lowerName != "storeuid" && !lowerName.hasPrefix("id=") {
+                docNameResult = name
+            }
         }
 
         // 2. Parse window title: "Design.pdf — Preview" → "Design.pdf"
@@ -51,8 +59,12 @@ enum DocumentContextResolver {
             let parsed = stripAppSuffix(from: title, appName: appName)
             // Only meaningful if it actually differs and looks like a document name
             if !parsed.isEmpty, parsed != appName, looksLikeDocument(parsed, appName: appName) {
-                return DocumentContext(name: parsed, fileURL: nil)
+                docNameResult = docNameResult ?? parsed
             }
+        }
+
+        if let finalName = docNameResult {
+            return DocumentContext(name: finalName, fileURL: docURLResult)
         }
 
         return nil

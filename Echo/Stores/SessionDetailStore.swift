@@ -21,6 +21,7 @@ final class SessionDetailStore: ObservableObject {
     @Published private(set) var isRestoring = false
     @Published private(set) var restoreProgress: Double = 0
     @Published private(set) var restoreMessage: String?
+    @Published private(set) var restoreProgressText: String?
     @Published var showRestoreSelection = false
     @Published var selectableRestoreItems: [RestoreWeighting.SelectableItem] = []
 
@@ -128,8 +129,9 @@ final class SessionDetailStore: ObservableObject {
         let result = await restoreEngine.restore(plan: plan) { [weak self] done, total in
             let progress = total > 0 ? Double(done) / Double(total) : 0
             self?.restoreProgress = progress
-            self?.restoreMessage = total > 0 ? "Restoring \(done)/\(total)…" : nil
+            self?.restoreProgressText = total > 0 ? "Restoring \(done) of \(total)..." : nil
         }
+        restoreProgressText = nil
         if result.failed.isEmpty {
             var parts: [String] = []
             if result.succeeded.count > 0 { parts.append("\(result.succeeded.count) opened") }

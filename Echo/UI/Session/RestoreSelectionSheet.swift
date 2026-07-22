@@ -380,31 +380,9 @@ struct RestoreSelectionSheet: View {
     }
 
     private func appName(for bundleId: String) -> String {
-        if bundleId.contains("Chrome") { return "Google Chrome" }
-        if bundleId.contains("Safari") { return "Safari" }
-        if bundleId.contains("Arc") { return "Arc" }
-        if bundleId.contains("Brave") { return "Brave Browser" }
-        if bundleId.contains("Finder") { return "Finder" }
-        if bundleId.contains("Preview") { return "Preview" }
-        // Apple iWork
-        if bundleId == "com.apple.iWork.Pages" { return "Pages" }
-        if bundleId == "com.apple.iWork.Numbers" { return "Numbers" }
-        if bundleId == "com.apple.iWork.Keynote" { return "Keynote" }
-        if bundleId == "com.apple.TextEdit" { return "TextEdit" }
-        // Microsoft Office
-        if bundleId == "com.microsoft.Word" { return "Microsoft Word" }
-        if bundleId == "com.microsoft.Excel" { return "Microsoft Excel" }
-        if bundleId == "com.microsoft.Powerpoint" { return "Microsoft PowerPoint" }
-        if bundleId == "com.microsoft.onenote.mac" { return "Microsoft OneNote" }
-        if bundleId == "com.microsoft.Outlook" { return "Microsoft Outlook" }
-        // LibreOffice
-        if bundleId.contains("libreoffice") { return "LibreOffice" }
-        if bundleId.contains("openoffice") { return "OpenOffice" }
-        // Adobe
-        if bundleId == "com.adobe.Photoshop" { return "Adobe Photoshop" }
-        if bundleId == "com.adobe.Illustrator" { return "Adobe Illustrator" }
-        if bundleId == "com.adobe.InDesign" { return "Adobe InDesign" }
-        if bundleId.contains("adobe.Acrobat") || bundleId.contains("adobe.Reader") { return "Adobe Acrobat" }
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            return url.deletingPathExtension().lastPathComponent
+        }
         return bundleId.components(separatedBy: ".").last?.capitalized ?? bundleId
     }
 
@@ -438,28 +416,51 @@ struct RestoreSelectionSheet: View {
     }
 
     private func humanizedProfileName(bundleId: String, directoryName: String) -> String {
-        let base: URL
-        if bundleId.contains("Chrome") {
-            base = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support/Google/Chrome")
-        } else if bundleId.contains("Brave") {
-            base = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support/BraveSoftware/Brave-Browser")
-        } else if bundleId.contains("Edge") {
-            base = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support/Microsoft Edge")
-        } else {
-            return directoryName
+        let appSupport = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        let appNameStr = appName(for: bundleId)
+        
+        // Build possible paths (standard Chromium conventions)
+        var possibleBases: [URL] = [
+            appSupport.appendingPathComponent(appNameStr),
+            appSupport.appendingPathComponent(appNameStr.replacingOccurrences(of: " ", with: "")),
+            appSupport.appendingPathComponent(bundleId)
+        ]
+        
+        // Add common specific vendor paths as fallbacks
+        let lowerBundleId = bundleId.lowercased()
+        if lowerBundleId.contains("chrome") { possibleBases.insert(appSupport.appendingPathComponent("Google/Chrome"), at: 0) }
+        if lowerBundleId.contains("brave") { possibleBases.insert(appSupport.appendingPathComponent("BraveSoftware/Brave-Browser"), at: 0) }
+        if lowerBundleId.contains("edge") { possibleBases.insert(appSupport.appendingPathComponent("Microsoft Edge"), at: 0) }
+        
+        var base: URL? = nil
+        for url in possibleBases {
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent("Local State").path) {
+                base = url
+                break
+            }
         }
         
-        let prefsURL = base.appendingPathComponent(directoryName).appendingPathComponent("Preferences")
-        guard let data = try? Data(contentsOf: prefsURL),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let profile = json["profile"] as? [String: Any],
-              let name = profile["name"] as? String else {
-            return directoryName
+        guard let validBase = base else { return directoryName }
+        
+        let localStateURL = validBase.appendingPathComponent("Local State")
+        if let data = try? Data(contentsOf: localStateURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let profile = json["profile"] as? [String: Any],
+           let cache = profile["info_cache"] as? [String: Any],
+           let dirInfo = cache[directoryName] as? [String: Any],
+           let name = dirInfo["name"] as? String {
+            return name
         }
-        return name
+        
+        let prefsURL = validBase.appendingPathComponent(directoryName).appendingPathComponent("Preferences")
+        if let data = try? Data(contentsOf: prefsURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let profile = json["profile"] as? [String: Any],
+           let name = profile["name"] as? String {
+            return name
+        }
+        
+        return directoryName
     }
 
     // MARK: - Selection Bindings

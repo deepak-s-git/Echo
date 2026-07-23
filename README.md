@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/License-Proprietary-red?style=flat-square" alt="License" />
+  <a href="https://github.com/deepak-s-git/Echo/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
   <a href="https://echo-macos.vercel.app/appcast.xml"><img src="https://img.shields.io/badge/Sparkle_Feed-active-orange?style=flat-square&logo=rss" alt="Sparkle Feed" /></a>
   <img src="https://img.shields.io/badge/Platform-macOS_14.0+-black?style=flat-square&logo=apple" alt="Platform Support" />
 </p>
@@ -58,3 +58,25 @@ Now, you can open the app normally!
 5. Enter your Mac credentials and click **Open**.
 
 ---
+
+## 🛠 Build from Source
+
+If you prefer to compile Echo yourself:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/deepak-s-git/Echo.git
+   cd Echo
+   ```
+2. Open the project in Xcode:
+   ```bash
+   open Echo.xcodeproj
+   ```
+3. Set your active scheme to **Echo**.
+4. Build and Run (`Cmd + R`).
+
+---
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=deepak-s-git/Echo&type=Date)](https://star-history.com/#deepak-s-git/Echo&Date)

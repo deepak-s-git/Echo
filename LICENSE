@@ -1,17 +1,21 @@
-Copyright (c) 2026 Deepak S. All rights reserved.
+MIT License
 
-This source code, repository, and any associated documentation (the "Software") are the proprietary and confidential property of the copyright holder.
+Copyright (c) 2026 Deepak
 
-GRANT OF LICENSE (READ-ONLY)
-You are granted a limited, non-exclusive, non-transferable license to read and view the source code solely for educational, personal, or employment review purposes. 
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-RESTRICTIONS
-1. NO COMMERCIAL USE: You may not use this Software or any part of it for any commercial purpose, including but not limited to monetizing, selling, leasing, or offering it as a service.
-2. NO DISTRIBUTION: You may not copy, distribute, publish, or publicly display the Software, either in its original form or as a compiled product.
-3. NO MODIFICATIONS: You may not modify, adapt, translate, reverse-engineer, decompile, or create derivative works based on this Software. You may not use this code as a foundation or reference for competing products.
-4. NO OPEN SOURCE STATUS: This Software is NOT open source. Access to the source code does not constitute a waiver of any intellectual property rights.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-DISCLAIMER OF WARRANTY
-THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED. THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE.
-
-By accessing, viewing, or interacting with this repository, you acknowledge and agree to be legally bound by these terms. Any unauthorized use, reproduction, or distribution of this Software will result in immediate legal action, including but not limited to DMCA takedown notices and claims for damages.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

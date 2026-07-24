@@ -196,6 +196,11 @@ actor SessionEngine {
         await sessionStore.loadRecent()
     }
 
+    func togglePinWorkflowThread(id: UUID) async throws {
+        try await repository.togglePinWorkflowThread(id: id)
+        await sessionStore.loadRecent()
+    }
+
     private func handleIdleTimeout() async {
         guard isRecordingEnabled else { return }
 

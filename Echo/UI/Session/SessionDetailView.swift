@@ -88,7 +88,15 @@ struct SessionDetailView: View {
             RestoreSelectionSheet(
                 items: $sessionDetailStore.selectableRestoreItems,
                 onRestore: {
-                    Task { await sessionDetailStore.restoreSelectedItems() }
+                    Task {
+                        await sessionDetailStore.restoreSelectedItems()
+                        if let mem = sessionDetailStore.memory {
+                            await MainActor.run {
+                                appStore.activeRestoredSessionId = mem.session.id
+                                appStore.activeRestoredSessionTitle = mem.session.title ?? "Untitled Session"
+                            }
+                        }
+                    }
                 },
                 onRestoreAndContinue: {
                     Task {

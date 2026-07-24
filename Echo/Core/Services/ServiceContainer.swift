@@ -152,6 +152,11 @@ final class ServiceContainer {
         await sessionStore.loadRecent()
     }
 
+    func togglePinWorkflowThread(id: UUID) async throws {
+        try await sessionEngine.togglePinWorkflowThread(id: id)
+        await sessionStore.loadRecent()
+    }
+
     func renameWorkflowThread(id: UUID, title: String, tags: [String]) async {
         try? await sessionRepository.updateThreadMetadata(
             threadId: id,

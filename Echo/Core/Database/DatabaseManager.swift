@@ -207,6 +207,12 @@ nonisolated final class DatabaseManager: Sendable {
             }
         }
 
+        migrator.registerMigration("v5_workflow_pins") { db in
+            try db.alter(table: WorkflowThread.databaseTableName) { t in
+                t.add(column: "isPinned", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         try migrator.migrate(pool)
     }
 

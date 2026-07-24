@@ -349,7 +349,7 @@ final class SessionRepository: Sendable {
     func fetchWorkflowThreads(limit: Int = 40) async throws -> [WorkflowThreadSummary] {
         try await database.readAsync { db in
             let threads = try WorkflowThread
-                .order(Column("lastActiveAt").desc)
+                .order(Column("isPinned").desc, Column("lastActiveAt").desc)
                 .limit(limit)
                 .fetchAll(db)
             return try threads.compactMap { thread in
@@ -368,7 +368,7 @@ final class SessionRepository: Sendable {
         return try await database.readAsync { db in
             let threads = try WorkflowThread
                 .filter(Column("title").like(likeQuery))
-                .order(Column("lastActiveAt").desc)
+                .order(Column("isPinned").desc, Column("lastActiveAt").desc)
                 .limit(limit)
                 .fetchAll(db)
             
@@ -389,6 +389,20 @@ final class SessionRepository: Sendable {
                 .filter(Column("statusRaw") != WorkflowThreadStatus.archived.rawValue)
                 .order(Column("lastActiveAt").desc)
                 .fetchOne(db)
+        }
+    }
+
+    func togglePinWorkflowThread(id: UUID) async throws {
+        try await database.writeAsync { db in
+            guard var thread = try WorkflowThread.fetchOne(db, key: id.uuidString) else { return }
+            if !thread.isPinned {
+                let pinnedCount = try WorkflowThread.filter(Column("isPinned") == true).fetchCount(db)
+                if pinnedCount >= 3 {
+                    throw NSError(domain: "Echo.WorkflowThread", code: 1, userInfo: [NSLocalizedDescriptionKey: "You can only pin up to 3 workflows at a time."])
+                }
+            }
+            thread.isPinned.toggle()
+            try thread.update(db)
         }
     }
 

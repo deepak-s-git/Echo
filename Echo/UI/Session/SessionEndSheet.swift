@@ -46,6 +46,7 @@ struct SessionEndSheet: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
+                .tint(EchoPalette.accent)
                 .disabled(isWorking)
             }
         }
@@ -74,6 +75,7 @@ struct SessionEndSheet: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         sessionControl.confirmEndSession(
+            sessionId: request.sessionId,
             title: title.isEmpty ? "Untitled session" : title,
             tags: tags,
             appStore: appStore

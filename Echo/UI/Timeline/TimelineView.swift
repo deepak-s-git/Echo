@@ -13,6 +13,7 @@ struct TimelineView: View {
     // Alerts & Confirmations
     private enum ActiveAlert: Identifiable {
         case deleteSingle(WorkflowThreadSummary)
+        case pinLimitReached
         case eraseAll
         case bulkDelete(count: Int)
         case deleteSession(Session, index: Int)
@@ -22,6 +23,8 @@ struct TimelineView: View {
             switch self {
             case .deleteSingle(let summary):
                 return "delete-single-\(summary.id.uuidString)"
+            case .pinLimitReached:
+                return "pin-limit-reached"
             case .eraseAll:
                 return "erase-all"
             case .bulkDelete(let count):
@@ -346,6 +349,15 @@ struct TimelineView: View {
                                             } else {
                                                 selectedSessionIds.insert(id)
                                             }
+                                        },
+                                        onTogglePin: {
+                                            Task {
+                                                do {
+                                                    try await sessionControl.togglePinWorkflowThread(id: summary.id)
+                                                } catch {
+                                                    activeAlert = .pinLimitReached
+                                                }
+                                            }
                                         }
                                     )
                                     .disabled(isSelectMode || (isSessionSelectMode && sessionSelectThreadId != summary.id))
@@ -414,6 +426,12 @@ struct TimelineView: View {
                         }
                     },
                     secondaryButton: .cancel()
+                )
+            case .pinLimitReached:
+                return Alert(
+                    title: Text("Pin Limit Reached"),
+                    message: Text("You can only pin up to 3 workflows at a time. Please unpin a workflow before pinning another."),
+                    dismissButton: .default(Text("OK"))
                 )
             case .bulkDelete(let count):
                 return Alert(
@@ -561,6 +579,7 @@ struct WorkflowThreadCard: View {
     let onDeleteSession: (Session, Int) -> Void
     let onStartSessionSelect: () -> Void
     let onToggleSessionSelect: (UUID) -> Void
+    let onTogglePin: () -> Void
 
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var sessionControl: SessionControlStore
@@ -588,6 +607,13 @@ struct WorkflowThreadCard: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         
+                        if summary.thread.isPinned {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(EchoPalette.accent)
+                                .rotationEffect(.degrees(45))
+                        }
+
                         if summary.thread.statusRaw == "archived" {
                             Text("Archived")
                                 .font(.system(size: 9, weight: .bold))
@@ -666,6 +692,10 @@ struct WorkflowThreadCard: View {
                     // 3-dot Menu Button (discoverable card actions)
                     Menu {
                         if !isSelectMode && !isSessionSelectMode {
+                            Button(summary.thread.isPinned ? "Unpin workflow" : "Pin workflow") {
+                                onTogglePin()
+                            }
+
                             Button("Rename workflow") {
                                 appStore.renameThreadDraft = WorkflowThreadRenameDraft(
                                     threadId: summary.id,

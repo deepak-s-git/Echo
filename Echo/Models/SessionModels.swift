@@ -149,6 +149,7 @@ nonisolated struct WorkflowThread: Identifiable, Codable, FetchableRecord, Persi
     var statusRaw: String
     var tagsJSON: String?
     var totalAccumulatedDuration: TimeInterval
+    var isPinned: Bool
 
     static let databaseTableName = "workflow_threads"
 
@@ -159,7 +160,8 @@ nonisolated struct WorkflowThread: Identifiable, Codable, FetchableRecord, Persi
         lastActiveAt: Date = Date(),
         statusRaw: String = WorkflowThreadStatus.idle.rawValue,
         tagsJSON: String? = nil,
-        totalAccumulatedDuration: TimeInterval = 0
+        totalAccumulatedDuration: TimeInterval = 0,
+        isPinned: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -168,6 +170,7 @@ nonisolated struct WorkflowThread: Identifiable, Codable, FetchableRecord, Persi
         self.statusRaw = statusRaw
         self.tagsJSON = tagsJSON
         self.totalAccumulatedDuration = totalAccumulatedDuration
+        self.isPinned = isPinned
     }
 
     var status: WorkflowThreadStatus {
@@ -189,6 +192,7 @@ nonisolated struct WorkflowThread: Identifiable, Codable, FetchableRecord, Persi
         container["statusRaw"] = statusRaw
         container["tagsJSON"] = tagsJSON
         container["totalAccumulatedDuration"] = totalAccumulatedDuration
+        container["isPinned"] = isPinned
     }
 
     init(row: Row) throws {
@@ -199,6 +203,7 @@ nonisolated struct WorkflowThread: Identifiable, Codable, FetchableRecord, Persi
         statusRaw = row["statusRaw"] ?? WorkflowThreadStatus.idle.rawValue
         tagsJSON = row["tagsJSON"]
         totalAccumulatedDuration = row["totalAccumulatedDuration"] ?? 0
+        isPinned = row["isPinned"] ?? false
     }
 }
 

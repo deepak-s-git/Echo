@@ -201,7 +201,8 @@ struct SearchView: View {
                                             onDeleteWorkflow: {},
                                             onDeleteSession: { _, _ in },
                                             onStartSessionSelect: {},
-                                            onToggleSessionSelect: { _ in }
+                                            onToggleSessionSelect: { _ in },
+                                            onTogglePin: {}
                                         )
                                     }
                                 }
@@ -899,57 +900,87 @@ struct MenuBarView: View {
 
                 // ── IDLE branch ────────────────────────────────────────
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Start Workflow Recording")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.secondary)
-                    
-                    HStack(spacing: 8) {
-                        TextField("Enter workflow name...", text: $newWorkflowName)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                    if appStore.activeRestoredSessionId != nil {
+                        Text("Viewing Restored Workspace")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.secondary)
                         
-                        Button {
-                            Task {
-                                let name = newWorkflowName.isEmpty ? "Quick Workflow" : newWorkflowName
-                                await sessionControl.startNewSession(workflowName: name, appStore: appStore)
-                                newWorkflowName = ""
-                            }
-                        } label: {
-                            Image(systemName: "record.circle.fill")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.red)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.red.opacity(0.2), lineWidth: 0.5))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        ForEach([
-                            ("Coding", "Coding"),
-                            ("Research", "Research"),
-                            ("Design", "Design"),
-                            ("Writing", "Writing")
-                        ], id: \.1) { label, name in
+                        VStack(alignment: .center, spacing: 12) {
+                            Text(appStore.activeRestoredSessionTitle ?? "Untitled Session")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(EchoPalette.indigoSoft)
+                                .lineLimit(1)
+                            
                             Button {
-                                Task {
-                                    await sessionControl.startNewSession(workflowName: name, appStore: appStore)
-                                }
+                                sessionControl.closeRestoredWorkspace(appStore: appStore)
                             } label: {
-                                Text(label)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 6)
-                                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
-                                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                                HStack {
+                                    Image(systemName: "xmark.circle.fill")
+                                    Text("Close Workspace")
+                                }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(EchoPalette.destructive, in: RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
+                        }
+                        .padding(.top, 4)
+                        
+                    } else {
+                        Text("Start Workflow Recording")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.secondary)
+                        
+                        HStack(spacing: 8) {
+                            TextField("Enter workflow name...", text: $newWorkflowName)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12, weight: .medium))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+                                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                            
+                            Button {
+                                Task {
+                                    let name = newWorkflowName.isEmpty ? "Quick Workflow" : newWorkflowName
+                                    await sessionControl.startNewSession(workflowName: name, appStore: appStore)
+                                    newWorkflowName = ""
+                                }
+                            } label: {
+                                Image(systemName: "record.circle.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.red.opacity(0.2), lineWidth: 0.5))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach([
+                                ("Coding", "Coding"),
+                                ("Research", "Research"),
+                                ("Design", "Design"),
+                                ("Writing", "Writing")
+                            ], id: \.1) { label, name in
+                                Button {
+                                    Task {
+                                        await sessionControl.startNewSession(workflowName: name, appStore: appStore)
+                                    }
+                                } label: {
+                                    Text(label)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 6)
+                                        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
@@ -968,7 +999,7 @@ struct MenuBarView: View {
             // Card 3: Recent Memories list
             let recentMemories = sessionStore.recentSessions.prefix(3)
             VStack(alignment: .leading, spacing: 8) {
-                Text("RECENT MEMORIES")
+                Text("RECENT SESSIONS")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 2)
@@ -1102,6 +1133,8 @@ struct MenuBarView: View {
             try? await Task.sleep(for: .seconds(1.2))
             await MainActor.run {
                 restoringSessionId = nil
+                appStore.activeRestoredSessionId = session.id
+                appStore.activeRestoredSessionTitle = session.title ?? "Untitled Session"
             }
         }
     }

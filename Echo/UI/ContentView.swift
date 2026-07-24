@@ -70,5 +70,8 @@ struct ContentView: View {
             appStore.selectedTab = .search
             appStore.isSearchPresented = true
         }
+        .sheet(item: $appStore.pendingQuitAppsRequest) { request in
+            QuitSessionAppsSheet(request: request)
+        }
     }
 }

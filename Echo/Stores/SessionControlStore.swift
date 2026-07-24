@@ -61,6 +61,7 @@ final class SessionControlStore: ObservableObject {
     }
 
     func confirmEndSession(
+        sessionId: UUID,
         title: String,
         tags: [String],
         appStore: AppStore
@@ -71,10 +72,49 @@ final class SessionControlStore: ObservableObject {
         appStore.finalizingToast = "Finalizing workflow…"
         Task {
             await container?.endCurrentSession(title: title, tags: tags)
+            let appsToQuit = await fetchAppsForQuit(sessionId: sessionId)
+            
             await MainActor.run {
                 appStore.finalizingToast = nil
+                if !appsToQuit.isEmpty {
+                    appStore.pendingQuitAppsRequest = QuitAppsRequest(apps: appsToQuit)
+                }
             }
         }
+    }
+    
+    func closeRestoredWorkspace(appStore: AppStore) {
+        guard let sessionId = appStore.activeRestoredSessionId else { return }
+        appStore.activeRestoredSessionId = nil
+        appStore.activeRestoredSessionTitle = nil
+        
+        Task {
+            let appsToQuit = await fetchAppsForQuit(sessionId: sessionId)
+            await MainActor.run {
+                if !appsToQuit.isEmpty {
+                    appStore.pendingQuitAppsRequest = QuitAppsRequest(apps: appsToQuit)
+                }
+            }
+        }
+    }
+    
+    private func fetchAppsForQuit(sessionId: UUID) async -> [TrackedAppInfo] {
+        var appsToQuit: [TrackedAppInfo] = []
+        if let repo = container?.repository(),
+           let activities = try? await repo.fetchActivities(sessionId: sessionId) {
+            var uniqueApps = Set<String>()
+            for activity in activities {
+                let bundleId = activity.appBundleId
+                let appName = activity.appName
+                if bundleId == Bundle.main.bundleIdentifier || bundleId == "com.apple.finder" { continue }
+                
+                if !uniqueApps.contains(bundleId) {
+                    uniqueApps.insert(bundleId)
+                    appsToQuit.append(TrackedAppInfo(bundleIdentifier: bundleId, appName: appName))
+                }
+            }
+        }
+        return appsToQuit
     }
 
     func deleteSession(id: UUID, appStore: AppStore) async {
@@ -106,6 +146,10 @@ final class SessionControlStore: ObservableObject {
 
     func unarchiveWorkflowThread(id: UUID) async {
         await container?.unarchiveWorkflowThread(id: id)
+    }
+
+    func togglePinWorkflowThread(id: UUID) async throws {
+        try await container?.togglePinWorkflowThread(id: id)
     }
 
     func renameWorkflowThread(id: UUID, title: String, tags: [String]) async {

@@ -14,13 +14,33 @@ struct RestoreSelectionSheet: View {
             EchoPalette.graphiteElevated.ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Resume Workflow")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.primary)
-                    Text("Choose what to reopen. Items you focused on for 2+ minutes are pre-selected.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.secondary.opacity(0.85))
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Resume Workflow")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.primary)
+                        Text("Choose what to reopen. Items you focused on for 2+ minutes are pre-selected.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.secondary.opacity(0.85))
+                    }
+                    
+                    Spacer()
+                    
+                    let allSelected = items.allSatisfy { $0.isSelected }
+                    Button {
+                        let targetState = !allSelected
+                        for i in items.indices {
+                            items[i].isSelected = targetState
+                        }
+                    } label: {
+                        Text(allSelected ? "Deselect All" : "Select All")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(EchoPalette.indigoSoft)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(EchoPalette.indigo.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 4)
 

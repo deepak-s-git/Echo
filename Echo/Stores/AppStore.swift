@@ -23,6 +23,9 @@ final class AppStore: ObservableObject {
     @Published var timelineDetailSessionId: UUID?
 
     @Published var pendingSessionEnd: SessionEndRequest?
+    @Published var pendingQuitAppsRequest: QuitAppsRequest?
+    @Published var activeRestoredSessionId: UUID?
+    @Published var activeRestoredSessionTitle: String?
     @Published var renameSessionDraft: SessionRenameDraft?
     @Published var renameThreadDraft: WorkflowThreadRenameDraft?
     @Published var finalizingToast: String?
@@ -89,4 +92,15 @@ struct WorkflowThreadRenameDraft: Identifiable {
     var tags: [String]
 
     var id: UUID { threadId }
+}
+
+struct TrackedAppInfo: Identifiable, Hashable {
+    let bundleIdentifier: String
+    let appName: String
+    var id: String { bundleIdentifier }
+}
+
+struct QuitAppsRequest: Identifiable {
+    let id = UUID()
+    let apps: [TrackedAppInfo]
 }

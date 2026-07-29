@@ -15,7 +15,7 @@ actor SemanticSearchEngine {
 
     func generateChunks(session: Session, activities: [ActivityEvent]) -> [(kind: String, document: String)] {
         // Exclude Echo itself from indexing
-        let selfBundleId = "com.deepaks.EchoTest2"
+        let selfBundleId = "com.deepaks.Echo"
         let activities = activities.filter { $0.appBundleId != selfBundleId }
 
         var chunks: [(kind: String, document: String)] = []

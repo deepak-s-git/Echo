@@ -216,7 +216,7 @@ actor ActivityTracker {
 
         // Skip ignored apps
         let ignoredIds = await MainActor.run { EchoSettings.shared.ignoredBundleIds }
-        let isEcho = snapshot.bundleId == (Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2")
+        let isEcho = snapshot.bundleId == (Bundle.main.bundleIdentifier ?? "com.deepaks.Echo")
         if ignoredIds.contains(snapshot.bundleId) || isEcho {
             closeCurrentAppFocus(at: Date())
             return

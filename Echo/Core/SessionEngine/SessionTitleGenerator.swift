@@ -6,7 +6,7 @@ enum SessionTitleGenerator {
     @MainActor
     static func generate(from events: [ActivityEvent], startedAt: Date) -> String {
         // Exclude Echo itself from title generation
-        let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2"
+        let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.Echo"
         let filtered = events.filter { $0.appBundleId != selfBundleId }
 
         guard !filtered.isEmpty else {

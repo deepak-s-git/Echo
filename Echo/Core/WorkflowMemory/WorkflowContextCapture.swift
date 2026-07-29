@@ -144,7 +144,7 @@ nonisolated enum WorkflowContextCapture {
 
   static func itemsForEvent(_ event: ActivityEvent, duration: TimeInterval, urlDurations: [String: TimeInterval] = [:], tabEligibility: Double? = nil, seen: inout Set<String>) -> [RestoreItem] {
     // Never include Echo itself in restore plans
-    let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2"
+    let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.Echo"
     guard event.appBundleId != selfBundleId else { return [] }
 
     let threshold = tabEligibility ?? {
@@ -293,7 +293,7 @@ nonisolated enum WorkflowContextCapture {
     else { return [] }
     
     let resolvedPath: String
-    if event.appBundleId == "com.microsoft.VSCode" || event.appBundleId == "com.todesktop.230313mzl4w4u92" || event.appBundleId == "com.google.antigravity-ide" || event.appBundleId == "com.google.antigravity" {
+    if event.appBundleId == "com.apple.dt.Xcode" || event.appBundleId == "com.microsoft.VSCode" || event.appBundleId == "com.todesktop.230313mzl4w4u92" || event.appBundleId == "com.google.antigravity-ide" || event.appBundleId == "com.google.antigravity" {
       resolvedPath = resolveProjectRoot(filePath: path, windowTitle: event.windowTitle, bundleId: event.appBundleId)
     } else {
       resolvedPath = path
@@ -485,6 +485,26 @@ nonisolated enum WorkflowContextCapture {
     } else {
       if !fileURL.pathExtension.isEmpty {
         startURL = fileURL.deletingLastPathComponent()
+      }
+    }
+    
+    if bundleId == "com.apple.dt.Xcode" {
+      var current = startURL
+      while current.path != "/" && current.path != "/Users" {
+        if let enumerator = FileManager.default.enumerator(at: current, includingPropertiesForKeys: nil, options: [.skipsSubdirectoryDescendants, .skipsHiddenFiles]) {
+          var xcodeprojPath: String? = nil
+          while let url = enumerator.nextObject() as? URL {
+            if url.pathExtension == "xcworkspace" {
+              return url.path
+            } else if url.pathExtension == "xcodeproj" {
+              xcodeprojPath = url.path
+            }
+          }
+          if let proj = xcodeprojPath {
+            return proj
+          }
+        }
+        current = current.deletingLastPathComponent()
       }
     }
     

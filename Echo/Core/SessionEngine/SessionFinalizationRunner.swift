@@ -21,7 +21,7 @@ nonisolated enum SessionFinalizationRunner {
 
         let allEvents = (try? await repository.fetchActivities(sessionId: session.id)) ?? []
         // Exclude Echo itself from all session metrics and finalization
-        let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.EchoTest2"
+        let selfBundleId = Bundle.main.bundleIdentifier ?? "com.deepaks.Echo"
         let events = allEvents.filter { $0.appBundleId != selfBundleId }
 
         let startedAt = session.startedAt

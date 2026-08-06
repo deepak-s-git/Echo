@@ -16,6 +16,10 @@
 
 ---
 
+<p align="center">
+  <video src="https://github.com/deepak-s-git/Echo/raw/main/assets/BetaLaunchGit.mp4" width="800" controls></video>
+</p>
+
 Say hello to **Echo**, a lightweight and privacy-first workflow memory assistant for macOS. Echo automatically records the apps, browser tabs, and windows you focus on. When you're ready to switch back to a task, Echo lets you restore your entire workspace state with a single click.
 
 *No cloud syncing, no accounts, and no data tracking. Everything stays local on your Mac.*
@@ -80,3 +84,11 @@ If you prefer to compile Echo yourself:
 ## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=deepak-s-git/Echo&type=Date)](https://star-history.com/#deepak-s-git/Echo&Date)
+
+---
+
+## 🎵 Credits
+
+Miguel Johnson - 2184 is under a YouTube Free license.  
+https://migueljohnson.bandcamp.com/  
+Music powered by BreakingCopyright: https://www.youtube.com/watch?v=QbqkR5VNaU8

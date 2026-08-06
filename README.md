@@ -16,9 +16,7 @@
 
 ---
 
-<p align="center">
-  <video src="https://github.com/deepak-s-git/Echo/raw/main/assets/BetaLaunchGit.mp4" width="800" controls></video>
-</p>
+https://github.com/deepak-s-git/Echo/raw/main/assets/BetaLaunchGit.mp4
 
 Say hello to **Echo**, a lightweight and privacy-first workflow memory assistant for macOS. Echo automatically records the apps, browser tabs, and windows you focus on. When you're ready to switch back to a task, Echo lets you restore your entire workspace state with a single click.
 

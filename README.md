@@ -16,6 +16,8 @@
 
 ---
 
+[![Echo - Workflow Memory Assistant](https://markdown-videos-api.jorgenkh.no/youtube/Dsvzuw4e3TA)](https://youtu.be/Dsvzuw4e3TA)
+
 Say hello to **Echo**, a lightweight and privacy-first workflow memory assistant for macOS. Echo automatically records the apps, browser tabs, and windows you focus on. When you're ready to switch back to a task, Echo lets you restore your entire workspace state with a single click.
 
 *No cloud syncing, no accounts, and no data tracking. Everything stays local on your Mac.*
